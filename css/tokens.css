@@ -1,0 +1,87 @@
+/* Seminaire : jetons de design. Ambiance studio, sombre, fort contraste.
+   Mobile d'abord : tout se lit et se touche a bout de bras dans une villa
+   mal eclairee, telephone dans une main. */
+
+:root {
+  color-scheme: dark;
+
+  /* ---- fonds, du plus profond au plus proche */
+  --bg:          #0b0c0f;
+  --surface:     #14161b;
+  --surface-2:   #1c1f26;
+  --surface-3:   #252932;
+
+  /* ---- traits */
+  --line:        #2a2f39;
+  --line-strong: #3a4150;
+
+  /* ---- texte */
+  --text:        #e9ebf0;
+  --text-dim:    #a2a9b8;
+  --text-faint:  #6c7484;
+
+  /* ---- accent : ambre de VU-metre, chaud, tres lisible sur noir */
+  --accent:      #ff9142;
+  --accent-dim:  #b85f22;
+  --accent-soft: rgba(255, 145, 66, 0.14);
+
+  /* ---- etats */
+  --ok:          #4ade80;
+  --warn:        #fbbf24;
+  --danger:      #f87171;
+  --live:        #ef4444;
+
+  /* ---- waveform */
+  --wave-idle:   #3a4150;
+  --wave-played: var(--accent);
+  --wave-cursor: #ffffff;
+
+  /* ---- typographie */
+  --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  --fs-xs:  12px;
+  --fs-sm:  13px;
+  --fs-md:  15px;   /* corps : 15px et pas 14, on lit a l'arrache */
+  --fs-lg:  18px;
+  --fs-xl:  22px;
+  --fs-2xl: 28px;
+
+  /* ---- espacements */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 24px;
+  --sp-6: 32px;
+  --sp-7: 48px;
+
+  /* ---- formes */
+  --r-sm: 8px;
+  --r-md: 12px;
+  --r-lg: 18px;
+  --r-pill: 999px;
+
+  /* ---- cible tactile minimale : jamais en dessous */
+  --touch: 48px;
+
+  --shadow: 0 8px 28px rgba(0, 0, 0, 0.55);
+
+  /* ---- encoches et barre de geste iOS */
+  --safe-top:    env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+
+  /* ---- hauteur du lecteur persistant, pour degager le bas des listes */
+  --player-h: 76px;
+}
+
+/* Couleurs par type de fichier : reperage instantane dans une liste
+   de 40 versions, sans avoir a lire les etiquettes. */
+:root {
+  --kind-instru:    #60a5fa;
+  --kind-voix:      #f472b6;
+  --kind-freestyle: #a78bfa;
+  --kind-mix:       #4ade80;
+  --kind-stems:     #fbbf24;
+  --kind-autre:     #94a3b8;
+}

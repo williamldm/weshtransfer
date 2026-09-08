@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Banc d essai waveform</title>
+<link rel="stylesheet" href="../css/app.css?v=1">
+<style>
+  body { padding: 16px; }
+  section { margin-bottom: 28px; }
+  .box { border: 1px solid var(--line); border-radius: var(--r-lg);
+         background: var(--surface); padding: 12px; }
+  pre { color: var(--text-dim); font-size: 12px; white-space: pre-wrap; }
+</style>
+</head>
+<body>
+
+<section>
+  <h2>1. Pics synthetiques</h2>
+  <div class="box"><div class="wave"><canvas id="w1"></canvas></div></div>
+  <pre id="log1">...</pre>
+</section>
+
+<section>
+  <h2>2. Decodage d un vrai WAV genere a la volee</h2>
+  <div class="box"><div class="wave"><canvas id="w2"></canvas></div></div>
+  <pre id="log2">calcul en cours...</pre>
+</section>
+
+<section>
+  <h2>3. Fichier sans pics (zip / trop lourd)</h2>
+  <div class="box"><div class="wave"><canvas id="w3"></canvas></div></div>
+  <pre id="log3">...</pre>
+</section>
+
+<div class="toast-wrap" id="toasts"></div>
+
+<script type="module">
+import { Waveform, formatTime } from "../js/waveform.js";
+import { computePeaks, PEAK_COUNT } from "../js/peaks.js";
+
+const results = [];
+const note = (id, text) => { document.getElementById(id).textContent = text; };
+
+// ---------------------------------------------------------------- 1
+const fake = [];
+for (let i = 0; i < PEAK_COUNT; i++) {
+  const env = Math.sin((i / PEAK_COUNT) * Math.PI * 3) * 0.5 + 0.5;
+  const hit = i % 50 < 3 ? 1 : 0.45;
+  fake.push(Math.round(255 * env * hit));
+}
+const w1 = new Waveform(document.getElementById("w1"), {
+  onSeek: (r, done) => { if (done) note("log1", "seek -> " + (r * 100).toFixed(1) + "%"); }
+});
+w1.setPeaks(fake);
+w1.setProgress(0.42);
+w1.setMarkers([{ atMs: 12000 }, { atMs: 45000 }, { atMs: 83000 }], 120000);
+note("log1", "OK - " + fake.length + " pics, progression 42%, 3 marqueurs, formatTime(83)=" + formatTime(83));
+results.push(["pics synthetiques", true]);
+
+// ---------------------------------------------------------------- 2
+// WAV 16 bits mono synthetise : sinus avec enveloppe, pour verifier
+// tout le chemin decodeAudioData -> downsample -> normalisation.
+function makeWav(seconds, rate) {
+  const n = seconds * rate;
+  const buf = new ArrayBuffer(44 + n * 2);
+  const view = new DataView(buf);
+  const str = (off, s) => { for (let i = 0; i < s.length; i++) view.setUint8(off + i, s.charCodeAt(i)); };
+  str(0, "RIFF"); view.setUint32(4, 36 + n * 2, true); str(8, "WAVE");
+  str(12, "fmt "); view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true); view.setUint16(22, 1, true);
+  view.setUint32(24, rate, true); view.setUint32(28, rate * 2, true);
+  view.setUint16(32, 2, true); view.setUint16(34, 16, true);
+  str(36, "data"); view.setUint32(40, n * 2, true);
+  for (let i = 0; i < n; i++) {
+    const t = i / rate;
+    const env = t < seconds / 2 ? t / (seconds / 2) : 1 - (t - seconds / 2) / (seconds / 2);
+    const v = Math.sin(2 * Math.PI * 220 * t) * env * 0.8;
+    view.setInt16(44 + i * 2, Math.round(v * 32767), true);
+  }
+  return new File([buf], "test.wav", { type: "audio/wav" });
+}
+
+try {
+  const file = makeWav(4, 44100);
+  const t0 = performance.now();
+  const out = await computePeaks(file);
+  const ms = Math.round(performance.now() - t0);
+
+  const w2 = new Waveform(document.getElementById("w2"), { onSeek: () => {} });
+  w2.setPeaks(out.peaks);
+  w2.setProgress(0.5);
+
+  const max = out.peaks ? Math.max(...out.peaks) : -1;
+  const mid = out.peaks ? out.peaks[Math.floor(out.peaks.length / 2)] : -1;
+  const ok = out.peaks && out.peaks.length === PEAK_COUNT && max === 255
+             && mid > 200 && out.duration > 3.9 && out.duration < 4.1;
+
+  note("log2", (ok ? "OK" : "ECHEC") +
+    " - pics=" + (out.peaks ? out.peaks.length : 0) +
+    " max=" + max + " milieu=" + mid +
+    " duree=" + (out.duration ? out.duration.toFixed(2) : "?") + "s" +
+    " skipped=" + out.skipped + " calcul=" + ms + "ms" +
+    " json=" + (out.peaks ? JSON.stringify(out.peaks).length : 0) + " octets");
+  results.push(["decodage wav", !!ok]);
+} catch (err) {
+  note("log2", "ECHEC - " + err.message);
+  results.push(["decodage wav", false]);
+}
+
+// ---------------------------------------------------------------- 3
+try {
+  const zip = new File([new Uint8Array([80, 75, 3, 4, 1, 2, 3])], "stems.zip", { type: "application/zip" });
+  const out = await computePeaks(zip);
+  const w3 = new Waveform(document.getElementById("w3"), { onSeek: () => {} });
+  w3.setPeaks(out.peaks);
+  w3.setProgress(0.3);
+  const ok = out.peaks === null && out.skipped === "decode_failed";
+  note("log3", (ok ? "OK" : "ECHEC") + " - peaks=" + out.peaks + " skipped=" + out.skipped +
+       " (trait sobre attendu, pas de plantage)");
+  results.push(["fichier non decodable", ok]);
+} catch (err) {
+  note("log3", "ECHEC - exception remontee : " + err.message);
+  results.push(["fichier non decodable", false]);
+}
+
+console.log("RESULTATS " + JSON.stringify(results));
+window.__results = results;
+</script>
+</body>
+</html>
