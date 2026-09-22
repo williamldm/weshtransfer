@@ -86,6 +86,7 @@ export class Waveform {
   _bindPointer() {
     const canvas = this.canvas;
     let dragging = false;
+    let before = 0;
 
     const ratioAt = (clientX) => {
       const rect = canvas.getBoundingClientRect();
@@ -94,6 +95,7 @@ export class Waveform {
 
     const down = (e) => {
       dragging = true;
+      before = this.progress;
       canvas.setPointerCapture(e.pointerId);
       const r = ratioAt(e.clientX);
       this.setProgress(r);
@@ -115,16 +117,25 @@ export class Waveform {
       this.onSeek(ratioAt(e.clientX), true);
     };
 
+    // pointercancel = le navigateur a repris la main (le doigt fait defiler
+    // la page). Ce n'est PAS un tap : surtout ne pas lancer la lecture.
+    const cancel = () => {
+      if (!dragging) return;
+      dragging = false;
+      this.progress = before;
+      this.draw();
+    };
+
     canvas.addEventListener("pointerdown", down);
     canvas.addEventListener("pointermove", move);
     canvas.addEventListener("pointerup", up);
-    canvas.addEventListener("pointercancel", up);
+    canvas.addEventListener("pointercancel", cancel);
 
     this._unbind = () => {
       canvas.removeEventListener("pointerdown", down);
       canvas.removeEventListener("pointermove", move);
       canvas.removeEventListener("pointerup", up);
-      canvas.removeEventListener("pointercancel", up);
+      canvas.removeEventListener("pointercancel", cancel);
     };
   }
 

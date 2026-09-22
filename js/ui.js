@@ -1,16 +1,73 @@
-// Briques d'interface partagees : messages, formatage.
+// Briques d'interface partagées : DOM, messages, formatage, feuilles.
+
+import { icon } from "./icons.js?v=2";
+
+// ------------------------------------------------------------------ DOM
+
+export function h(html) {
+  const tpl = document.createElement("template");
+  tpl.innerHTML = html.trim();
+  return tpl.content.firstElementChild;
+}
+
+export function esc(text) {
+  return String(text == null ? "" : text).replace(/[&<>"']/g, (c) => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+  })[c]);
+}
+
+// alias historique
+export const escapeHtml = esc;
+
+// ------------------------------------------------------------- messages
 
 export function toast(message, kind) {
   const wrap = document.getElementById("toasts");
   if (!wrap) return;
-
   const el = document.createElement("div");
-  el.className = kind === "err" ? "toast err" : "toast";
+  el.className = "toast" + (kind === "err" ? " err" : kind === "ok" ? " ok" : "");
   el.textContent = message;
   wrap.appendChild(el);
-
-  setTimeout(() => el.remove(), kind === "err" ? 6000 : 3500);
+  setTimeout(() => el.classList.add("out"), kind === "err" ? 5600 : 3000);
+  setTimeout(() => el.remove(), kind === "err" ? 6000 : 3400);
 }
+
+// Traduit les codes d'erreur du back en français lisible.
+const ERRORS = {
+  CODE_INVALIDE: "Ce code ne correspond à aucun espace.",
+  ESPACE_EXPIRE: "Cet espace a expiré.",
+  ESPACE_VERROUILLE: "Cet espace n'accepte plus de nouveaux arrivants.",
+  PSEUDO_PRIS: "Ce blaze est déjà pris ici, choisis-en un autre.",
+  NON_AUTHENTIFIE: "Connexion impossible, réessaie.",
+  TROP_DE_CONNEXIONS: "Trop de connexions depuis ce réseau, réessaie dans quelques minutes.",
+  NON_MEMBRE: "Tu ne fais plus partie de cet espace.",
+  TITRE_INVALIDE: "Il faut un titre (80 caractères max).",
+  AUCUN_FICHIER: "Choisis au moins un fichier.",
+  TROP_DE_FICHIERS: "100 fichiers maximum par envoi.",
+  FICHIER_INVALIDE: "Un des fichiers n'est plus disponible.",
+  EMAIL_INVALIDE: "Adresse email invalide",
+  TROP_DE_DESTINATAIRES: "20 destinataires maximum par envoi.",
+  QUOTA_EMAILS: "Limite de 200 emails par jour atteinte pour cet espace.",
+  PAS_TON_ENVOI: "Seul l'expéditeur peut faire ça.",
+  ENVOI_EXPIRE: "Cet envoi a expiré.",
+  CHEMIN_INVALIDE: "Chemin de fichier refusé.",
+  RESEAU: "Pas de réseau. Vérifie ta connexion.",
+  CONFIG_MANQUANTE: "L'appli n'est pas encore reliée à Supabase (js/config.js).",
+  CLE_SECRETE_DANS_LE_FRONT: "Clé secrète détectée dans js/config.js : remplace-la par la clé publishable."
+};
+
+export function errorText(err) {
+  const raw = String((err && err.message) || err || "");
+  const match = raw.match(/[A-Z][A-Z_]{4,}/);
+  if (match && ERRORS[match[0]]) {
+    const extra = raw.split(":").slice(1).join(":").trim();
+    return ERRORS[match[0]] + (extra && match[0] === "EMAIL_INVALIDE" ? " : " + extra : "");
+  }
+  if (/Failed to fetch|NetworkError|Load failed/i.test(raw)) return ERRORS.RESEAU;
+  return raw || "Erreur inattendue.";
+}
+
+// ------------------------------------------------------------ formatage
 
 export function formatBytes(bytes) {
   if (!Number.isFinite(bytes) || bytes < 0) return "";
@@ -22,7 +79,16 @@ export function formatBytes(bytes) {
     value /= 1024;
     i++;
   }
-  return (value >= 10 ? Math.round(value) : value.toFixed(1)) + " " + units[i];
+  return (value >= 10 ? Math.round(value) : value.toFixed(1)).toString().replace(".", ",") + " " + units[i];
+}
+
+export function formatDuration(seconds) {
+  if (!Number.isFinite(seconds) || seconds < 0) return "";
+  const s = Math.round(seconds);
+  const hh = Math.floor(s / 3600);
+  const mm = Math.floor((s % 3600) / 60);
+  const ss = String(s % 60).padStart(2, "0");
+  return hh ? hh + ":" + String(mm).padStart(2, "0") + ":" + ss : mm + ":" + ss;
 }
 
 // "il y a 3 min" : en session, savoir si un son date de 2 minutes ou de
@@ -30,19 +96,209 @@ export function formatBytes(bytes) {
 export function timeAgo(iso) {
   const then = new Date(iso).getTime();
   if (!Number.isFinite(then)) return "";
-
   const sec = Math.max(0, (Date.now() - then) / 1000);
-  if (sec < 60) return "a l instant";
-  const min = Math.floor(sec / 60);
+  if (sec < 45) return "à l'instant";
+  const min = Math.round(sec / 60);
   if (min < 60) return "il y a " + min + " min";
-  const hours = Math.floor(min / 60);
+  const hours = Math.round(min / 60);
   if (hours < 24) return "il y a " + hours + " h";
-  const days = Math.floor(hours / 24);
+  const days = Math.round(hours / 24);
   return days === 1 ? "hier" : "il y a " + days + " jours";
 }
 
-export function escapeHtml(text) {
-  return String(text).replace(/[&<>"']/g, (c) => ({
-    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
-  })[c]);
+export function formatDate(iso, withTime) {
+  const d = new Date(iso);
+  if (!Number.isFinite(d.getTime())) return "";
+  const opts = { weekday: "long", day: "numeric", month: "long" };
+  if (withTime) { opts.hour = "2-digit"; opts.minute = "2-digit"; }
+  return new Intl.DateTimeFormat("fr-FR", opts).format(d);
+}
+
+export function daysLeft(iso) {
+  const ms = new Date(iso).getTime() - Date.now();
+  if (ms <= 0) return 0;
+  return Math.ceil(ms / 86400000);
+}
+
+export function plural(n, one, many) {
+  return n + " " + (n > 1 ? many : one);
+}
+
+// ------------------------------------------------------ types de fichier
+
+export const KINDS = [
+  ["instru", "Instru"],
+  ["voix", "Voix"],
+  ["freestyle", "Freestyle"],
+  ["mix", "Mix"],
+  ["stems", "Stems"],
+  ["autre", "Autre"]
+];
+
+export const KIND_LABEL = Object.fromEntries(KINDS);
+
+export function kindBadge(kind) {
+  const k = KIND_LABEL[kind] ? kind : "autre";
+  return '<span class="kind kind-' + k + '">' + KIND_LABEL[k] + "</span>";
+}
+
+// Pastille avec initiale, couleur stable par pseudo.
+export function avatar(pseudo, online) {
+  const name = String(pseudo || "?");
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) | 0;
+  const hue = Math.abs(hash) % 360;
+  return '<span class="avatar' + (online ? " is-online" : "") + '" style="--hue:' + hue + '">' +
+    esc(name.charAt(0).toUpperCase()) + "</span>";
+}
+
+// ------------------------------------------------------- presse-papiers
+
+export async function copyText(text) {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch (err) {
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.setAttribute("readonly", "");
+    ta.style.position = "fixed";
+    ta.style.opacity = "0";
+    document.body.appendChild(ta);
+    ta.select();
+    let ok = false;
+    try { ok = document.execCommand("copy"); } catch (e) { ok = false; }
+    ta.remove();
+    return ok;
+  }
+}
+
+// Feuille de partage native sur mobile (WhatsApp, SMS, AirDrop...),
+// copie du lien ailleurs.
+export async function shareLink(data) {
+  if (navigator.share) {
+    try {
+      await navigator.share(data);
+      return "shared";
+    } catch (err) {
+      if (err && err.name === "AbortError") return "cancel";
+    }
+  }
+  const ok = await copyText(data.url);
+  toast(ok ? "Lien copié" : "Copie impossible", ok ? "ok" : "err");
+  return ok ? "copied" : "fail";
+}
+
+export function canShare() {
+  return typeof navigator.share === "function";
+}
+
+// Déclenche un téléchargement sans quitter la page.
+export function triggerDownload(url, name) {
+  const a = document.createElement("a");
+  a.href = url;
+  if (name) a.download = name;
+  a.rel = "noopener";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+}
+
+// --------------------------------------------------------------- feuilles
+// Panneau qui monte du bas sur mobile, modale centrée sur grand écran.
+
+export function openSheet(opts) {
+  const root = document.getElementById("sheets") || document.body;
+  const el = h(
+    '<div class="sheet-wrap" role="dialog" aria-modal="true">' +
+      '<div class="sheet-backdrop" data-close></div>' +
+      '<div class="sheet">' +
+        '<div class="sheet-grip" aria-hidden="true"></div>' +
+        '<div class="sheet-head"><h2>' + esc(opts.title || "") + '</h2>' +
+        '<button class="btn btn-ghost btn-icon" data-close aria-label="Fermer">' + icon("x") + "</button></div>" +
+        '<div class="sheet-body"></div>' +
+      "</div>" +
+    "</div>"
+  );
+  const body = el.querySelector(".sheet-body");
+  if (typeof opts.body === "string") body.innerHTML = opts.body;
+  else if (opts.body) body.appendChild(opts.body);
+
+  let closed = false;
+  const close = () => {
+    if (closed) return;
+    closed = true;
+    el.classList.remove("is-open");
+    document.removeEventListener("keydown", onKey);
+    setTimeout(() => el.remove(), 220);
+    if (opts.onClose) opts.onClose();
+  };
+  const onKey = (e) => { if (e.key === "Escape") close(); };
+
+  el.addEventListener("click", (e) => {
+    if (e.target.closest("[data-close]")) close();
+  });
+  document.addEventListener("keydown", onKey);
+
+  root.appendChild(el);
+  requestAnimationFrame(() => el.classList.add("is-open"));
+  return { el, body, close };
+}
+
+export function confirmSheet(message, options) {
+  const o = options || {};
+  return new Promise((resolve) => {
+    let answered = false;
+    const body = h(
+      '<div><p class="sheet-text">' + esc(message) + "</p>" +
+      '<div class="sheet-actions">' +
+        '<button class="btn btn-block" data-no>' + esc(o.cancel || "Annuler") + "</button>" +
+        '<button class="btn btn-block ' + (o.danger ? "btn-danger" : "btn-primary") + '" data-yes>' +
+          esc(o.ok || "Confirmer") + "</button>" +
+      "</div></div>"
+    );
+    const sheet = openSheet({
+      title: o.title || "Confirmer",
+      body,
+      onClose: () => { if (!answered) resolve(false); }
+    });
+    body.querySelector("[data-no]").onclick = () => { answered = true; resolve(false); sheet.close(); };
+    body.querySelector("[data-yes]").onclick = () => { answered = true; resolve(true); sheet.close(); };
+  });
+}
+
+// Petite saisie texte dans une feuille (renommer un morceau...).
+export function promptSheet(title, value, options) {
+  const o = options || {};
+  return new Promise((resolve) => {
+    let answered = false;
+    const body = h(
+      '<form><input class="input" maxlength="' + (o.max || 80) + '" value="' + esc(value || "") + '">' +
+      '<div class="sheet-actions"><button class="btn btn-primary btn-block" type="submit">' +
+      esc(o.ok || "Enregistrer") + "</button></div></form>"
+    );
+    const sheet = openSheet({ title, body, onClose: () => { if (!answered) resolve(null); } });
+    const input = body.querySelector("input");
+    setTimeout(() => { input.focus(); input.select(); }, 60);
+    body.addEventListener("submit", (e) => {
+      e.preventDefault();
+      answered = true;
+      resolve(input.value.trim());
+      sheet.close();
+    });
+  });
+}
+
+// Menu d'actions (tap long / bouton "...").
+export function actionSheet(title, actions) {
+  const body = h('<div class="action-list"></div>');
+  const sheet = openSheet({ title, body });
+  for (const a of actions) {
+    if (!a) continue;
+    const btn = h('<button class="action-item' + (a.danger ? " is-danger" : "") + '">' +
+      icon(a.icon || "chevron") + "<span>" + esc(a.label) + "</span></button>");
+    btn.onclick = () => { sheet.close(); a.run(); };
+    body.appendChild(btn);
+  }
+  return sheet;
 }

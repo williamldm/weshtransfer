@@ -34,12 +34,17 @@ grant execute on function is_member(uuid), me(uuid), is_host(uuid) to authentica
 -- anon (pas encore authentifie) n'a acces a rien : tout passe par le JWT anonyme.
 revoke all on table spaces, participants, projects, files, comments from anon;
 
-grant select                         on table spaces       to authenticated;
-grant update                         on table spaces       to authenticated;
-grant select, update                 on table participants to authenticated;
-grant select, insert, update, delete on table projects     to authenticated;
-grant select, insert, update, delete on table files        to authenticated;
-grant select, insert, delete         on table comments     to authenticated;
+-- Les UPDATE sont restreints colonne par colonne : un client ne doit jamais
+-- pouvoir reecrire un space_id, un auteur ou un storage_path apres coup.
+grant select                                       on table spaces       to authenticated;
+grant update (name, is_locked, expires_at, purge_at) on table spaces     to authenticated;
+grant select                                       on table participants to authenticated;
+grant update (pseudo, last_seen_at)                on table participants to authenticated;
+grant select, insert, delete                       on table projects     to authenticated;
+grant update (title, notes, bpm, musical_key, archived) on table projects to authenticated;
+grant select, insert, delete                       on table files        to authenticated;
+grant update (label, kind, bpm, musical_key, peaks, duration_sec) on table files to authenticated;
+grant select, insert, delete                       on table comments     to authenticated;
 
 alter table spaces       enable row level security;
 alter table participants enable row level security;

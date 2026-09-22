@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Banc d'essai page publique</title>
+<link rel="stylesheet" href="../css/app.css?v=2">
+</head>
+<body class="public">
+<!-- Réplique de t.html avec la réponse de l'Edge Function simulée :
+     ?etat=ok | expire | inconnu -->
+<main class="tp">
+  <div class="tp-brand"><span class="brand-mark sm" aria-hidden="true"><i style="height:45%"></i><i style="height:90%"></i><i style="height:60%"></i><i style="height:100%"></i><i style="height:50%"></i></span>Séminaire</div>
+  <div id="tp"><div class="skeleton tall"></div></div>
+</main>
+<div class="toast-wrap" id="toasts"></div>
+<script>
+// WAV synthétique (vrai fichier lisible) pour tester lecture et zip.
+function wav(seconds, freq) {
+  const rate = 22050, n = seconds * rate, buf = new ArrayBuffer(44 + n * 2), v = new DataView(buf);
+  const s = (o, t) => { for (let i = 0; i < t.length; i++) v.setUint8(o + i, t.charCodeAt(i)); };
+  s(0, "RIFF"); v.setUint32(4, 36 + n * 2, true); s(8, "WAVE"); s(12, "fmt "); v.setUint32(16, 16, true);
+  v.setUint16(20, 1, true); v.setUint16(22, 1, true); v.setUint32(24, rate, true); v.setUint32(28, rate * 2, true);
+  v.setUint16(32, 2, true); v.setUint16(34, 16, true); s(36, "data"); v.setUint32(40, n * 2, true);
+  for (let i = 0; i < n; i++) v.setInt16(44 + i * 2, Math.sin(2 * Math.PI * freq * i / rate) * 9000 * (0.4 + 0.6 * Math.abs(Math.sin(i / rate * 2))), true);
+  return URL.createObjectURL(new Blob([buf], { type: "audio/wav" }));
+}
+const pk = (seed) => Array.from({ length: 800 }, (_, i) => Math.round(255 * (0.3 + 0.7 * Math.abs(Math.sin(i / (30 + seed))))));
+const later = new Date(Date.now() + 5 * 86400000).toISOString();
+const a = wav(6, 220), b = wav(4, 330);
+const fixture = {
+  title: "Nuit blanche - mix du jour 2",
+  message: "Voilà le mix d'hier soir,\ndis-moi pour les voix.",
+  sender: "Tom", space: "Villa septembre", expires_at: later, recipient: "inge@studio-exemple.fr",
+  files: [
+    { id: "f1", name: "NUIT_BLANCHE_mix_v2.wav", size: 1058444, kind: "mix", duration: 6, peaks: pk(1), url: a, download_url: a, uploader: "Sofiane" },
+    { id: "f2", name: "couplet2_take3.wav", size: 705644, kind: "voix", duration: 4, peaks: pk(9), url: b, download_url: b, uploader: "Tom" },
+    { id: "f3", name: "stems_nuit_blanche.zip", size: 612e6, kind: "stems", duration: null, peaks: null, url: a, download_url: a, uploader: "Kenza" }
+  ]
+};
+const etat = new URLSearchParams(location.search).get("etat") || "ok";
+window.__calls = [];
+const realFetch = window.fetch;
+window.fetch = async (url, opts) => {
+  if (String(url).includes("/functions/v1/transfer-open")) {
+    const body = JSON.parse(opts.body);
+    window.__calls.push(body);
+    if (body.action === "download") return new Response('{"ok":true}', { status: 200 });
+    if (etat === "expire") return new Response(JSON.stringify({ error: "LIEN_EXPIRE", title: fixture.title, sender: "Tom" }), { status: 410 });
+    if (etat === "inconnu") return new Response('{"error":"LIEN_INCONNU"}', { status: 404 });
+    return new Response(JSON.stringify(fixture), { status: 200 });
+  }
+  return realFetch(url, opts);
+};
+</script>
+<script type="module" src="../js/transfer-page.js?v=2"></script>
+</body>
+</html>

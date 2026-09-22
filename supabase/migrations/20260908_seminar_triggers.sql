@@ -28,6 +28,15 @@ begin
   new.space_id    := v_space;
   new.uploaded_by := coalesce(new.uploaded_by, me(v_space));
 
+  -- Le chemin est impose : spaces/<space>/<project>/<file_id>.<ext>
+  -- Sans ce controle, un membre pourrait declarer un fichier d'un AUTRE
+  -- espace, l'ajouter a un envoi, et le faire signer par transfer-open
+  -- (qui tourne en service_role) : exfiltration via lien public.
+  if new.storage_path not like
+       'spaces/' || v_space || '/' || new.project_id || '/' || new.id || '.%' then
+    raise exception 'CHEMIN_INVALIDE';
+  end if;
+
   if new.version_no is null then
     -- verrou par projet : deux uploads simultanes ne peuvent pas
     -- reserver le meme numero de version.

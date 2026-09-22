@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Banc d'essai des vues</title>
+<link rel="stylesheet" href="../css/app.css?v=2">
+<style>
+  .dev-nav { position: sticky; top: 0; z-index: 99; display: flex; gap: 6px; overflow-x: auto; padding: 8px; background: #000; border-bottom: 1px solid #333; }
+  .dev-nav a { flex: none; padding: 4px 10px; border-radius: 99px; background: #222; color: #ccc; font-size: 12px; }
+  .dev-nav a.on { background: var(--accent); color: #000; }
+</style>
+</head>
+<body>
+<!-- Données fictives, aucun appel réseau vers Supabase : sert à vérifier
+     le rendu et les interactions de chaque écran. -->
+<nav class="dev-nav" id="dev-nav"></nav>
+<header class="app-header" id="header"></header>
+<main class="app-main" id="view"></main>
+<div class="player" id="player"></div>
+<div id="sheets"></div>
+<div class="toast-wrap" id="toasts"></div>
+
+<script type="module">
+import { renderProjects } from "../js/views/home.js?v=2";
+import { renderVersion } from "../js/views/project.js?v=2";
+import { renderFileShell, renderComments } from "../js/views/file.js?v=2";
+import { renderTransfers } from "../js/views/transfers.js?v=2";
+import { renderJob } from "../js/views/uploads.js?v=2";
+import * as send from "../js/views/send.js?v=2";
+import { openPeopleSheet } from "../js/views/people.js?v=2";
+import { openUploadSheet } from "../js/views/upload-sheet.js?v=2";
+import { Waveform } from "../js/waveform.js?v=2";
+import { icon } from "../js/icons.js?v=2";
+
+const view = document.getElementById("view");
+const ago = (min) => new Date(Date.now() - min * 60000).toISOString();
+const later = (days) => new Date(Date.now() + days * 86400000).toISOString();
+
+function peaks(seed, shape) {
+  const out = [];
+  let x = seed;
+  for (let i = 0; i < 800; i++) {
+    x = (x * 9301 + 49297) % 233280;
+    const rnd = x / 233280;
+    const env = shape === "build" ? Math.min(1, i / 500) : 0.55 + 0.45 * Math.sin(i / 60);
+    const hit = i % 40 < 2 ? 1 : 0.5 + rnd * 0.4;
+    out.push(Math.round(255 * env * hit));
+  }
+  return out;
+}
+
+const space = {
+  id: "s1", participantId: "p1", name: "Villa septembre", code: "VILLA7", pseudo: "Tom",
+  isHost: true, isLocked: false, purgeAt: later(12), expiresAt: later(5), maxFileBytes: 3e9
+};
+const ctx = {
+  space, online: new Set(["p1", "p2", "p3"]),
+  bus: { on: () => () => {}, emit() {} },
+  navigate: (h) => { location.hash = h.replace("#/", "#"); },
+  setTitle() {}, setBack() {}
+};
+
+document.getElementById("header").innerHTML =
+  '<span class="brand-dot"></span><div class="title">Villa septembre</div>' +
+  '<span class="up-pill">' + icon("upload", 14) + ' 2</span>' +
+  '<a class="btn btn-ghost btn-icon">' + icon("send") + '</a>' +
+  '<button class="btn btn-ghost btn-icon people-btn">' + icon("users") + '<span class="badge">3</span></button>';
+
+const projects = [
+  { id: "a", title: "Nuit blanche", bpm: 92, musical_key: "Am", last_activity_at: ago(3),
+    files: [{ kind: "instru", status: "ready" }, { kind: "voix", status: "ready" }, { kind: "voix", status: "ready" }, { kind: "mix", status: "ready" }] },
+  { id: "b", title: "Freestyle piscine 02h14", last_activity_at: ago(95),
+    files: [{ kind: "freestyle", status: "ready" }] },
+  { id: "c", title: "Type beat sombre avec un titre vraiment très long pour tester la coupure", bpm: 140, last_activity_at: ago(60 * 26),
+    files: [{ kind: "instru", status: "ready" }, { kind: "stems", status: "ready" }] }
+];
+
+const versions = [
+  { id: "f4", version_no: 4, label: "mix v2 voix devant", kind: "mix", status: "ready", storage_path: "x/4.wav", original_name: "NUIT_BLANCHE_mix_v2.wav",
+    size_bytes: 48e6, duration_sec: 214, peaks: peaks(4), created_at: ago(3), uploaded_by: "p2", uploader: { id: "p2", pseudo: "Sofiane" }, comments: [{ count: 3 }] },
+  { id: "f3", version_no: 3, label: "take 3", kind: "voix", status: "ready", storage_path: "x/3.wav", original_name: "couplet2_take3.wav",
+    size_bytes: 31e6, duration_sec: 188, peaks: peaks(3, "build"), created_at: ago(70), uploaded_by: "p1", uploader: { id: "p1", pseudo: "Tom" }, comments: [{ count: 0 }] },
+  { id: "f2", version_no: 2, label: null, kind: "stems", status: "ready", storage_path: "x/2.zip", original_name: "stems_nuit_blanche.zip",
+    size_bytes: 612e6, duration_sec: null, peaks: null, created_at: ago(300), uploaded_by: "p3", uploader: { id: "p3", pseudo: "Kenza" }, comments: [{ count: 1 }] },
+  { id: "f1", version_no: 1, label: "instru", kind: "instru", status: "ready", storage_path: "x/1.wav", original_name: "prod_92bpm.wav",
+    size_bytes: 52e6, duration_sec: 221, peaks: null, created_at: ago(600), uploaded_by: "p3", uploader: { id: "p3", pseudo: "Kenza" }, comments: [{ count: 0 }] }
+];
+
+const comments = [
+  { id: "c1", body: "La voix est trop en avant ici, baisse de 2 dB", at_ms: 83000, created_at: ago(2), author_id: "p2", author: { pseudo: "Sofiane" } },
+  { id: "c2", body: "Le refrain tape fort, on garde", at_ms: 41500, created_at: ago(9), author_id: "p1", author: { pseudo: "Tom" } },
+  { id: "c3", body: "Globalement c'est lourd, juste la fin à revoir", at_ms: null, created_at: ago(20), author_id: "p3", author: { pseudo: "Kenza" } }
+];
+
+const transfers = [
+  { id: "t1", title: "Nuit blanche - mix du jour 2", message: "Voilà le mix d'hier soir,\ndis-moi pour les voix.", token: "abc",
+    expires_at: later(5), created_at: ago(40), download_count: 2, sender_id: "p1", sender: { pseudo: "Tom" },
+    transfer_files: [{ file: { size_bytes: 48e6 } }, { file: { size_bytes: 31e6 } }],
+    transfer_recipients: [
+      { email: "ingé@studio-exemple.fr", status: "sent", first_opened_at: ago(30), first_download_at: ago(25) },
+      { email: "label@exemple.com", status: "sent", first_opened_at: ago(10), first_download_at: null },
+      { email: "manager@exemple.fr", status: "sent" },
+      { email: "faute@@exemple", status: "failed", error: "Invalid email" }
+    ] },
+  { id: "t2", title: "Freestyle piscine", message: null, token: "def", expires_at: later(1), created_at: ago(200),
+    download_count: 0, sender_id: "p2", sender: { pseudo: "Sofiane" }, transfer_files: [{ file: { size_bytes: 12e6 } }], transfer_recipients: [] },
+  { id: "t3", title: "Premier jet", message: null, token: "ghi", expires_at: ago(60), created_at: ago(60 * 24 * 3),
+    download_count: 5, sender_id: "p1", sender: { pseudo: "Tom" }, transfer_files: [{ file: { size_bytes: 9e6 } }], transfer_recipients: [] }
+];
+
+const jobs = [
+  { id: 1, name: "couplet3_take1.wav", size: 84e6, loaded: 37e6, speed: 2.4e6, state: "uploading" },
+  { id: 2, name: "stems_final.zip", size: 740e6, loaded: 0, state: "queued" },
+  { id: 3, name: "hook.wav", size: 12e6, loaded: 12e6, state: "done" },
+  { id: 4, name: "trop_lourd.wav", size: 90e6, loaded: 0, state: "error", error: "Trop lourd pour la limite de stockage du projet (50 Mo par fichier en plan Free)." }
+];
+
+const colors = () => {
+  const cs = getComputedStyle(document.documentElement);
+  return { idleColor: cs.getPropertyValue("--wave-idle").trim(), playedColor: cs.getPropertyValue("--accent").trim(), markerColor: cs.getPropertyValue("--accent").trim() };
+};
+
+const screens = {
+  home() {
+    view.innerHTML =
+      '<section class="space-card"><div class="space-top"><div><div class="eyebrow">Espace</div><h1>Villa septembre</h1></div>' +
+      '<button class="code-chip"><span class="mono">VILLA7</span>' + icon("share", 16) + "</button></div>" +
+      '<div class="space-meta"><span class="dot-online"></span>3 personnes en ligne · fichiers supprimés dans 12 jours</div></section>' +
+      '<div class="hero-actions"><label class="btn btn-primary btn-xl">' + icon("upload", 22) + '<span>Ajouter des sons</span></label>' +
+      '<a class="btn btn-xl">' + icon("send", 22) + "<span>Envoyer par email</span></a></div>" +
+      '<div class="section-head"><h2>Uploads</h2></div><div class="jobs">' + jobs.map(renderJob).join("") + "</div>" +
+      '<div class="section-head"><h2>Morceaux</h2><button class="btn btn-ghost btn-sm">' + icon("plus", 16) + " Nouveau</button></div>" +
+      renderProjects(projects) +
+      '<a class="link-row">' + icon("mail", 18) + "<span>Envois par email et liens</span>" + icon("chevron", 18) + "</a>";
+  },
+  empty() {
+    view.innerHTML = renderProjects([]);
+  },
+  project() {
+    view.innerHTML =
+      '<header class="page-head"><div class="eyebrow">Morceau</div><h1 class="editable">Nuit blanche' + icon("edit", 16) + "</h1>" +
+      '<div class="meta">4 versions · 92 BPM · Am · créé par Kenza</div></header>' +
+      '<div class="actions-row"><label class="btn btn-primary">' + icon("plus", 18) + "<span>Nouvelle version</span></label>" +
+      '<a class="btn">' + icon("send", 18) + '<span>Envoyer</span></a><button class="btn">' + icon("download", 18) + "<span>Tout (zip)</span></button>" +
+      '<button class="btn btn-ghost btn-icon">' + icon("more") + "</button></div>" +
+      '<div class="versions">' + versions.map((f) => renderVersion(f, "p1")).join("") + "</div>";
+    for (const f of versions) {
+      const c = view.querySelector('.version[data-id="' + f.id + '"] canvas');
+      if (!c) continue;
+      const w = new Waveform(c, Object.assign(colors(), { barWidth: 2, barGap: 1, onSeek: () => {} }));
+      w.setPeaks(f.peaks);
+      if (f.id === "f4") w.setProgress(0.36);
+    }
+    view.querySelector('.version[data-id="f4"]').classList.add("is-current");
+  },
+  file() {
+    const file = Object.assign({}, versions[0], {
+      project: { id: "a", title: "Nuit blanche", files: versions.map((v) => ({ id: v.id, version_no: v.version_no, label: v.label, status: "ready" })) },
+      bpm: 92, musical_key: "Am"
+    });
+    view.innerHTML = renderFileShell(file, space);
+    view.querySelector("[data-comments]").innerHTML = renderComments(comments, "p1", false);
+    view.querySelector("[data-ccount]").textContent = comments.length;
+    view.querySelector("[data-timechip] span").textContent = "à 1:17";
+    view.querySelector("[data-time]").textContent = "1:17";
+    view.querySelector("[data-toggle]").innerHTML = icon("pause", 30);
+    const w = new Waveform(view.querySelector(".wave canvas"), Object.assign(colors(), { onSeek: () => {} }));
+    w.setPeaks(file.peaks);
+    w.setProgress(77 / 214);
+    w.setMarkers(comments.filter((c) => c.at_ms != null).map((c) => ({ atMs: c.at_ms })), 214000);
+  },
+  async send() {
+    await send.mount(view, ctx, { query: new URLSearchParams() });
+    // simule une sélection
+    const box = view.querySelector("[data-email]");
+    box.value = "inge@studio-exemple.fr label@exemple.com pas-un-email";
+    box.dispatchEvent(new Event("blur"));
+  },
+  async done() {
+    await send.showDone(view, ctx, { id: "t1", token: "0123456789abcdef0123456789abcdef", expires_at: later(7) },
+      { emailOn: false, results: [], title: "Nuit blanche - mix du jour 2" });
+  },
+  transfers() {
+    view.innerHTML = '<header class="page-head"><div class="eyebrow">Espace Villa septembre</div><h1>Envois</h1></header>' +
+      '<a class="btn btn-primary btn-block">' + icon("send", 18) + " Nouvel envoi</a>" +
+      '<div class="transfers">' + renderTransfers(transfers, "p1", false, true) + "</div>";
+  },
+  async upload() {
+    screens.home();
+    const f = (name, size) => new File([new Uint8Array(8)], name, { type: "audio/wav" });
+    const files = [f("NUIT_BLANCHE_voix_take3_92bpm.wav"), f("NUIT_BLANCHE_voix_take4.wav"), f("notes.txt")];
+    Object.defineProperty(files[0], "size", { value: 41e6 });
+    Object.defineProperty(files[1], "size", { value: 39e6 });
+    await openUploadSheet(ctx, files, { onQueued() {} });
+  },
+  async people() {
+    screens.home();
+    await openPeopleSheet(ctx);
+  },
+  player() {
+    screens.project();
+    const bar = document.getElementById("player");
+    bar.innerHTML = '<div class="player-progress"><i style="width:36%"></i></div>' +
+      '<button class="player-play">' + icon("pause", 22) + "</button>" +
+      '<button class="player-info"><span class="t">Nuit blanche · v4 mix v2 voix devant</span><span class="s">Sofiane <span class="mono">1:17 / 3:34</span></span></button>' +
+      '<button class="btn btn-ghost btn-icon">' + icon("x") + "</button>";
+    bar.classList.add("is-open");
+    document.body.classList.add("has-player");
+  }
+};
+
+const nav = document.getElementById("dev-nav");
+nav.innerHTML = Object.keys(screens).map((k) => '<a href="#' + k + '" data-k="' + k + '">' + k + "</a>").join("");
+
+async function show() {
+  const k = location.hash.slice(1) || "home";
+  document.getElementById("sheets").innerHTML = "";
+  document.getElementById("player").classList.remove("is-open");
+  document.body.classList.remove("has-player");
+  for (const a of nav.children) a.classList.toggle("on", a.dataset.k === k);
+  await (screens[k] || screens.home)();
+  window.__ready = k;
+}
+window.addEventListener("hashchange", show);
+show();
+</script>
+</body>
+</html>

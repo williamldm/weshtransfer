@@ -4,10 +4,13 @@
 -- Prive : aucune lecture publique, tout passe par des URLs signees.
 -- allowed_mime_types volontairement NULL : sur mobile, un .m4a ou un .aiff
 -- arrive souvent en application/octet-stream et serait rejete a tort.
--- Le filtrage se fait a l'extension cote client + file_size_limit ici.
+-- Le filtrage se fait a l'extension cote client.
+-- file_size_limit NULL : le bucket herite du plafond global du projet
+-- (Storage > Settings). En plan Free ce plafond est de 50 Mo par fichier,
+-- il faut le relever en plan Pro pour les WAV et les stems.
 insert into storage.buckets (id, name, public, file_size_limit)
-values ('seminar', 'seminar', false, 3221225472)
-on conflict (id) do update set file_size_limit = excluded.file_size_limit;
+values ('seminar', 'seminar', false, null)
+on conflict (id) do nothing;
 
 -- Chemin : spaces/<space_id>/<project_id>/<file_id>.<ext>
 -- foldername(name) => {spaces, <space_id>, <project_id>} donc [2] = space_id.
