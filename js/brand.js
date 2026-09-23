@@ -1,26 +1,17 @@
-// Identité WeshTransfer : monogramme (le W aux trois cheminées fumantes)
-// et logotype "Wesh" en violet + "Transfer", en Outfit grasse.
-// Tracé repris tel quel du canevas de l'identité.
+// Identité WeshTransfer : monogramme (ligature W + T, la barre du T se
+// termine en flèche de transfert) et logotype "Wesh" en violet +
+// "Transfer", en Outfit grasse. Tracé repris du canevas de l'identité
+// (piste A, "flèche de transfert").
 
 const MARK_PATHS =
-  '<path d="M20 6 C 11 -2, 30 -9, 21 -19" stroke="#8B6CF0" stroke-width="3" fill="none" stroke-linecap="round" opacity="0.45"/>' +
-  '<path d="M70 6 C 58 0, 82 -6, 70 -13 L 70 -25" stroke="#EEE9F5" stroke-width="6.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>' +
-  '<polygon points="70,-44 55,-19 85,-19" fill="#EEE9F5"/>' +
-  '<path d="M120 6 C 111 -2, 130 -9, 121 -19" stroke="#8B6CF0" stroke-width="3" fill="none" stroke-linecap="round" opacity="0.45"/>' +
-  '<polyline points="20,12 20,50 45,130 70,50 95,130 120,50 120,12" fill="none" stroke="#EEE9F5" stroke-width="12" stroke-linejoin="miter"/>' +
-  '<line x1="70" y1="12" x2="70" y2="54" stroke="#EEE9F5" stroke-width="12"/>' +
-  '<rect x="11" y="8" width="18" height="5" fill="#EEE9F5"/>' +
-  '<rect x="61" y="8" width="18" height="5" fill="#EEE9F5"/>' +
-  '<rect x="111" y="8" width="18" height="5" fill="#EEE9F5"/>' +
-  '<rect x="14" y="22" width="12" height="4" fill="#8B6CF0"/>' +
-  '<rect x="64" y="22" width="12" height="4" fill="#8B6CF0"/>' +
-  '<rect x="114" y="22" width="12" height="4" fill="#8B6CF0"/>';
+  '<path d="M135.733 84.8 125.733 84.933 146.8 0H183.2L155.067 100H110.8L84.933 18.8H98.267L72.4 100H28.133L0 0H36.533L57.6 84.8L47.6 84.667L73.6 0H109.6Z" fill="#A48BFF"/>' +
+  '<path d="M200.048 14.8H234.448V100H200.048ZM164.048 0H258V30.667H164.048ZM256 -15L292 15.333L256 45.667Z" fill="#ECEAF0"/>';
 
-// hauteur en px ; le monogramme est plus haut que large (140 x 204)
+// Le monogramme est large : 294 x 118 unités. On le dimensionne par sa hauteur.
 export function monogram(height) {
-  const h = height || 28;
-  const w = Math.round((h * 140) / 204);
-  return '<svg class="monogram" width="' + w + '" height="' + h + '" viewBox="0 -46 140 204" aria-hidden="true">' + MARK_PATHS + "</svg>";
+  const h = height || 20;
+  const w = Math.round((h * 294) / 118);
+  return '<svg class="monogram" width="' + w + '" height="' + h + '" viewBox="0 -16 294 118" aria-hidden="true">' + MARK_PATHS + "</svg>";
 }
 
 export function wordmark() {

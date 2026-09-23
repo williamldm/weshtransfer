@@ -3,10 +3,10 @@
 // les espaces déjà ouverts sur cet appareil (ouvrir, oublier, supprimer).
 // session.js / api.js ne sont chargés qu'au moment d'agir.
 
-import { icon } from "./icons.js?v=24";
-import { esc, h, errorText, formatBytes, plural, actionSheet, confirmSheet, toast } from "./ui.js?v=24";
-import { isBlocked } from "./files.js?v=24";
-import { putPending, MAX_BYTES } from "./pending.js?v=24";
+import { icon } from "./icons.js?v=27";
+import { esc, h, errorText, formatBytes, plural, actionSheet, confirmSheet, toast } from "./ui.js?v=27";
+import { isBlocked } from "./files.js?v=27";
+import { putPending, MAX_BYTES } from "./pending.js?v=27";
 
 const PSEUDO_KEY = "seminaire.pseudo";
 const MODE_LABEL = { envoi: "Envois", seminaire: "Salon", revue: "Retours" };
@@ -172,7 +172,7 @@ function spaceMenu(k) {
     {
       label: "Oublier sur cet appareil", icon: "logout",
       run: async () => {
-        const session = await import("./session.js?v=24");
+        const session = await import("./session.js?v=27");
         session.forgetSpace(k.id);
         toast("\"" + k.name + "\" n'apparaît plus ici. Rien n'a été supprimé.", "ok");
         drawSpacesLink();
@@ -187,9 +187,9 @@ function spaceMenu(k) {
           { ok: "Tout supprimer", danger: true, title: "Supprimer l'espace" });
         if (!ok) return;
         try {
-          const session = await import("./session.js?v=24");
+          const session = await import("./session.js?v=27");
           await session.ensureAuth();
-          const api = await import("./api.js?v=24");
+          const api = await import("./api.js?v=27");
           await api.deleteSpace(k.id);
           session.forgetSpace(k.id);
           toast("\"" + k.name + "\" a été supprimé.", "ok");
@@ -235,7 +235,7 @@ deck.addEventListener("submit", async (e) => {
     }
     if (mine) { goTo(mine); return; }
 
-    const session = await import("./session.js?v=24");
+    const session = await import("./session.js?v=27");
     if (kind === "join") await session.joinSpace(val("code"), pseudo);
     else if (kind === "salon") await session.createSpace(val("name"), "seminaire", pseudo);
     else if (kind === "revue") await session.createSpace(val("project"), "revue", pseudo);
