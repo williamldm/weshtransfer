@@ -8,7 +8,7 @@
 
 import { admin, callerId } from "../_shared/supabase.ts";
 import { json, preflight, readJson } from "../_shared/http.ts";
-import { mailConfig, sendBatch, transferLink, transferMail, type OutgoingEmail } from "../_shared/email.ts";
+import { mailConfig, sendEmails, transferLink, transferMail, type OutgoingEmail } from "../_shared/email.ts";
 
 type TransferRow = {
   id: string;
@@ -19,11 +19,6 @@ type TransferRow = {
   sender: { pseudo: string; user_id: string } | null;
   space: { name: string } | null;
 };
-
-async function sha256(text: string): Promise<string> {
-  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
-  return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
-}
 
 Deno.serve(async (req) => {
   const early = preflight(req);
@@ -97,8 +92,7 @@ Deno.serve(async (req) => {
       canReply: !!transfer.reply_to,
     });
     return {
-      from: cfg.from,
-      to: [r.email],
+      to: r.email,
       subject: mail.subject,
       html: mail.html,
       text: mail.text,
@@ -106,27 +100,23 @@ Deno.serve(async (req) => {
     };
   });
 
-  // Un double clic ou une relance reseau ne doit pas envoyer deux fois.
-  const key = await sha256(transfer.id + ":" + recipients.map((r) => r.id).join(","));
-  const result = await sendBatch(cfg, emails, key);
+  const results = await sendEmails(cfg, emails);
   const now = new Date().toISOString();
 
-  if (result.ok) {
-    await db.from("transfer_recipients")
-      .update({ status: "sent", sent_at: now, error: null })
-      .in("id", recipients.map((r) => r.id));
-  } else {
-    await db.from("transfer_recipients")
-      .update({ status: "failed", error: result.error.slice(0, 500) })
-      .in("id", recipients.map((r) => r.id));
-  }
+  await Promise.all(recipients.map((r, n) => {
+    const res = results[n];
+    return db.from("transfer_recipients")
+      .update(res.ok
+        ? { status: "sent", sent_at: now, error: null }
+        : { status: "failed", error: res.error.slice(0, 500) })
+      .eq("id", r.id);
+  }));
 
   return json({
     email_enabled: true,
-    results: recipients.map((r) => ({
-      email: r.email,
-      status: result.ok ? "sent" : "failed",
-      error: result.ok ? null : result.error,
-    })),
+    results: recipients.map((r, n) => {
+      const res = results[n];
+      return { email: r.email, status: res.ok ? "sent" : "failed", error: res.ok ? null : res.error };
+    }),
   });
 });

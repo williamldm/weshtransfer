@@ -78,13 +78,12 @@ Mise en place (interface web B2) :
 
        supabase functions deploy storage send-transfer transfer-open purge-spaces --no-verify-jwt --use-api
 
-5. **Emails** (facultatif, sinon mode lien) : compte Resend + domaine vérifié.
+5. **Emails** (facultatif, sinon mode lien) : compte Brevo, domaine
+   `weshtransfer.fr` authentifié (Brevo > Expéditeurs, domaines et IP
+   dédiées > Domaines : enregistrements DKIM, DMARC et code Brevo à ajouter
+   dans la zone DNS chez o2switch), expéditeur `envoi@weshtransfer.fr`.
 
-       supabase secrets set RESEND_API_KEY=re_... MAIL_FROM="WeshTransfer <envoi@weshtransfer.fr>" SITE_URL=https://weshtransfer.fr
-
-   Resend demande d'ajouter quelques enregistrements DNS (DKIM, SPF d'un
-   sous-domaine d'envoi) : ils se posent dans la zone DNS chez o2switch, sans
-   toucher à la messagerie existante du domaine.
+       supabase secrets set BREVO_API_KEY=xkeysib-... MAIL_FROM="WeshTransfer <envoi@weshtransfer.fr>" SITE_URL=https://weshtransfer.fr
 
 6. **Purge quotidienne** : un même secret, jamais versionné, à deux endroits :
 

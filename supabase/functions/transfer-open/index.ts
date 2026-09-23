@@ -9,7 +9,7 @@
 
 import { admin } from "../_shared/supabase.ts";
 import { json, preflight, readJson } from "../_shared/http.ts";
-import { downloadNoticeMail, mailConfig, sendBatch } from "../_shared/email.ts";
+import { downloadNoticeMail, mailConfig, sendEmails } from "../_shared/email.ts";
 import { b2Config, presignGet } from "../_shared/b2.ts";
 
 const URL_TTL = 6 * 3600;
@@ -83,9 +83,8 @@ Deno.serve(async (req) => {
         title: transfer.title,
         spaceName: transfer.space?.name ?? "",
       });
-      await sendBatch(cfg, [{
-        from: cfg.from,
-        to: [transfer.reply_to],
+      await sendEmails(cfg, [{
+        to: transfer.reply_to,
         subject: mail.subject,
         html: mail.html,
         text: mail.text,

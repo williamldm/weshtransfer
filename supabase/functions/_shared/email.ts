@@ -1,18 +1,25 @@
-// Emails transactionnels via Resend (https://resend.com).
+// Emails transactionnels via Brevo (https://www.brevo.com), API HTTP.
 //
 // Trois secrets a definir (supabase secrets set ...) :
-//   RESEND_API_KEY  cle API Resend (re_...)
-//   MAIL_FROM       expediteur sur un domaine verifie chez Resend,
-//                   ex. "Seminaire <envoi@mondomaine.fr>"
-//   SITE_URL        adresse publique du site, ex. https://sons.mondomaine.fr
+//   BREVO_API_KEY   cle API Brevo (xkeysib-...), SMTP & API > Cles API
+//   MAIL_FROM       expediteur sur un domaine authentifie chez Brevo,
+//                   ex. "WeshTransfer <envoi@weshtransfer.fr>"
+//   SITE_URL        adresse publique du site, ex. https://weshtransfer.fr
 // Tant que l'un manque, l'envoi par email est desactive et l'appli bascule
 // sur le partage de lien : rien ne casse.
 
-export type MailConfig = { key: string; from: string; site: string };
+export type MailConfig = { key: string; from: { name?: string; email: string }; site: string };
+
+// "Nom <adresse>" ou "adresse" seule
+function parseFrom(raw: string): { name?: string; email: string } | null {
+  const m = raw.trim().match(/^(?:"?([^"<]*?)"?\s*<([^>\s]+@[^>\s]+)>|([^<>\s]+@[^<>\s]+))$/);
+  if (!m) return null;
+  return m[3] ? { email: m[3] } : { name: m[1] || undefined, email: m[2] };
+}
 
 export function mailConfig(): MailConfig | null {
-  const key = Deno.env.get("RESEND_API_KEY");
-  const from = Deno.env.get("MAIL_FROM");
+  const key = Deno.env.get("BREVO_API_KEY");
+  const from = parseFrom(Deno.env.get("MAIL_FROM") ?? "");
   const site = Deno.env.get("SITE_URL");
   if (!key || !from || !site) return null;
   return { key, from, site: site.replace(/\/+$/, "") };
@@ -23,42 +30,43 @@ export function transferLink(site: string, token: string): string {
 }
 
 export type OutgoingEmail = {
-  from: string;
-  to: string[];
+  to: string;
   subject: string;
   html: string;
   text: string;
   reply_to?: string;
 };
 
-export async function sendBatch(
-  cfg: MailConfig,
-  emails: OutgoingEmail[],
-  idempotencyKey?: string,
-): Promise<{ ok: true; ids: string[] } | { ok: false; error: string }> {
-  const headers: Record<string, string> = {
-    Authorization: `Bearer ${cfg.key}`,
-    "Content-Type": "application/json",
-  };
-  if (idempotencyKey) headers["Idempotency-Key"] = idempotencyKey;
+export type SendResult = { ok: true; id: string | null } | { ok: false; error: string };
 
+// Un appel par destinataire (chacun a son lien personnel), en parallele :
+// un echec n'empeche pas les autres de partir.
+export function sendEmails(cfg: MailConfig, emails: OutgoingEmail[]): Promise<SendResult[]> {
+  return Promise.all(emails.map((e) => sendOne(cfg, e)));
+}
+
+async function sendOne(cfg: MailConfig, e: OutgoingEmail): Promise<SendResult> {
   let res: Response;
   try {
-    res = await fetch("https://api.resend.com/emails/batch", {
+    res = await fetch("https://api.brevo.com/v3/smtp/email", {
       method: "POST",
-      headers,
-      body: JSON.stringify(emails),
+      headers: { "api-key": cfg.key, "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({
+        sender: cfg.from,
+        to: [{ email: e.to }],
+        subject: e.subject,
+        htmlContent: e.html,
+        textContent: e.text,
+        ...(e.reply_to ? { replyTo: { email: e.reply_to } } : {}),
+        tags: ["weshtransfer"],
+      }),
     });
   } catch (err) {
-    return { ok: false, error: `Resend injoignable : ${(err as Error).message}` };
+    return { ok: false, error: `Brevo injoignable : ${(err as Error).message}` };
   }
-
-  const body = await res.json().catch(() => ({})) as {
-    data?: { id: string }[];
-    message?: string;
-  };
-  if (!res.ok) return { ok: false, error: body.message ?? `Resend HTTP ${res.status}` };
-  return { ok: true, ids: (body.data ?? []).map((d) => d.id) };
+  const body = await res.json().catch(() => ({})) as { messageId?: string; message?: string; code?: string };
+  if (!res.ok) return { ok: false, error: body.message ?? body.code ?? `Brevo HTTP ${res.status}` };
+  return { ok: true, id: body.messageId ?? null };
 }
 
 // ------------------------------------------------------------ formatage
