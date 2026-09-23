@@ -1,7 +1,7 @@
 // Briques d'interface partagées : DOM, messages, formatage, feuilles.
 
-import { icon } from "./icons.js?v=30";
-import { CATEGORY, categoryOf, extOf } from "./files.js?v=30";
+import { icon } from "./icons.js?v=31";
+import { CATEGORY, categoryOf, extOf } from "./files.js?v=31";
 
 // ------------------------------------------------------------------ DOM
 
@@ -61,6 +61,18 @@ const ERRORS = {
   TROP_DE_CODES: "Trop de codes demandés. Réessaie dans une heure.",
   ENVOI_CODE_ECHEC: "Le code n'a pas pu partir. Vérifie l'adresse et réessaie.",
   CODE_FAUX: "Ce n'est pas le bon code.",
+  TROP_D_ESSAIS_CODE: "Trop de codes essayés. Réessaie dans une heure.",
+  DUREE_MAX: "Un espace vit 60 jours au plus, prolongations comprises.",
+  ESPACE_PLEIN: "Cet espace a atteint sa taille maximale.",
+  TROP_RAPIDE: "Doucement : réessaie dans une minute.",
+  QUOTA_ENVOIS: "100 envois par jour et par espace, c'est la limite.",
+  QUOTA_UPLOAD_JOUR: "Tu as déjà envoyé beaucoup de fichiers aujourd'hui. Réessaie demain.",
+  QUOTA_ESPACE: "Cet espace est plein. Supprime des fichiers ou crée un autre espace.",
+  QUOTA_GLOBAL: "La centrale est en surchauffe : trop de fichiers aujourd'hui. Réessaie demain.",
+  TROP_D_UPLOADS: "Trop d'uploads en même temps. Attends que les premiers finissent.",
+  TAILLE_INCOHERENTE: "Le fichier reçu ne correspond pas à l'original. Réessaie.",
+  UPLOAD_INCONNU: "Upload introuvable ou expiré. Réessaie.",
+  QUOTA_EMAILS_JOUR: "Tu as atteint la limite d'emails pour aujourd'hui. Partage le lien à la place.",
   CODE_EXPIRE: "Ce code a expiré. Demande-en un nouveau.",
   TROP_D_ESSAIS: "Trop d'essais. Demande un nouveau code.",
   ENVOI_EXPIRE: "Cet envoi a expiré.",

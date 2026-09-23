@@ -160,7 +160,7 @@ function tidy(parts) {
 
 // ------------------------------------------------------------- l'envoi
 
-// input : { site, to?, sender, title, message, files: [{ name, kind, size }],
+// input : { site, to?, sender, senderEmail?, title, message, files: [{ name, kind, size }],
 //           link, expiresAt, canReply }
 export function transferMail(input) {
   const site = input.site;
@@ -198,7 +198,9 @@ export function transferMail(input) {
   const body =
     eyebrow(`${esc(countLabel)} · ${esc(formatBytes(total))}`) +
     heading(esc(input.title)) +
-    para(`<strong style="color:${C.text};font-weight:600;">${esc(input.sender)}</strong> t'a envoyé ${count > 1 ? "des fichiers" : "un fichier"}. Écoute avant de télécharger, sans compte.`) +
+    para(`<strong style="color:${C.text};font-weight:600;">${esc(input.sender)}</strong>` +
+      (input.senderEmail ? ` <span style="color:${C.faint};">(${esc(input.senderEmail)}, adresse vérifiée)</span>` : "") +
+      ` t'a envoyé ${count > 1 ? "des fichiers" : "un fichier"}. Écoute avant de télécharger, sans compte.`) +
     message +
     button(input.link, "Écouter et télécharger&nbsp;&rarr;") +
     small(`Disponible jusqu'au ${esc(until)}. Après, on libère la place pour la prochaine fournée de charbon.`) +
@@ -212,7 +214,7 @@ export function transferMail(input) {
   const html = layout({ site, title: subject, preheader, body, footer });
 
   const text = tidy([
-    `${input.sender} t'a envoyé ${countLabel} : ${input.title}`,
+    `${input.sender}${input.senderEmail ? " (" + input.senderEmail + ", adresse vérifiée)" : ""} t'a envoyé ${countLabel} : ${input.title}`,
     "",
     input.message && input.message.trim() ? input.message.trim() + "\n" : "",
     ...shown.map((f) => `- ${f.name} (${typeLabel(f.name, f.kind)}${f.size ? ", " + formatBytes(f.size) : ""})`),

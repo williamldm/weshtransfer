@@ -58,6 +58,26 @@ Deno.serve(async (req) => {
   if (!transfer.reply_to) return json({ error: "EMAIL_EXPEDITEUR_REQUIS" }, 400);
   if (!await isVerified(db, uid, transfer.reply_to)) return json({ error: "EMAIL_NON_VERIFIE" }, 403);
 
+  // Plafonds quotidiens : par expéditeur (une adresse vérifiée ne sert pas
+  // à arroser), et pour tout le site (le quota du fournisseur d'envoi est
+  // partagé, codes de vérification compris).
+  const since = new Date(Date.now() - 86400e3).toISOString();
+  const [{ count: bySender }, { count: sentAll }, { count: codesAll }, { count: pending }] = await Promise.all([
+    db.from("transfer_recipients").select("id, transfers!inner(reply_to)", { count: "exact", head: true })
+      .eq("status", "sent").gte("sent_at", since).eq("transfers.reply_to", transfer.reply_to),
+    db.from("transfer_recipients").select("id", { count: "exact", head: true })
+      .eq("status", "sent").gte("sent_at", since),
+    db.from("email_codes").select("id", { count: "exact", head: true }).gte("created_at", since),
+    db.from("transfer_recipients").select("id", { count: "exact", head: true })
+      .eq("transfer_id", transfer.id).eq("status", "pending"),
+  ]);
+  const wanted = pending ?? 0;
+  const senderMax = Number(Deno.env.get("MAIL_SENDER_DAY") || 60);
+  const globalMax = Number(Deno.env.get("MAIL_GLOBAL_DAY") || (cfg.smtp ? 800 : 280));
+  if ((bySender ?? 0) + wanted > senderMax || (sentAll ?? 0) + (codesAll ?? 0) + wanted > globalMax) {
+    return json({ error: "QUOTA_EMAILS_JOUR" }, 429);
+  }
+
   if (body.retry) {
     await db.from("transfer_recipients")
       .update({ status: "pending", error: null })
@@ -92,6 +112,7 @@ Deno.serve(async (req) => {
       site: cfg.site,
       to: r.email,
       sender,
+      senderEmail: transfer.reply_to,
       title: transfer.title,
       message: transfer.message,
       files,

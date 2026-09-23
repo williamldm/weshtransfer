@@ -86,12 +86,21 @@ export async function createMultipart(b2: B2, key: string, contentType: string):
   return id;
 }
 
-export async function presignPart(b2: B2, key: string, uploadId: string, part: number, expires: number): Promise<string> {
+// La taille de la partie est signée (Content-Length dans les en-têtes
+// signés) : l'URL n'accepte que ce nombre exact d'octets. Sans ça, une URL
+// de partie accepterait jusqu'à 5 Go, quelle que soit la taille annoncée.
+export async function presignPart(
+  b2: B2, key: string, uploadId: string, part: number, expires: number, length: number,
+): Promise<string> {
   const url = objectUrl(b2, key);
   url.searchParams.set("partNumber", String(part));
   url.searchParams.set("uploadId", uploadId);
   url.searchParams.set("X-Amz-Expires", String(expires));
-  const signed = await b2.aws.sign(url.toString(), { method: "PUT", aws: { signQuery: true } });
+  const signed = await b2.aws.sign(url.toString(), {
+    method: "PUT",
+    headers: { "Content-Length": String(length) },
+    aws: { signQuery: true, allHeaders: true },
+  });
   return signed.url;
 }
 

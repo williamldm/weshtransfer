@@ -5,8 +5,9 @@
 // POST { action: "confirm", email, code }  -> { verified } ou erreur
 //
 // Rattaché à la session anonyme de l'appelant (un appareil). Limites :
-// 5 codes par heure et par appareil, 8 par jour et par adresse (sinon ce
-// serait un moyen d'inonder la boîte de quelqu'un), 5 essais par code,
+// 5 codes par heure et par appareil, 10 par heure et par IP, 8 par jour
+// et par adresse (sinon ce serait un moyen d'inonder la boîte de
+// quelqu'un), 100 par heure pour tout le site, 5 essais par code,
 // 15 minutes de validité. Déployée avec --no-verify-jwt : l'appelant est
 // identifié ici via son JWT.
 
@@ -32,6 +33,12 @@ function newCode(): string {
 
 const hashOf = (uid: string, email: string, code: string) => sha256(`${uid}:${email}:${code}`);
 
+function clientIp(req: Request): string {
+  return req.headers.get("cf-connecting-ip")
+    || (req.headers.get("x-forwarded-for") ?? "").split(",")[0].trim()
+    || "inconnue";
+}
+
 Deno.serve(async (req) => {
   const early = preflight(req);
   if (early) return early;
@@ -54,11 +61,16 @@ Deno.serve(async (req) => {
   if (body.action === "request") {
     const hourAgo = new Date(Date.now() - 3600e3).toISOString();
     const dayAgo = new Date(Date.now() - 86400e3).toISOString();
-    const [{ count: mine }, { count: forEmail }] = await Promise.all([
+    const ip = await sha256("wt:" + clientIp(req));
+    const [{ count: mine }, { count: forEmail }, { count: fromIp }, { count: all }] = await Promise.all([
       db.from("email_codes").select("id", { count: "exact", head: true }).eq("user_id", uid).gte("created_at", hourAgo),
       db.from("email_codes").select("id", { count: "exact", head: true }).eq("email", email).gte("created_at", dayAgo),
+      db.from("email_codes").select("id", { count: "exact", head: true }).eq("ip_hash", ip).gte("created_at", hourAgo),
+      db.from("email_codes").select("id", { count: "exact", head: true }).gte("created_at", hourAgo),
     ]);
-    if ((mine ?? 0) >= 5 || (forEmail ?? 0) >= 8) return json({ error: "TROP_DE_CODES" }, 429);
+    if ((mine ?? 0) >= 5 || (forEmail ?? 0) >= 8 || (fromIp ?? 0) >= 10 || (all ?? 0) >= 100) {
+      return json({ error: "TROP_DE_CODES" }, 429);
+    }
 
     // ménage : les codes de plus d'un jour ne servent plus qu'aux limites
     await db.from("email_codes").delete().lt("created_at", dayAgo);
@@ -71,6 +83,7 @@ Deno.serve(async (req) => {
     const { data: row, error } = await db.from("email_codes").insert({
       user_id: uid,
       email,
+      ip_hash: ip,
       code_hash: await hashOf(uid, email, code),
       expires_at: new Date(Date.now() + MINUTES * 60e3).toISOString(),
     }).select("id").single();

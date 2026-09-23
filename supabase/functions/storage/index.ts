@@ -33,6 +33,39 @@ const BLOCKED = ["exe", "msi", "bat", "cmd", "com", "scr", "pif", "cpl", "dll", 
   "jar", "apk", "app", "dmg", "pkg", "sh", "command"];
 const KEY = /^spaces\/([0-9a-f-]{36})\/([0-9a-f-]{36})\/([0-9a-f-]{36})\.([a-z0-9]{1,10})$/;
 
+// Quotas (surchargeables par secrets, en Go). Un site sans compte : chaque
+// limite existe par appareil ET par IP, plus un disjoncteur global.
+const GB = 1024 ** 3;
+const env = (name: string, fallback: number) => Number(Deno.env.get(name) || fallback) * GB;
+const LIMITS = {
+  userDay: env("UPLOAD_USER_DAY_GB", 20),      // par appareil, sur 24 h
+  ipDay: env("UPLOAD_IP_DAY_GB", 40),          // par IP, sur 24 h
+  space: env("SPACE_MAX_GB", 50),              // par espace, au total
+  globalDay: env("UPLOAD_GLOBAL_DAY_GB", 200), // tout le site, sur 24 h
+  open: 12,                                    // uploads ouverts en même temps
+};
+
+// Type servi par B2 décidé ici, jamais par le client : un .html déposé
+// ne doit pas s'ouvrir comme une page (phishing hébergé sur nos liens).
+const SAFE_TYPES: Record<string, string> = {
+  mp3: "audio/mpeg", wav: "audio/wav", aif: "audio/aiff", aiff: "audio/aiff", m4a: "audio/mp4",
+  flac: "audio/flac", ogg: "audio/ogg", opus: "audio/ogg", aac: "audio/aac",
+  mp4: "video/mp4", mov: "video/quicktime", m4v: "video/mp4", webm: "video/webm",
+  jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", gif: "image/gif", webp: "image/webp",
+  avif: "image/avif", heic: "image/heic",
+  pdf: "application/pdf", zip: "application/zip", txt: "text/plain; charset=utf-8",
+};
+
+async function ipHash(req: Request): Promise<string> {
+  const ip = req.headers.get("cf-connecting-ip")
+    || (req.headers.get("x-forwarded-for") ?? "").split(",")[0].trim()
+    || "inconnue";
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode("wt:" + ip));
+  return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+type Session = { id: string; declared_bytes: number; completed_at: string | null };
+
 type FileRow = { id: string; storage_path: string; backend: string; original_name: string };
 
 Deno.serve(async (req) => {
@@ -88,9 +121,29 @@ Deno.serve(async (req) => {
         const { data: taken } = await db.from("files").select("id").eq("id", fileId).maybeSingle();
         if (taken) return json({ error: "FICHIER_EXISTANT" }, 409);
 
+        const ip = await ipHash(req);
+        const { data: budget, error: budgetError } = await service.rpc("upload_budget", {
+          p_user: uid, p_ip: ip, p_space: project.space_id,
+        });
+        if (budgetError) return json({ error: "ERREUR_BASE", detail: budgetError.message }, 500);
+        const b = budget as { user_day: number; ip_day: number; global_day: number; open: number; space: number };
+        if (b.open >= LIMITS.open) return json({ error: "TROP_D_UPLOADS" }, 429);
+        if (b.global_day + size > LIMITS.globalDay) return json({ error: "QUOTA_GLOBAL" }, 429);
+        if (b.user_day + size > LIMITS.userDay || b.ip_day + size > LIMITS.ipDay) {
+          return json({ error: "QUOTA_UPLOAD_JOUR" }, 429);
+        }
+        if (b.space + size > LIMITS.space) return json({ error: "QUOTA_ESPACE" }, 413);
+
         const key = `spaces/${project.space_id}/${projectId}/${fileId}.${ext}`;
-        const contentType = String(body.content_type ?? "") || "application/octet-stream";
-        const uploadId = await createMultipart(b2, key, contentType);
+        const uploadId = await createMultipart(b2, key, SAFE_TYPES[ext] ?? "application/octet-stream");
+        const { error: sessionError } = await service.from("upload_sessions").insert({
+          user_id: uid, space_id: project.space_id, storage_path: key, upload_id: uploadId,
+          declared_bytes: size, ip_hash: ip,
+        });
+        if (sessionError) {
+          await abortMultipart(b2, key, uploadId);
+          return json({ error: "FICHIER_EXISTANT" }, 409);
+        }
         return json({ backend: "b2", key, upload_id: uploadId, part_size: PART_SIZE });
       }
 
@@ -98,11 +151,23 @@ Deno.serve(async (req) => {
       const uploadId = String(body.upload_id ?? "");
       if (!key || !uploadId) return json({ error: "NON_MEMBRE" }, 403);
 
+      // L'upload doit avoir été ouvert par CET appareil, ici même.
+      const { data: session } = await service.from("upload_sessions")
+        .select("id, declared_bytes, completed_at")
+        .eq("storage_path", key).eq("upload_id", uploadId).eq("user_id", uid)
+        .maybeSingle<Session>();
+      if (!session) return json({ error: "UPLOAD_INCONNU" }, 404);
+      if (session.completed_at && action !== "upload-complete") return json({ error: "UPLOAD_INCONNU" }, 404);
+
+      const partCount = Math.ceil(session.declared_bytes / PART_SIZE);
+      const partLength = (n: number) =>
+        n < partCount ? PART_SIZE : session.declared_bytes - PART_SIZE * (partCount - 1);
+
       if (action === "upload-parts") {
         const parts = (Array.isArray(body.parts) ? body.parts : [])
-          .map(Number).filter((n) => Number.isInteger(n) && n >= 1 && n <= 10000).slice(0, 100);
+          .map(Number).filter((n) => Number.isInteger(n) && n >= 1 && n <= partCount).slice(0, 100);
         const urls: Record<number, string> = {};
-        for (const n of parts) urls[n] = await presignPart(b2, key, uploadId, n, PUT_TTL);
+        for (const n of parts) urls[n] = await presignPart(b2, key, uploadId, n, PUT_TTL, partLength(n));
         return json({ urls });
       }
 
@@ -117,12 +182,26 @@ Deno.serve(async (req) => {
       }
 
       if (action === "upload-complete") {
+        if (session.completed_at) return json({ ok: true, size: session.declared_bytes });
+        // Toutes les parties, et rien de plus : sinon on annule tout.
+        const parts = await listParts(b2, key, uploadId);
+        const received = parts.reduce((s, p) => s + p.size, 0);
+        const complete = parts.length === partCount
+          && parts.every((p, i) => p.part === i + 1 && p.size === partLength(p.part));
+        if (!complete || received !== session.declared_bytes) {
+          await abortMultipart(b2, key, uploadId);
+          await service.from("upload_sessions").delete().eq("id", session.id);
+          return json({ error: "TAILLE_INCOHERENTE" }, 400);
+        }
         const size = await completeMultipart(b2, key, uploadId);
+        await service.from("upload_sessions")
+          .update({ completed_at: new Date().toISOString(), size_bytes: size }).eq("id", session.id);
         return json({ ok: true, size });
       }
 
       if (action === "upload-abort") {
         await abortMultipart(b2, key, uploadId);
+        await service.from("upload_sessions").delete().eq("id", session.id).is("completed_at", null);
         return json({ ok: true });
       }
 

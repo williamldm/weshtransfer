@@ -22,3 +22,12 @@
   [headers.values]
     Referrer-Policy = "no-referrer"
     X-Robots-Tag = "noindex, nofollow"
+
+# Mêmes protections que le .htaccess d'o2switch.
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    X-Frame-Options = "SAMEORIGIN"
+    Permissions-Policy = "camera=(), microphone=(), geolocation=(), payment=()"
+    Content-Security-Policy = "default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://*.backblazeb2.com https://mqjzzcnzbsbhololiiyw.supabase.co; media-src 'self' blob: https://*.backblazeb2.com https://mqjzzcnzbsbhololiiyw.supabase.co; connect-src 'self' https://mqjzzcnzbsbhololiiyw.supabase.co wss://mqjzzcnzbsbhololiiyw.supabase.co https://*.backblazeb2.com https://cdn.jsdelivr.net; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'"

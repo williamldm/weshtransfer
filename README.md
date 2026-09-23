@@ -166,6 +166,40 @@ Netlify (`netlify.toml`) reste possible pour une copie de test : même
 
 ## Sécurité
 
+### Garde-fous contre les abus
+
+Sans compte, n'importe qui peut revenir avec une nouvelle session
+anonyme : chaque limite existe par appareil **et** par IP
+(`cf-connecting-ip`, posé par Cloudflare, stocké haché), plus des
+disjoncteurs globaux. Migration `..._seminar_abuse_limits.sql`.
+
+| Quoi | Limite |
+| --- | --- |
+| Upload par appareil / par IP, sur 24 h | 20 Go / 40 Go (`UPLOAD_USER_DAY_GB`, `UPLOAD_IP_DAY_GB`) |
+| Upload pour tout le site, sur 24 h | 200 Go (`UPLOAD_GLOBAL_DAY_GB`) |
+| Taille d'un espace | 50 Go (`SPACE_MAX_GB`), 1 000 fichiers, 500 morceaux |
+| Uploads ouverts en même temps | 12 par appareil |
+| Durée de vie d'un espace | 60 jours au plus, prolongations comprises |
+| Création d'espaces | 5 par jour et par appareil, 10 par IP |
+| Codes d'espace faux | 10 par heure et par appareil, 30 par IP |
+| Commentaires | 20 par minute et par personne, 5 000 par espace |
+| Envois | 100 par jour et par espace |
+| Emails d'envoi | 60 destinataires par jour et par expéditeur (`MAIL_SENDER_DAY`), plafond global (`MAIL_GLOBAL_DAY`) |
+| Codes de vérification | 5/h par appareil, 10/h par IP, 8/jour par adresse, 100/h au total |
+
+Uploads B2 : chaque upload est ouvert, suivi et clos par le serveur
+(`upload_sessions`). La taille de chaque partie est **signée** dans son
+URL (B2 refuse un octet de plus ou de moins), l'upload n'est validé que si
+toutes les parties sont là et font exactement la taille annoncée, et la
+taille enregistrée en base vient du serveur, jamais du client. Le type
+servi par B2 est décidé par le serveur d'après l'extension (un `.html`
+déposé est servi en `application/octet-stream`, pas comme une page).
+L'upload direct vers le Storage Supabase est coupé.
+
+En-têtes du site (`.htaccess`, `netlify.toml`) : CSP stricte (scripts du
+site et de jsDelivr seulement, aucun script en ligne), `nosniff`,
+`X-Frame-Options`, `Permissions-Policy`.
+
 - Le rôle `anon` n'a accès à rien ; tout passe par une session anonyme membre
   de l'espace (`is_member()`), et on ne modifie que ce qu'on a posté.
 - Les UPDATE sont limités colonne par colonne.

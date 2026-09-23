@@ -39,6 +39,11 @@ DirectoryIndex index.html
   Header always set X-Content-Type-Options "nosniff"
   Header always set X-Frame-Options "SAMEORIGIN"
   Header always set Referrer-Policy "strict-origin-when-cross-origin"
+  Header always set Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()"
+  # Scripts : le site et jsDelivr seulement, aucun script en ligne. Même si
+  # une faille d'injection apparaissait, le navigateur refuserait de
+  # l'exécuter. Médias : B2 et le Storage Supabase (anciens fichiers).
+  Header always set Content-Security-Policy "default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://*.backblazeb2.com https://mqjzzcnzbsbhololiiyw.supabase.co; media-src 'self' blob: https://*.backblazeb2.com https://mqjzzcnzbsbhololiiyw.supabase.co; connect-src 'self' https://mqjzzcnzbsbhololiiyw.supabase.co wss://mqjzzcnzbsbhololiiyw.supabase.co https://*.backblazeb2.com https://cdn.jsdelivr.net; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'"
 
   # Les pages changent à chaque version (?v=N) : jamais de HTML en cache,
   # sinon il pointerait vers d'anciens scripts.

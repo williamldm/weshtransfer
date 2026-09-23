@@ -1,7 +1,7 @@
 // Session anonyme + appartenance à un espace. Aucun compte : l'appareil
 // reçoit un utilisateur anonyme Supabase, puis rejoint un espace via son code.
 
-import { sb, q, requireClient } from "./db.js?v=30";
+import { sb, q, requireClient } from "./db.js?v=31";
 
 const SPACE_KEY = "seminaire.space";      // espace actif
 const KNOWN_KEY = "seminaire.spaces";     // tous les espaces rejoints sur cet appareil
@@ -102,6 +102,9 @@ export async function createSpace(name, mode, pseudo) {
 export async function joinSpace(code, pseudo) {
   await ensureAuth();
   const s = await q(sb.rpc("join_space", { p_code: code, p_pseudo: pseudo }));
+  // code faux : renvoyé et non levé, pour que le serveur garde la trace
+  // de l'essai (limite anti-énumération des codes)
+  if (s && s.error) throw new Error(s.error);
   const space = {
     id: s.space_id,
     participantId: s.participant_id,
