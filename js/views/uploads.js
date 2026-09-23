@@ -1,13 +1,14 @@
 // Rendu de la file d'upload (liste de progression), réutilisé par
 // l'accueil et la page d'un morceau.
 
-import { onUploads, getJobs, cancel, retry, dismiss } from "../upload.js?v=2";
-import { icon } from "../icons.js?v=2";
-import { esc, formatBytes } from "../ui.js?v=2";
+import { onUploads, getJobs, cancel, retry, dismiss } from "../upload.js?v=6";
+import { icon } from "../icons.js?v=6";
+import { esc, formatBytes } from "../ui.js?v=6";
 
 const STATE_LABEL = {
   queued: "En attente",
   uploading: "",
+  waiting: "Finalisation...",
   saving: "Finalisation...",
   done: "Uploadé",
   error: "Échec",
@@ -34,7 +35,7 @@ export function renderJob(job) {
   return '<div class="job is-' + job.state + '">' +
     '<div class="job-main">' +
       '<div class="job-name">' + esc(job.name) + "</div>" +
-      '<div class="progress"><i style="width:' + (job.state === "done" || job.state === "saving" ? 100 : pct) + '%"></i></div>' +
+      '<div class="progress"><i style="width:' + (["done", "saving", "waiting"].includes(job.state) ? 100 : pct) + '%"></i></div>' +
       '<div class="job-detail">' + detail + "</div>" +
     "</div>" +
     '<div class="job-actions">' + actions + "</div>" +

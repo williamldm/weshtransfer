@@ -5,10 +5,10 @@
 // va couper. TUS reprend là où ça s'est arrêté au lieu de tout recommencer.
 
 import { Upload } from "https://cdn.jsdelivr.net/npm/tus-js-client@4.3.1/+esm";
-import { sb, BUCKET } from "./db.js?v=2";
-import { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, ALLOWED_EXT, PEAKS_MAX_BYTES } from "./config.js?v=2";
-import { computePeaks } from "./peaks.js?v=2";
-import { insertFile } from "./api.js?v=2";
+import { sb, BUCKET } from "./db.js?v=6";
+import { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, ALLOWED_EXT, PEAKS_MAX_BYTES } from "./config.js?v=6";
+import { computePeaks } from "./peaks.js?v=6";
+import { insertFile } from "./api.js?v=6";
 
 // Hôte de stockage direct : recommandé par Supabase pour les gros fichiers.
 const ENDPOINT = SUPABASE_URL.replace(".supabase.co", ".storage.supabase.co") + "/storage/v1/upload/resumable";
@@ -38,8 +38,10 @@ export function getJobs() {
   return jobs.slice();
 }
 
+const ACTIVE = ["queued", "uploading", "waiting", "saving"];
+
 export function activeCount() {
-  return jobs.filter((j) => j.state === "queued" || j.state === "uploading" || j.state === "saving").length;
+  return jobs.filter((j) => ACTIVE.includes(j.state)).length;
 }
 
 // ------------------------------------------------------------ validation
@@ -94,8 +96,17 @@ export function titleFromName(name) {
 // meta : { spaceId, projectId, projectTitle, kind, label, bpm, musicalKey, tag }
 export function enqueue(files, meta) {
   const added = [];
+  // Les numéros de version suivent l'ordre de sélection, pas l'ordre
+  // d'arrivée : chaque fichier attend que le précédent du lot soit
+  // enregistré avant de s'enregistrer à son tour (l'envoi, lui, reste
+  // parallèle).
+  let previous = Promise.resolve();
   for (const file of files) {
+    let release;
+    const turn = new Promise((resolve) => { release = resolve; });
     const job = {
+      waitTurn: previous,
+      releaseTurn: release,
       id: ++seq,
       file,
       name: file.name,
@@ -108,6 +119,7 @@ export function enqueue(files, meta) {
       result: null,
       tus: null
     };
+    previous = turn;
     jobs.push(job);
     added.push(job);
     emit(job);
@@ -121,6 +133,7 @@ export function cancel(jobId) {
   if (!job) return;
   if (job.tus) job.tus.abort(true).catch(() => {});
   job.state = "canceled";
+  job.releaseTurn();
   emit(job);
   pump();
 }
@@ -136,7 +149,7 @@ export function retry(jobId) {
 
 export function dismiss(jobId) {
   const i = jobs.findIndex((j) => j.id === jobId);
-  if (i >= 0 && jobs[i].state !== "uploading" && jobs[i].state !== "saving") {
+  if (i >= 0 && !["uploading", "waiting", "saving"].includes(jobs[i].state)) {
     const [job] = jobs.splice(i, 1);
     job.state = "dismissed";
     emit(job);
@@ -151,6 +164,8 @@ export function clearFinished() {
 }
 
 function pump() {
+  // "waiting" ne compte pas : un fichier monté qui attend son tour
+  // d'enregistrement libère sa place pour le suivant.
   const running = jobs.filter((j) => j.state === "uploading" || j.state === "saving").length;
   const free = PARALLEL - running;
   const next = jobs.filter((j) => j.state === "queued").slice(0, Math.max(0, free));
@@ -177,6 +192,11 @@ async function run(job) {
     await tusUpload(job, path, mime);
     if (job.state === "canceled") return;
 
+    job.state = "waiting";
+    emit(job);
+    pump();
+    await job.waitTurn;
+
     job.state = "saving";
     emit(job);
 
@@ -198,10 +218,14 @@ async function run(job) {
     });
     job.state = "done";
     job.file = null;   // libère la mémoire
+    // la ligne de progression disparaît d'elle-même une fois le son en ligne
+    setTimeout(() => dismiss(job.id), 4000);
   } catch (err) {
     if (job.state === "canceled") return;
     job.state = "error";
     job.error = explain(err);
+  } finally {
+    job.releaseTurn();
   }
   emit(job);
   pump();

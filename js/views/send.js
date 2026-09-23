@@ -5,14 +5,14 @@
 import {
   getProject, getFilesByIds, listSpaceFiles, createTransfer, sendTransfer, emailEnabled,
   getTransfer, transferUrl
-} from "../api.js?v=2";
-import { openUploadSheet } from "./upload-sheet.js?v=2";
-import { onUploads } from "../upload.js?v=2";
-import { icon } from "../icons.js?v=2";
+} from "../api.js?v=6";
+import { openUploadSheet } from "./upload-sheet.js?v=6";
+import { onUploads } from "../upload.js?v=6";
+import { icon } from "../icons.js?v=6";
 import {
   esc, h, kindBadge, formatBytes, plural, toast, errorText, openSheet, copyText, shareLink,
   canShare, formatDate, daysLeft
-} from "../ui.js?v=2";
+} from "../ui.js?v=6";
 
 export const title = () => "Envoyer";
 
@@ -90,7 +90,10 @@ export async function mount(root, ctx, params) {
         '<div class="card-head"><h2>À qui ?</h2><span class="muted">facultatif</span></div>' +
         '<div class="email-input" data-emailbox>' +
           '<span data-chips></span>' +
-          '<input type="email" inputmode="email" autocomplete="email" autocapitalize="off" spellcheck="false" ' +
+          // type="text" et non "email" : un champ email efface lui-même les
+          // espaces de fin, le séparateur tapé serait invisible. inputmode
+          // garde le clavier email sur mobile.
+          '<input type="text" inputmode="email" autocomplete="email" autocapitalize="off" spellcheck="false" ' +
             'placeholder="email@exemple.fr" data-email>' +
         "</div>" +
         '<p class="hint">Sépare les adresses par un espace ou une virgule. Sans adresse : tu récupères juste le lien.</p>' +
@@ -175,25 +178,25 @@ export async function mount(root, ctx, params) {
     if (added) drawChips();
   }
 
+  // Découpage sur le TEXTE saisi, pas sur les touches : les claviers
+  // Android (Gboard...) signalent chaque touche comme "Unidentified", un
+  // test sur e.key === " " n'y verrait jamais passer l'espace. Couvre
+  // aussi le collage d'une liste d'adresses.
+  emailEl.addEventListener("input", () => {
+    const value = emailEl.value;
+    if (!/[\s,;]/.test(value)) return;
+    const parts = value.split(/[\s,;]+/);
+    const rest = /[\s,;]$/.test(value) ? "" : parts.pop();
+    commitEmails(parts.join(" "));
+    emailEl.value = rest;
+  });
   emailEl.addEventListener("keydown", (e) => {
-    if (["Enter", ",", " ", ";"].includes(e.key)) {
-      if (emailEl.value.trim()) {
-        e.preventDefault();
-        commitEmails(emailEl.value);
-        emailEl.value = "";
-      } else if (e.key === "Enter") {
-        e.preventDefault();
-      }
+    if (e.key === "Enter") {
+      e.preventDefault();
+      if (emailEl.value.trim()) { commitEmails(emailEl.value); emailEl.value = ""; }
     } else if (e.key === "Backspace" && !emailEl.value && state.emails.length) {
       state.emails.pop();
       drawChips();
-    }
-  });
-  emailEl.addEventListener("paste", (e) => {
-    const text = (e.clipboardData || window.clipboardData).getData("text");
-    if (/[\s,;]/.test(text.trim())) {
-      e.preventDefault();
-      commitEmails(text);
     }
   });
   emailEl.addEventListener("blur", () => {

@@ -43,8 +43,12 @@ propre projet Supabase, aucune dépendance à un autre projet.
 
        supabase secrets set RESEND_API_KEY=re_... MAIL_FROM="Séminaire <envoi@domaine.fr>" SITE_URL=https://adresse-du-site
 
-6. **Purge quotidienne** : `supabase secrets set CRON_SECRET=...`, puis une tâche
-   pg_cron qui appelle `purge-spaces` avec l'en-tête `x-cron-secret`.
+6. **Purge quotidienne** : un même secret, jamais versionné, à deux endroits :
+
+       supabase secrets set CRON_SECRET=<secret>
+       select vault.create_secret('<secret>', 'seminaire_cron_secret');   -- SQL editor
+
+   La migration `..._seminar_cron.sql` planifie l'appel chaque nuit à 04h17 UTC.
 7. **Créer un espace** (SQL editor) :
 
        select code, expires_at, purge_at from create_space('Villa septembre', 14);

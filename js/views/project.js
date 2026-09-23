@@ -1,17 +1,17 @@
 // Un morceau : ses versions de la plus récente à la plus ancienne, chacune
 // avec sa mini-waveform jouable d'un tap.
 
-import { getProject, signUrls, cachedUrl, updateProject, deleteProject, deleteFile, withDownloadName } from "../api.js?v=2";
-import { mountUploads } from "./uploads.js?v=2";
-import { openUploadSheet } from "./upload-sheet.js?v=2";
-import { Waveform } from "../waveform.js?v=2";
-import { play, toggle, isCurrent, onPlayer, seekRatio, state as playerState, trackFromFile } from "../player.js?v=2";
-import { saveZip, canStreamToDisk, MEMORY_LIMIT } from "../zip.js?v=2";
-import { icon } from "../icons.js?v=2";
+import { getProject, signUrls, cachedUrl, updateProject, deleteProject, deleteFile, withDownloadName } from "../api.js?v=6";
+import { mountUploads } from "./uploads.js?v=6";
+import { openUploadSheet } from "./upload-sheet.js?v=6";
+import { Waveform } from "../waveform.js?v=6";
+import { play, toggle, isCurrent, onPlayer, seekRatio, state as playerState, trackFromFile } from "../player.js?v=6";
+import { saveZip, canStreamToDisk, MEMORY_LIMIT } from "../zip.js?v=6";
+import { icon } from "../icons.js?v=6";
 import {
   esc, kindBadge, timeAgo, formatBytes, formatDuration, plural, promptSheet,
   confirmSheet, actionSheet, toast, errorText, triggerDownload
-} from "../ui.js?v=2";
+} from "../ui.js?v=6";
 
 export const title = () => "Morceau";
 

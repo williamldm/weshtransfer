@@ -3,7 +3,7 @@
 // La cle publishable se trouve dans Supabase > Project Settings > API Keys.
 
 export const SUPABASE_URL = "https://mqjzzcnzbsbhololiiyw.supabase.co";
-export const SUPABASE_PUBLISHABLE_KEY = "";
+export const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_UyLarAZElDWKybmIUlm4_Q_mKsf4ia4";
 
 // Extensions acceptées. Filtrage à l'extension et non au type MIME : sur
 // mobile, un .m4a ou un .aiff arrive souvent en application/octet-stream.

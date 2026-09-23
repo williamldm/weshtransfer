@@ -1,4 +1,4 @@
-@import url("tokens.css?v=2");
+@import url("tokens.css?v=6");
 
 /* =============================================================== base */
 *, *::before, *::after { box-sizing: border-box; }
@@ -265,7 +265,8 @@ body.has-player .app-main { padding-bottom: calc(var(--player-h) + var(--safe-bo
 .section-head h2 { font-size: var(--fs-md); color: var(--text-dim); font-weight: 700; letter-spacing: .02em; }
 
 .eyebrow {
-  display: inline-flex;
+  display: flex;
+  width: fit-content;
   align-items: center;
   gap: 4px;
   margin-bottom: var(--sp-1);
@@ -475,7 +476,7 @@ body.has-player .app-main { padding-bottom: calc(var(--player-h) + var(--safe-bo
 .job.is-error { border-color: rgba(248, 113, 113, .4); }
 .job.is-error .job-detail { color: #ffb4b4; }
 .job.is-error .progress > i { background: var(--danger); }
-.job.is-done .progress > i, .job.is-saving .progress > i { background: var(--ok); }
+.job.is-done .progress > i, .job.is-saving .progress > i, .job.is-waiting .progress > i { background: var(--ok); }
 
 .progress { height: 5px; overflow: hidden; border-radius: var(--r-pill); background: var(--surface-3); }
 .progress > i { display: block; height: 100%; width: 0; border-radius: inherit; background: var(--accent); transition: width .25s; }
