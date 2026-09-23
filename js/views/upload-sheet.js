@@ -1,11 +1,11 @@
 // Feuille "Ajouter des sons" : choix du morceau, du type, détails optionnels.
 // L'upload démarre dès validation ; on peut naviguer pendant qu'il tourne.
 
-import { enqueue, checkFile, guessKind, guessBpm, titleFromName } from "../upload.js?v=29";
-import { listProjects, createProject } from "../api.js?v=29";
-import { icon } from "../icons.js?v=29";
-import { CATEGORY, categoryOf, isAudio } from "../files.js?v=29";
-import { esc, h, openSheet, toast, errorText, formatBytes, KINDS } from "../ui.js?v=29";
+import { enqueue, checkFile, guessKind, guessBpm, titleFromName } from "../upload.js?v=30";
+import { listProjects, createProject } from "../api.js?v=30";
+import { icon } from "../icons.js?v=30";
+import { CATEGORY, categoryOf, isAudio } from "../files.js?v=30";
+import { esc, h, openSheet, toast, errorText, formatBytes, KINDS } from "../ui.js?v=30";
 
 // opts : { projectId, newTitle, tag, onQueued(jobs, projectId) }
 export async function openUploadSheet(ctx, fileList, opts) {

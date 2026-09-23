@@ -1,7 +1,7 @@
 // Accès aux données. Toutes les requêtes de l'appli passent par ici : les
 // vues ne connaissent ni PostgREST ni le Storage.
 
-import { sb, q, invoke, requireClient } from "./db.js?v=29";
+import { sb, q, invoke, requireClient } from "./db.js?v=30";
 
 // Toute requête passe par ici : sans config, message clair plutôt
 // qu'un "Cannot read properties of null".
@@ -257,6 +257,16 @@ export async function confirmEmailCode(email, code) {
   const r = await invoke("verify-email", { action: "confirm", email, code });
   if (r && r.verified) rememberVerified(email);
   return !!(r && r.verified);
+}
+
+// Carnet des destinataires, rattaché à l'email d'expédition vérifié
+export async function listContacts(sender) {
+  const r = await invoke("contacts", { action: "list", sender });
+  return (r && r.contacts) || [];
+}
+
+export function forgetContact(sender, email) {
+  return invoke("contacts", { action: "forget", sender, email });
 }
 
 let emailCheck = null;

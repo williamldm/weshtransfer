@@ -5,18 +5,18 @@
 import {
   getProject, getFilesByIds, listSpaceFiles, createTransfer, sendTransfer, emailEnabled,
   getTransfer, transferUrl, createProject, signFiles, cachedUrl,
-  emailVerified, knownVerified, requestEmailCode, confirmEmailCode
-} from "../api.js?v=29";
-import { openUploadSheet } from "./upload-sheet.js?v=29";
-import { mountUploads } from "./uploads.js?v=29";
-import { onUploads, enqueue, checkFile } from "../upload.js?v=29";
-import { categoryOf, canPreview } from "../files.js?v=29";
-import { takePending } from "../pending.js?v=29";
-import { icon } from "../icons.js?v=29";
+  emailVerified, knownVerified, requestEmailCode, confirmEmailCode, listContacts, forgetContact
+} from "../api.js?v=30";
+import { openUploadSheet } from "./upload-sheet.js?v=30";
+import { mountUploads } from "./uploads.js?v=30";
+import { onUploads, enqueue, checkFile } from "../upload.js?v=30";
+import { categoryOf, canPreview } from "../files.js?v=30";
+import { takePending } from "../pending.js?v=30";
+import { icon } from "../icons.js?v=30";
 import {
   esc, h, formatBytes, formatDuration, plural, toast, errorText, openSheet, copyText, shareLink,
   canShare, formatDate, daysLeft, fileBadge, fileTile
-} from "../ui.js?v=29";
+} from "../ui.js?v=30";
 
 // Dans un espace "envoi", ce composeur EST l'accueil.
 export const title = (ctx) => (ctx && ctx.space.mode === "envoi" ? ctx.space.name : "Envoyer");
@@ -29,50 +29,19 @@ function remembered() {
   try { return localStorage.getItem(REPLY_KEY) || ""; } catch (err) { return ""; }
 }
 
-// Destinataires déjà utilisés, gardés sur CET appareil seulement (rien de
-// plus sur le serveur) : { email, n: nombre d'envois, t: dernier envoi }.
-const RECENT_KEY = "seminaire.recentRecipients";
-const RECENT_MAX = 40;
-
-export function recentRecipients() {
-  try {
-    const list = JSON.parse(localStorage.getItem(RECENT_KEY) || "[]");
-    return Array.isArray(list) ? list.filter((r) => r && EMAIL_RE.test(r.email)) : [];
-  } catch (err) {
-    return [];
-  }
-}
-
-function saveRecent(list) {
-  try { localStorage.setItem(RECENT_KEY, JSON.stringify(list.slice(0, RECENT_MAX))); } catch (err) { /* privé */ }
-}
-
-export function rememberRecipients(emails) {
-  const now = Date.now();
-  const list = recentRecipients();
-  for (const email of emails) {
-    if (!EMAIL_RE.test(email)) continue;
-    const known = list.find((r) => r.email === email);
-    if (known) { known.n = (known.n || 1) + 1; known.t = now; }
-    else list.push({ email, n: 1, t: now });
-  }
-  list.sort((a, b) => b.t - a.t);
-  saveRecent(list);
-}
-
-function forgetRecipient(email) {
-  saveRecent(recentRecipients().filter((r) => r.email !== email));
-}
+// Première version : carnet gardé dans le navigateur. Il vit désormais
+// sur le serveur, rattaché à l'email d'expédition : on efface l'ancien.
+try { localStorage.removeItem("seminaire.recentRecipients"); } catch (err) { /* privé */ }
 
 // Suggestions pour ce qui est tapé : début de l'adresse, du nom de
 // domaine, ou d'un morceau séparé par un point, un tiret...
-function suggest(query, exclude) {
+function suggest(contacts, query, exclude) {
   const q = query.trim().toLowerCase();
-  const list = recentRecipients().filter((r) => !exclude.includes(r.email));
+  const list = contacts.filter((r) => !exclude.includes(r.email));
   if (!q) return list.slice(0, 6);
   return list
     .filter((r) => r.email.startsWith(q) || r.email.split(/[@._+-]/).some((part) => part.startsWith(q)))
-    .sort((a, b) => Number(b.email.startsWith(q)) - Number(a.email.startsWith(q)) || b.t - a.t)
+    .sort((a, b) => Number(b.email.startsWith(q)) - Number(a.email.startsWith(q)) || (a.last_at < b.last_at ? 1 : -1))
     .slice(0, 6);
 }
 
@@ -84,7 +53,9 @@ export async function mount(root, ctx, params) {
     message: "",
     replyTo: remembered(),
     days: 7,
-    sending: false
+    sending: false,
+    contacts: [],       // carnet de l'email d'expédition (vérifié)
+    contactsOf: ""
   };
   const tag = "send-" + Date.now();
   const envoiMode = ctx.space.mode === "envoi";
@@ -245,6 +216,26 @@ export async function mount(root, ctx, params) {
   }
   replyInput.addEventListener("input", drawReplyHint);
 
+  // Le carnet suit l'email d'expédition : chargé dès que l'adresse est
+  // vérifiée sur cet appareil (le serveur refuse sinon).
+  async function loadContacts() {
+    const sender = replyInput.value.trim().toLowerCase();
+    if (!emailOn || !EMAIL_RE.test(sender) || !knownVerified(sender)) {
+      if (state.contactsOf) { state.contacts = []; state.contactsOf = ""; drawRecents(); }
+      return;
+    }
+    if (sender === state.contactsOf) return;
+    try {
+      const list = await listContacts(sender);
+      if (replyInput.value.trim().toLowerCase() !== sender) return;   // adresse changée entre-temps
+      state.contacts = list;
+      state.contactsOf = sender;
+      drawRecents();
+    } catch (err) { /* sans carnet, on tape les adresses à la main */ }
+  }
+  let contactsTimer = null;
+  replyInput.addEventListener("input", () => { clearTimeout(contactsTimer); contactsTimer = setTimeout(loadContacts, 400); });
+
   // Si la durée par défaut dépasse la vie de l'espace, on prend la plus longue possible.
   if (state.days > maxDays) {
     const best = DURATIONS.filter((d) => d <= maxDays).pop() || 1;
@@ -288,11 +279,11 @@ export async function mount(root, ctx, params) {
 
   // Destinataires déjà utilisés : proposés sous le champ, filtrés par la saisie
   function drawRecents() {
-    const list = suggest(emailEl.value, state.emails);
+    const list = suggest(state.contacts, emailEl.value, state.emails);
     recentsEl.hidden = !list.length;
     if (!list.length) { recentsEl.innerHTML = ""; return; }
     recentsEl.innerHTML =
-      '<span class="recents-label">' + (emailEl.value.trim() ? "Déjà utilisées" : "Récents") + "</span>" +
+      '<span class="recents-label">' + (emailEl.value.trim() ? "Ton carnet" : "Récents") + "</span>" +
       list.map((r) =>
         '<span class="recent">' +
           '<button type="button" class="recent-add" data-add="' + esc(r.email) + '">' + icon("plus", 14) + "<span>" + esc(r.email) + "</span></button>" +
@@ -370,8 +361,10 @@ export async function mount(root, ctx, params) {
       commitEmails(add.dataset.add);
       emailEl.focus();
     } else if (forget) {
-      forgetRecipient(forget.dataset.forget);
+      const email = forget.dataset.forget;
+      state.contacts = state.contacts.filter((r) => r.email !== email);
       drawRecents();
+      forgetContact(state.contactsOf, email).catch((err) => toast(errorText(err), "err"));
     }
   });
 
@@ -549,6 +542,7 @@ export async function mount(root, ctx, params) {
       }
       if (outcome === "skip") replyTo = "";
       drawReplyHint();
+      loadContacts();
     }
     submitEl.innerHTML = '<span class="spinner"></span><span>' + (state.emails.length && emailOn ? "Décollage..." : "Impression du billet...") + "</span>";
 
@@ -562,7 +556,6 @@ export async function mount(root, ctx, params) {
         replyTo,
         days: state.days
       });
-      rememberRecipients(state.emails);
 
       let results = [];
       if (state.emails.length && emailOn) {
@@ -583,6 +576,7 @@ export async function mount(root, ctx, params) {
 
   drawFiles();
   drawChips();
+  loadContacts();
 
   // Fichiers déposés sur l'accueil : l'upload démarre tout seul ici.
   if (envoiMode) {

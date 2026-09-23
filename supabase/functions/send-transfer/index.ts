@@ -120,6 +120,13 @@ Deno.serve(async (req) => {
       .eq("id", r.id);
   }));
 
+  // Carnet de l'expéditeur (rattaché à son email vérifié) : seulement les
+  // adresses qui ont bien reçu l'envoi.
+  const delivered = recipients.filter((_, n) => results[n].ok).map((r) => r.email);
+  if (delivered.length) {
+    await db.rpc("remember_contacts", { p_sender: transfer.reply_to, p_emails: delivered });
+  }
+
   return json({
     email_enabled: true,
     results: recipients.map((r, n) => {

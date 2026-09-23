@@ -81,7 +81,7 @@ Réglages du bucket (posés par l'API `b2_update_bucket`) :
 3. **Auth** : Authentication > Sign In / Providers > Anonymous sign-ins : ON.
 4. **Edge Functions** (toutes en `--no-verify-jwt`, elles vérifient elles-mêmes) :
 
-       supabase functions deploy storage send-transfer transfer-open verify-email purge-spaces --no-verify-jwt --use-api
+       supabase functions deploy storage send-transfer transfer-open verify-email contacts purge-spaces --no-verify-jwt --use-api
 
 5. **Emails** (facultatif, sinon mode lien). Deux voies, essayées dans cet
    ordre, chaque message refusé par la première repartant par la seconde :
@@ -112,6 +112,12 @@ Réglages du bucket (posés par l'API `b2_update_bucket`) :
    `sender_emails` et `email_codes`, fermées au navigateur). Une fois par
    appareil et par adresse. Limites : 5 codes par heure et par appareil,
    8 par jour et par adresse, 5 essais par code, 15 minutes de validité.
+
+   **Carnet des destinataires** : rattaché à l'email d'expédition vérifié
+   (table `sender_contacts`, écrite par `send-transfer` après un envoi
+   réussi, lue par l'Edge Function `contacts`). On le retrouve sur tout
+   appareil où cette adresse a été vérifiée, jamais ailleurs. 40 adresses
+   proposées au plus, effacées après 180 jours sans envoi.
 
 6. **Purge quotidienne** : un même secret, jamais versionné, à deux endroits :
 
