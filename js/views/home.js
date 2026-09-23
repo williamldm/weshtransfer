@@ -1,13 +1,13 @@
 // Accueil de l'espace : gros boutons d'action, uploads en cours, morceaux
 // triés par activité récente.
 
-import { listProjects, createProject, listReviewComments, deleteProject, deleteFile } from "../api.js?v=34";
-import { stateOf, isEngineerOf } from "./review.js?v=34";
-import { mountUploads } from "./uploads.js?v=34";
-import { openUploadSheet } from "./upload-sheet.js?v=34";
-import { openPeopleSheet } from "./people.js?v=34";
-import { icon } from "../icons.js?v=34";
-import { esc, h, kindBadge, timeAgo, plural, promptSheet, toast, errorText, daysLeft, formatDate, actionSheet, confirmSheet } from "../ui.js?v=34";
+import { listProjects, createProject, listReviewComments, deleteProject, deleteFile } from "../api.js?v=35";
+import { stateOf, isEngineerOf } from "./review.js?v=35";
+import { mountUploads } from "./uploads.js?v=35";
+import { openUploadSheet } from "./upload-sheet.js?v=35";
+import { openPeopleSheet } from "./people.js?v=35";
+import { icon } from "../icons.js?v=35";
+import { esc, h, kindBadge, timeAgo, plural, promptSheet, toast, errorText, daysLeft, formatDate, actionSheet, confirmSheet } from "../ui.js?v=35";
 
 export const title = (ctx) => ctx.space.name;
 

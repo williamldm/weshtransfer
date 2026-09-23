@@ -3,20 +3,20 @@
 // compte ni code. Sans adresse, on obtient juste un lien à partager.
 
 import {
-  getProject, getFilesByIds, listSpaceFiles, createTransfer, sendTransfer, emailEnabled,
+  getProject, getFilesByIds, createTransfer, sendTransfer, emailEnabled,
   getTransfer, transferUrl, createProject, signFiles, cachedUrl,
   emailVerified, knownVerified, requestEmailCode, confirmEmailCode, listContacts, forgetContact
-} from "../api.js?v=34";
-import { openUploadSheet } from "./upload-sheet.js?v=34";
-import { mountUploads } from "./uploads.js?v=34";
-import { onUploads, enqueue, checkFile } from "../upload.js?v=34";
-import { categoryOf, canPreview } from "../files.js?v=34";
-import { takePending } from "../pending.js?v=34";
-import { icon } from "../icons.js?v=34";
+} from "../api.js?v=35";
+import { openUploadSheet } from "./upload-sheet.js?v=35";
+import { mountUploads } from "./uploads.js?v=35";
+import { onUploads, enqueue, checkFile } from "../upload.js?v=35";
+import { categoryOf, canPreview } from "../files.js?v=35";
+import { takePending } from "../pending.js?v=35";
+import { icon } from "../icons.js?v=35";
 import {
   esc, h, formatBytes, formatDuration, plural, toast, errorText, openSheet, copyText, shareLink,
   canShare, formatDate, daysLeft, fileBadge, fileTile
-} from "../ui.js?v=34";
+} from "../ui.js?v=35";
 
 // Dans un espace "envoi", ce composeur EST l'accueil.
 export const title = (ctx) => (ctx && ctx.space.mode === "envoi" ? ctx.space.name : "Envoyer");
@@ -114,13 +114,11 @@ export async function mount(root, ctx, params) {
               "<strong>Charge la soute</strong><span>Touche ici, ou glisse tes fichiers n'importe où sur la page</span>" +
               '<input type="file" multiple hidden data-upload></label>'
           : "") +
-        '<div class="row-2 stack-sm"' + (envoiMode ? " hidden" : "") + ">" +
-          '<button type="button" class="btn btn-block" data-pick>' + icon("music", 18) + "<span>Depuis l'espace</span></button>" +
-          '<label class="btn btn-block">' + icon("upload", 18) + "<span>Nouveaux fichiers</span>" +
-            '<input type="file" multiple hidden data-upload-sheet></label>' +
-        "</div>" +
+        (envoiMode
+          ? ""
+          : '<label class="btn btn-block">' + icon("upload", 18) + "<span>Ajouter des fichiers</span>" +
+              '<input type="file" multiple hidden data-upload-sheet></label>') +
         '<div class="send-pending" data-pending hidden></div>' +
-        (envoiMode ? '<button type="button" class="btn btn-ghost btn-block btn-sm" data-pick-more>' + icon("retry", 16) + " Reprendre un fichier déjà envoyé</button>" : "") +
       "</section>" +
 
       '<section class="step">' +
@@ -387,16 +385,6 @@ export async function mount(root, ctx, params) {
     drawFiles();
   });
 
-  root.querySelector("[data-pick]").onclick = () => openPicker(ctx, state.files.map((f) => f.id), (chosen) => {
-    const known = new Set(state.files.map((f) => f.id));
-    for (const f of chosen) if (!known.has(f.id)) state.files.push(f);
-    state.files = state.files.filter((f) => chosen.some((c) => c.id === f.id));
-    if (!titleInput.value.trim() && state.files[0]) {
-      titleInput.value = state.files[0].project ? state.files[0].project.title : state.files[0].original_name;
-    }
-    drawFiles();
-  });
-
   // Nouveaux fichiers : uploadés dans un morceau de l'espace, puis ajoutés
   // automatiquement à l'envoi dès qu'ils sont en ligne.
 
@@ -419,7 +407,7 @@ export async function mount(root, ctx, params) {
   }
 
   // Mode envoi : pas de question, les sons vont dans un morceau créé en
-  // coulisse pour cet envoi (retrouvable ensuite via "Reprendre un son").
+  // coulisse pour cet envoi.
   async function addDirect(fileList) {
     const files = Array.from(fileList || []);
     const refused = files.map((f) => [f, checkFile(f, ctx.space.maxFileBytes)]).filter(([, err]) => err);
@@ -457,9 +445,6 @@ export async function mount(root, ctx, params) {
       onQueued: (jobs) => { waiting += jobs.length; drawPending(); }
     });
   });
-
-  const pickMore = root.querySelector("[data-pick-more]");
-  if (pickMore) pickMore.onclick = () => root.querySelector("[data-pick]").click();
 
   // Progression des fichiers de CET envoi, dans la carte "Fichiers"
   const offJobs = mountUploads(pendingEl, (j) => j.meta.tag === tag);
@@ -790,47 +775,4 @@ export async function showDone(root, ctx, created, info) {
     ctx.navigate("#/send?new=" + Date.now());
   };
   window.scrollTo(0, 0);
-}
-
-// -------------------------------------------------- sélecteur de fichiers
-
-async function openPicker(ctx, selectedIds, onDone) {
-  const selected = new Set(selectedIds);
-  const body = h('<div class="picker"><div class="skeleton"></div></div>');
-  const sheet = openSheet({ title: "Fichiers de l'espace", body });
-
-  let projects = [];
-  try {
-    projects = await listSpaceFiles(ctx.space.id);
-  } catch (err) {
-    body.innerHTML = '<p class="empty">' + esc(errorText(err)) + "</p>";
-    return;
-  }
-
-  const index = new Map();
-  for (const p of projects) {
-    for (const f of p.files || []) index.set(f.id, Object.assign({}, f, { project: { id: p.id, title: p.title } }));
-  }
-
-  body.innerHTML =
-    projects.filter((p) => (p.files || []).some((f) => f.status === "ready")).map((p) =>
-      '<details class="pick-project"' + ((p.files || []).some((f) => selected.has(f.id)) ? " open" : "") + ">" +
-        "<summary><span>" + esc(p.title) + '</span><span class="count">' + p.files.filter((f) => f.status === "ready").length + "</span></summary>" +
-        p.files.filter((f) => f.status === "ready").map((f) =>
-          '<label class="pick-file"><input type="checkbox" value="' + f.id + '"' + (selected.has(f.id) ? " checked" : "") + ">" +
-            '<span class="pf-main"><span class="pf-name">v' + f.version_no + " " + esc(f.label || f.original_name) + "</span>" +
-            '<span class="pf-meta">' + fileBadge(f.original_name, f.mime_type, f.kind) + " " + formatBytes(f.size_bytes) + "</span></span></label>").join("") +
-      "</details>").join("") +
-    '<div class="sheet-actions sticky"><button class="btn btn-primary btn-block" data-ok>Valider</button></div>';
-
-  if (!index.size) {
-    body.innerHTML = '<div class="empty-state">' + icon("music", 32) + "<p>Aucun fichier dans l'espace pour l'instant.</p></div>";
-    return;
-  }
-
-  body.querySelector("[data-ok]").onclick = () => {
-    const ids = [...body.querySelectorAll("input[type=checkbox]:checked")].map((i) => i.value);
-    onDone(ids.map((id) => index.get(id)).filter(Boolean));
-    sheet.close();
-  };
 }

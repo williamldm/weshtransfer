@@ -1,5 +1,5 @@
-@import url("fonts.css?v=34");
-@import url("tokens.css?v=34");
+@import url("fonts.css?v=35");
+@import url("tokens.css?v=35");
 
 /* ================================================================= base */
 *, *::before, *::after { box-sizing: border-box; }
@@ -506,15 +506,6 @@ details.more[open] summary { margin-bottom: var(--sp-3); }
 .recipients li, .tr-recips li { display: flex; align-items: center; gap: var(--sp-2); padding: var(--sp-2) 0; border-bottom: 1px solid var(--line); font-size: var(--fs-sm); }
 .r-mail { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-.picker { padding-bottom: 80px; }
-.pick-project { border-bottom: 1px solid var(--line); }
-.pick-project summary { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-3); padding: var(--sp-3) 0; font-weight: 600; cursor: pointer; list-style: none; }
-.pick-project summary::-webkit-details-marker { display: none; }
-.pick-file { display: flex; align-items: center; gap: var(--sp-3); padding: var(--sp-2) 0 var(--sp-2) var(--sp-2); cursor: pointer; }
-.pick-file input { flex: none; width: 20px; height: 20px; accent-color: var(--accent); }
-.pf-main { display: flex; min-width: 0; flex-direction: column; }
-.pf-name { overflow: hidden; font-size: var(--fs-sm); text-overflow: ellipsis; white-space: nowrap; }
-.pf-meta { display: flex; gap: var(--sp-2); color: var(--text-faint); font-family: var(--mono); font-size: 11px; }
 
 /* ============================================================ envois */
 .transfer { padding: var(--sp-4) 0; border-bottom: 1px solid var(--line); }
