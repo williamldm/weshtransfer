@@ -2,12 +2,13 @@
 // Pas de supabase-js ici : un simple appel à l'Edge Function transfer-open,
 // qui vérifie le lien et renvoie des URLs signées. Page légère, rapide en 4G.
 
-import { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from "./config.js?v=32";
-import { Waveform, formatTime } from "./waveform.js?v=32";
-import { saveZip, canStreamToDisk, MEMORY_LIMIT } from "./zip.js?v=32";
-import { icon } from "./icons.js?v=32";
-import { esc, formatBytes, formatDuration, formatDate, plural, toast, triggerDownload, avatar, fileBadge, fileTile } from "./ui.js?v=32";
-import { categoryOf, canPreview } from "./files.js?v=32";
+import { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from "./config.js?v=33";
+import { Waveform, formatTime } from "./waveform.js?v=33";
+import { saveZip, canStreamToDisk, MEMORY_LIMIT } from "./zip.js?v=33";
+import { icon } from "./icons.js?v=33";
+import { esc, formatBytes, formatDuration, formatDate, plural, toast, triggerDownload, avatar, fileBadge, fileTile } from "./ui.js?v=33";
+import { categoryOf, canPreview } from "./files.js?v=33";
+import { mountWallpaper } from "./wallpapers.js?v=33";
 
 const root = document.getElementById("tp");
 const k = new URLSearchParams(location.search).get("k") || "";
@@ -339,3 +340,5 @@ async function load() {
 }
 
 load();
+
+mountWallpaper(document.querySelector(".scene"));

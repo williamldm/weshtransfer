@@ -139,6 +139,8 @@ Réglages du bucket (posés par l'API `b2_update_bucket`) :
 - `dev/transfer.html` : la page destinataire avec un serveur simulé.
 - `dev/waveform-test.html` : décodage audio et rendu de la waveform.
 - `dev/emails.html` : les emails avec des données fictives, ordinateur et téléphone.
+- `python3 tools/scenes.py` : régénère les fonds d'écran (`img/scenes/`), scènes de nuit
+  dans la palette de la centrale (`img/scene.svg`). Liste et légendes : `js/wallpapers.js`.
 - `python3 tools/check.py` : contrôles avant mise en ligne (versions `?v=`
   cohérentes, aucune clé secrète dans le front, pas de guillemets
   typographiques dans le code).
