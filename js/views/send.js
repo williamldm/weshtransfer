@@ -5,16 +5,16 @@
 import {
   getProject, getFilesByIds, listSpaceFiles, createTransfer, sendTransfer, emailEnabled,
   getTransfer, transferUrl, createProject, signFiles, cachedUrl
-} from "../api.js?v=12";
-import { openUploadSheet } from "./upload-sheet.js?v=12";
-import { mountUploads } from "./uploads.js?v=12";
-import { onUploads, enqueue, checkFile } from "../upload.js?v=12";
-import { categoryOf, canPreview } from "../files.js?v=12";
-import { icon } from "../icons.js?v=12";
+} from "../api.js?v=13";
+import { openUploadSheet } from "./upload-sheet.js?v=13";
+import { mountUploads } from "./uploads.js?v=13";
+import { onUploads, enqueue, checkFile } from "../upload.js?v=13";
+import { categoryOf, canPreview } from "../files.js?v=13";
+import { icon } from "../icons.js?v=13";
 import {
   esc, h, formatBytes, formatDuration, plural, toast, errorText, openSheet, copyText, shareLink,
   canShare, formatDate, daysLeft, fileBadge, fileTile
-} from "../ui.js?v=12";
+} from "../ui.js?v=13";
 
 // Dans un espace "envoi", ce composeur EST l'accueil.
 export const title = (ctx) => (ctx && ctx.space.mode === "envoi" ? ctx.space.name : "Envoyer");
@@ -446,6 +446,9 @@ export async function showDone(root, ctx, created, info) {
   const recipients = transfer ? transfer.transfer_recipients : [];
 
   const sent = recipients.filter((r) => r.status === "sent").length;
+  // pure blague : un "aller-retour en jet" par tranche de 50 Mo, minimum 1
+  const bytes = transfer ? (transfer.transfer_files || []).reduce((s, x) => s + ((x.file && x.file.size_bytes) || 0), 0) : 0;
+  const carbon = Math.max(1, Math.round(bytes / (50 * 1024 * 1024)));
   const failed = recipients.filter((r) => r.status === "failed").length;
   const headline = !recipients.length || !info.emailOn
     ? "Ton lien est prêt"
@@ -460,6 +463,8 @@ export async function showDone(root, ctx, created, info) {
       '<div class="done-icon">' + icon(failed && !sent && info.emailOn && recipients.length ? "alert" : "check", 40) + "</div>" +
       "<h1>" + esc(headline) + "</h1>" +
       '<p class="muted">' + esc(sub) + "</p>" +
+      '<p class="carbon">' + icon("sparkle", 14) + " Bilan carbone de cet envoi : l'équivalent de " +
+        plural(carbon, "aller-retour", "allers-retours") + " Paris-Dubaï en jet privé.<br><span>Estimation totalement fantaisiste.</span></p>" +
 
       '<div class="link-box">' +
         '<input class="input mono" readonly value="' + esc(url) + '" data-url>' +

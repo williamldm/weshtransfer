@@ -2,12 +2,12 @@
 // Pas de supabase-js ici : un simple appel à l'Edge Function transfer-open,
 // qui vérifie le lien et renvoie des URLs signées. Page légère, rapide en 4G.
 
-import { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from "./config.js?v=12";
-import { Waveform, formatTime } from "./waveform.js?v=12";
-import { saveZip, canStreamToDisk, MEMORY_LIMIT } from "./zip.js?v=12";
-import { icon } from "./icons.js?v=12";
-import { esc, formatBytes, formatDuration, formatDate, plural, toast, triggerDownload, avatar, fileBadge, fileTile } from "./ui.js?v=12";
-import { categoryOf, canPreview } from "./files.js?v=12";
+import { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from "./config.js?v=13";
+import { Waveform, formatTime } from "./waveform.js?v=13";
+import { saveZip, canStreamToDisk, MEMORY_LIMIT } from "./zip.js?v=13";
+import { icon } from "./icons.js?v=13";
+import { esc, formatBytes, formatDuration, formatDate, plural, toast, triggerDownload, avatar, fileBadge, fileTile } from "./ui.js?v=13";
+import { categoryOf, canPreview } from "./files.js?v=13";
 
 const root = document.getElementById("tp");
 const k = new URLSearchParams(location.search).get("k") || "";
@@ -173,7 +173,10 @@ function render(d) {
     (groups.image.length ? '<section class="tp-section">' + head("Images", groups.image.length) + '<div class="tp-gallery">' + groups.image.map(renderImage).join("") + "</div></section>" : "") +
     (groups.other.length ? '<section class="tp-section">' + head("Autres fichiers", groups.other.length) + '<ul class="tp-files">' + groups.other.map(renderOther).join("") + "</ul></section>" : "") +
 
-    '<p class="tp-foot">Envoyé avec Séminaire · les fichiers sont supprimés automatiquement à expiration.</p>';
+    '<a class="tp-cta" href="index.html"><span><strong>Toi aussi, gaspille de la bande passante.</strong>' +
+      "<br>Envoie tes fichiers avec WeshTransfer, sans compte.</span>" + icon("chevron", 20) + "</a>" +
+    '<p class="tp-foot">WeshTransfer, le transfert le moins éco-responsable du web. ' +
+      "(En vrai, tes fichiers sont supprimés automatiquement à expiration.)</p>";
 
   const cs = getComputedStyle(document.documentElement);
   for (const f of groups.audio) {

@@ -2,56 +2,84 @@
 <html lang="fr">
 <head>
 <meta charset="utf-8">
-<!-- viewport-fit=cover : l'appli passe sous l'encoche, les marges de
-     sécurité sont gérées en CSS avec env(safe-area-inset-*) -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0b0911">
-<meta name="robots" content="noindex">
+<meta name="description" content="WeshTransfer, le transfert de fichiers le moins éco-responsable du web. Envoie tes sons, clips et stems, écoute avant de télécharger. Sans compte.">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>Séminaire</title>
+<title>WeshTransfer · le transfert le moins éco-responsable du web</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230b0911'/%3E%3Cpath d='M7 20v-8M12 24V8M17 21v-10M22 18v-4M25 17v-2' stroke='%23a78bfa' stroke-width='2.4' stroke-linecap='round'/%3E%3C/svg%3E">
-<link rel="stylesheet" href="css/app.css?v=12">
+<link rel="stylesheet" href="css/app.css?v=13">
 </head>
-<body>
+<body class="hub">
 
-<main class="join">
-  <div class="join-brand">
-    <div class="brand-mark" aria-hidden="true">
-      <i style="height:40%"></i><i style="height:85%"></i><i style="height:60%"></i><i style="height:100%"></i><i style="height:45%"></i><i style="height:70%"></i><i style="height:30%"></i>
+<header class="hub-top">
+  <a class="logo" href="index.html">
+    <span class="brand-mark sm" aria-hidden="true"><i style="height:45%"></i><i style="height:90%"></i><i style="height:60%"></i><i style="height:100%"></i><i style="height:50%"></i></span>
+    WeshTransfer
+  </a>
+  <button class="btn btn-ghost btn-sm" data-open="join">J'ai un code</button>
+</header>
+
+<main class="hub-main">
+  <section class="hub-hero">
+    <span class="hub-tag">Bilan carbone : catastrophique</span>
+    <h1>Le transfert de fichiers <span class="grad-text">le moins éco-responsable</span> du web.</h1>
+    <p>Tes sons, clips et stems voyagent en jet privé. On les écoute avant de les télécharger, on les commente à la seconde près. Sans compte, sans remords.</p>
+    <div class="hub-cta">
+      <button class="btn btn-primary btn-xl" data-open="send">Envoyer des fichiers</button>
+      <button class="btn btn-xl" data-open="salon">Créer un salon</button>
     </div>
-    <h1>Séminaire</h1>
-    <p class="sub">Envoie, écoute, commente. Sans compte.</p>
-  </div>
+    <div class="resume-list" id="resume" hidden></div>
+  </section>
 
-  <div class="resume-list" id="resume" hidden></div>
-
-  <form id="join-form" novalidate>
-    <div class="field">
-      <label class="label" for="code">Code de l'espace</label>
-      <input class="input input-code" id="code" name="code"
-             autocapitalize="characters" autocomplete="off"
-             autocorrect="off" spellcheck="false" maxlength="8"
-             placeholder="ABC123" required>
-    </div>
-
-    <div class="field">
-      <label class="label" for="pseudo">Ton blaze</label>
-      <input class="input" id="pseudo" name="pseudo"
-             autocomplete="nickname" maxlength="24"
-             placeholder="Comment on te reconnaît" required>
-    </div>
-
-    <button class="btn btn-primary btn-block btn-xl" id="join-submit" type="submit">
-      Entrer
+  <section class="hub-cards">
+    <button class="hub-card" data-open="send">
+      <span class="ft ft-audio" data-icon="send"></span>
+      <strong>Envoyer</strong>
+      <span>Dépose tes fichiers, mets des adresses. Ils reçoivent un lien pour écouter, voir et télécharger. Jusqu'à 3 Go par fichier.</span>
     </button>
+    <button class="hub-card" data-open="salon">
+      <span class="ft ft-video" data-icon="users"></span>
+      <strong>Créer un salon</strong>
+      <span>Un espace pour ton groupe, ta résidence, ton séminaire. Versions, commentaires horodatés, tout le monde en temps réel.</span>
+    </button>
+    <button class="hub-card" data-open="join">
+      <span class="ft ft-project" data-icon="link"></span>
+      <strong>Rejoindre</strong>
+      <span>On t'a donné un code à 6 caractères ? C'est ici. Tu choisis juste un blaze.</span>
+    </button>
+  </section>
 
-    <p class="form-error" id="join-error" role="alert" hidden></p>
-  </form>
+  <section class="hub-stats" aria-label="Statistiques parfaitement sérieuses">
+    <div><strong>0</strong><span>arbre planté</span></div>
+    <div><strong>3×</strong><span>le tour de la Terre par fichier</span></div>
+    <div><strong>100 %</strong><span>des serveurs allumés pour rien</span></div>
+  </section>
 
-  <p class="join-foot">Pas de compte à créer. Tes fichiers sont supprimés automatiquement après le séminaire.</p>
+  <section class="hub-faq">
+    <details>
+      <summary>C'est vraiment le moins éco-responsable ?</summary>
+      <p>On fait de notre mieux. Mais en vrai, les fichiers sont supprimés automatiquement à expiration et on ne garde rien. Désolé.</p>
+    </details>
+    <details>
+      <summary>Il faut un compte ?</summary>
+      <p>Non. Ni pour envoyer, ni pour recevoir. Un blaze suffit.</p>
+    </details>
+    <details>
+      <summary>Je peux envoyer quoi ?</summary>
+      <p>Tout : sons, stems, clips, visuels, PDF, projets Ableton ou FL Studio. Sauf les programmes (.exe, .dmg...), on n'est pas là pour ça.</p>
+    </details>
+  </section>
+
+  <footer class="hub-foot">
+    WeshTransfer est un projet parodique. Aucun jet privé n'a été affrété pour transférer tes fichiers.
+  </footer>
 </main>
 
-<script type="module" src="js/join.js?v=12"></script>
+<div id="sheets"></div>
+<div class="toast-wrap" id="toasts" aria-live="polite"></div>
+
+<script type="module" src="js/hub.js?v=13"></script>
 </body>
 </html>

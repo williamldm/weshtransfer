@@ -3,8 +3,8 @@
 import pathlib, re, sys
 
 root = pathlib.Path(__file__).resolve().parent.parent
-front = [p for p in root.rglob("*") if p.suffix in {".js", ".html", ".css"} and ".git" not in p.parts]
-code = [p for p in root.rglob("*") if p.suffix in {".js", ".ts"} and ".git" not in p.parts]
+front = [p for p in root.rglob("*") if p.suffix in {".js", ".html", ".css"} and ".git" not in p.parts and "_deploy" not in p.parts]
+code = [p for p in root.rglob("*") if p.suffix in {".js", ".ts"} and ".git" not in p.parts and "_deploy" not in p.parts]
 problems = []
 
 # 1. une seule version d'assets partout (deux ?v= differents = deux

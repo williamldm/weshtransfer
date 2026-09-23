@@ -151,7 +151,7 @@ export function transferMail(input: TransferMailInput): { subject: string; html:
 <tr><td align="center">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#ffffff;border-radius:14px;overflow:hidden;">
     <tr><td style="background:#0b0911;background-image:linear-gradient(135deg,#1b1030 0%,#0b0911 70%);padding:20px 24px;">
-      <span style="font-size:15px;font-weight:700;color:#ffffff;letter-spacing:.02em;"><span style="color:#a78bfa;">&#9679;</span> Séminaire</span>
+      <span style="font-size:15px;font-weight:700;color:#ffffff;letter-spacing:.02em;"><span style="color:#a78bfa;">&#9679;</span> WeshTransfer</span>
       <span style="font-size:13px;color:#aba2bf;"> · ${esc(input.spaceName)}</span>
     </td></tr>
     <tr><td style="padding:28px 24px 8px;">
@@ -201,7 +201,7 @@ export function downloadNoticeMail(input: {
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#fff;border-radius:14px;">
 <tr><td style="padding:24px;font-size:15px;line-height:1.5;color:#16181d;">
-<p style="margin:0 0 8px;font-size:13px;color:#6c7484;">Séminaire · ${esc(input.spaceName)}</p>
+<p style="margin:0 0 8px;font-size:13px;color:#6c7484;">WeshTransfer · ${esc(input.spaceName)}</p>
 <p style="margin:0;"><strong>${esc(who)}</strong> a téléchargé ton envoi <strong>${esc(input.title)}</strong>.</p>
 </td></tr></table></td></tr></table></body></html>`;
   const text = `${who} a téléchargé ton envoi "${input.title}".`;

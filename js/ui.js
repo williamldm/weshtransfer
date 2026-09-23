@@ -1,7 +1,7 @@
 // Briques d'interface partagées : DOM, messages, formatage, feuilles.
 
-import { icon } from "./icons.js?v=12";
-import { CATEGORY, categoryOf } from "./files.js?v=12";
+import { icon } from "./icons.js?v=13";
+import { CATEGORY, categoryOf } from "./files.js?v=13";
 
 // ------------------------------------------------------------------ DOM
 
@@ -39,6 +39,9 @@ const ERRORS = {
   ESPACE_EXPIRE: "Cet espace a expiré.",
   ESPACE_VERROUILLE: "Cet espace n'accepte plus de nouveaux arrivants.",
   PSEUDO_PRIS: "Ce blaze est déjà pris ici, choisis-en un autre.",
+  QUOTA_ESPACES: "Tu as déjà créé 5 espaces aujourd'hui. Même nous, on a des limites.",
+  NOM_INVALIDE: "Donne un nom à ton salon (60 caractères max).",
+  PSEUDO_INVALIDE: "Ton blaze doit faire entre 2 et 24 caractères.",
   NON_AUTHENTIFIE: "Connexion impossible, réessaie.",
   TROP_DE_CONNEXIONS: "Trop de connexions depuis ce réseau, réessaie dans quelques minutes.",
   NON_MEMBRE: "Tu ne fais plus partie de cet espace.",

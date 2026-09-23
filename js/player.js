@@ -2,9 +2,9 @@
 // navigation entre les vues. Les vues l'écoutent pour animer leurs
 // waveforms, la barre du bas l'affiche en permanence.
 
-import { cachedUrl, signFiles } from "./api.js?v=12";
-import { icon } from "./icons.js?v=12";
-import { formatDuration, toast } from "./ui.js?v=12";
+import { cachedUrl, signFiles } from "./api.js?v=13";
+import { icon } from "./icons.js?v=13";
+import { formatDuration, toast } from "./ui.js?v=13";
 
 const audio = new Audio();
 audio.preload = "metadata";
@@ -135,7 +135,7 @@ function updateMediaSession() {
     navigator.mediaSession.metadata = new MediaMetadata({
       title: track.title,
       artist: track.subtitle || "",
-      album: track.album || "Séminaire"
+      album: track.album || "WeshTransfer"
     });
   } catch (err) { /* navigateur ancien */ }
 }
