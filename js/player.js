@@ -2,9 +2,9 @@
 // navigation entre les vues. Les vues l'écoutent pour animer leurs
 // waveforms, la barre du bas l'affiche en permanence.
 
-import { cachedUrl, signUrls } from "./api.js?v=6";
-import { icon } from "./icons.js?v=6";
-import { formatDuration, toast } from "./ui.js?v=6";
+import { cachedUrl, signFiles } from "./api.js?v=8";
+import { icon } from "./icons.js?v=8";
+import { formatDuration, toast } from "./ui.js?v=8";
 
 const audio = new Audio();
 audio.preload = "metadata";
@@ -43,11 +43,11 @@ export function isCurrent(fileId) {
 export function play(next, options) {
   const opts = options || {};
   if (!track || track.fileId !== next.fileId) {
-    const url = next.url || cachedUrl(next.path);
+    const url = next.url || cachedUrl(next.fileId);
     if (!url) {
-      return signUrls([next.path]).then((urls) => {
-        if (!urls[next.path]) throw new Error("URL indisponible");
-        return play(Object.assign({}, next, { url: urls[next.path] }), opts);
+      return signFiles([next.fileId]).then((urls) => {
+        if (!urls[next.fileId]) throw new Error("URL indisponible");
+        return play(Object.assign({}, next, { url: urls[next.fileId] }), opts);
       }).catch((err) => toast("Lecture impossible : " + err.message, "err"));
     }
     track = next;

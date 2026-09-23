@@ -5,10 +5,10 @@
 // va couper. TUS reprend là où ça s'est arrêté au lieu de tout recommencer.
 
 import { Upload } from "https://cdn.jsdelivr.net/npm/tus-js-client@4.3.1/+esm";
-import { sb, BUCKET } from "./db.js?v=6";
-import { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, ALLOWED_EXT, PEAKS_MAX_BYTES } from "./config.js?v=6";
-import { computePeaks } from "./peaks.js?v=6";
-import { insertFile } from "./api.js?v=6";
+import { sb, BUCKET } from "./db.js?v=8";
+import { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, ALLOWED_EXT, PEAKS_MAX_BYTES } from "./config.js?v=8";
+import { computePeaks } from "./peaks.js?v=8";
+import { insertFile, storageCall, storageConfig } from "./api.js?v=8";
 
 // Hôte de stockage direct : recommandé par Supabase pour les gros fichiers.
 const ENDPOINT = SUPABASE_URL.replace(".supabase.co", ".storage.supabase.co") + "/storage/v1/upload/resumable";
@@ -132,6 +132,7 @@ export function cancel(jobId) {
   const job = jobs.find((j) => j.id === jobId);
   if (!job) return;
   if (job.tus) job.tus.abort(true).catch(() => {});
+  if (job.b2) cancelB2(job);
   job.state = "canceled";
   job.releaseTurn();
   emit(job);
@@ -179,8 +180,9 @@ async function run(job) {
 
   const { file, meta } = job;
   const ext = extOf(file.name);
-  const fileId = crypto.randomUUID();
-  const path = "spaces/" + meta.spaceId + "/" + meta.projectId + "/" + fileId + "." + ext;
+  let fileId = crypto.randomUUID();
+  let path = "spaces/" + meta.spaceId + "/" + meta.projectId + "/" + fileId + "." + ext;
+  let backend = "supabase";
   const mime = file.type && file.type !== "application/octet-stream" ? file.type : (MIME[ext] || "application/octet-stream");
 
   // La waveform se calcule pendant que ça monte : aucun temps perdu.
@@ -189,7 +191,17 @@ async function run(job) {
     : computePeaks(file, { maxBytes: PEAKS_MAX_BYTES }).catch(() => ({ peaks: null, duration: null }));
 
   try {
-    await tusUpload(job, path, mime);
+    // Le serveur décide : B2 dès que ses identifiants sont en place,
+    // Storage Supabase sinon.
+    const conf = await storageConfig();
+    if (conf.backend === "b2") {
+      const done = await b2Upload(job, mime);
+      fileId = done.fileId;
+      path = done.key;
+      backend = "b2";
+    } else {
+      await tusUpload(job, path, mime);
+    }
     if (job.state === "canceled") return;
 
     job.state = "waiting";
@@ -205,6 +217,7 @@ async function run(job) {
       id: fileId,
       project_id: meta.projectId,
       storage_path: path,
+      backend,
       original_name: file.name.slice(0, 200),
       mime_type: mime,
       size_bytes: file.size,
@@ -284,7 +297,164 @@ function tusUpload(job, path, mime) {
   });
 }
 
+// ---------------------------------------------------------- upload B2
+// Multipart S3 : le fichier est découpé en parties envoyées directement à
+// B2 via des URLs signées par l'Edge Function storage. Une partie ratée
+// est renvoyée seule ; un onglet fermé reprend où il en était (l'état est
+// gardé dans localStorage, les parties déjà reçues sont relues sur B2).
+
+const B2_PARALLEL = 3;
+const B2_RETRIES = [1000, 2000, 4000, 8000, 15000, 30000];
+
+function resumeKey(job) {
+  const f = job.file;
+  return "seminaire.up:" + [job.meta.projectId, f.name, f.size, f.lastModified].join("|");
+}
+
+function loadResume(k) {
+  try { return JSON.parse(localStorage.getItem(k)); } catch (err) { return null; }
+}
+
+function saveResume(k, v) {
+  try { localStorage.setItem(k, JSON.stringify(v)); } catch (err) { /* privé */ }
+}
+
+function forgetResume(k) {
+  try { localStorage.removeItem(k); } catch (err) { /* privé */ }
+}
+
+async function b2Upload(job, mime) {
+  const file = job.file;
+  const rk = resumeKey(job);
+  let st = loadResume(rk);
+  const done = new Map();   // numéro de partie -> taille reçue par B2
+
+  if (st) {
+    try {
+      const status = await storageCall("upload-status", { key: st.key, upload_id: st.uploadId });
+      for (const p of status.parts || []) done.set(p.part, p.size);
+    } catch (err) {
+      st = null;           // upload expiré côté B2 : on repart de zéro
+      forgetResume(rk);
+    }
+  }
+  if (!st) {
+    const fileId = crypto.randomUUID();
+    const init = await storageCall("upload-init", {
+      project_id: job.meta.projectId,
+      file_id: fileId,
+      file_name: file.name,
+      size: file.size,
+      content_type: mime
+    });
+    st = { fileId, key: init.key, uploadId: init.upload_id, partSize: init.part_size };
+    saveResume(rk, st);
+  }
+
+  job.b2 = { key: st.key, uploadId: st.uploadId, rk, xhrs: new Set() };
+  const partSize = st.partSize;
+  const total = Math.max(1, Math.ceil(file.size / partSize));
+  const queue = [];
+  for (let n = 1; n <= total; n++) if (!done.has(n)) queue.push(n);
+
+  let confirmed = 0;
+  for (const size of done.values()) confirmed += size;
+  const inflight = new Map();
+  const urls = {};
+  let lastT = performance.now();
+  let lastB = confirmed;
+
+  const progress = () => {
+    let sent = confirmed;
+    for (const v of inflight.values()) sent += v;
+    const now = performance.now();
+    if (now - lastT > 700) {
+      job.speed = ((sent - lastB) / (now - lastT)) * 1000;
+      lastT = now;
+      lastB = sent;
+    }
+    job.loaded = Math.min(sent, file.size);
+    emit(job);
+  };
+  progress();
+
+  // URLs signées par lots de 20, à la demande
+  const urlFor = async (n) => {
+    if (!urls[n]) {
+      const batch = [n].concat(queue.filter((x) => !urls[x]).slice(0, 19));
+      const res = await storageCall("upload-parts", { key: st.key, upload_id: st.uploadId, parts: batch });
+      Object.assign(urls, res.urls || {});
+    }
+    return urls[n];
+  };
+
+  const putPart = (n) => new Promise((resolve, reject) => {
+    const start = (n - 1) * partSize;
+    // slice sans type : aucun Content-Type envoyé, donc aucune négociation
+    // CORS supplémentaire avec B2
+    const blob = file.slice(start, Math.min(start + partSize, file.size));
+    urlFor(n).then((url) => {
+      const xhr = new XMLHttpRequest();
+      job.b2.xhrs.add(xhr);
+      xhr.open("PUT", url);
+      xhr.upload.onprogress = (e) => { inflight.set(n, e.loaded); progress(); };
+      xhr.onload = () => {
+        job.b2.xhrs.delete(xhr);
+        if (xhr.status >= 200 && xhr.status < 300) {
+          inflight.delete(n);
+          confirmed += blob.size;
+          progress();
+          resolve();
+        } else {
+          if (xhr.status === 403) delete urls[n];   // URL expirée : on la resignera
+          inflight.delete(n);
+          reject(Object.assign(new Error("HTTP " + xhr.status), { status: xhr.status }));
+        }
+      };
+      xhr.onerror = () => { job.b2.xhrs.delete(xhr); inflight.delete(n); reject(new Error("RESEAU")); };
+      xhr.onabort = () => { job.b2.xhrs.delete(xhr); inflight.delete(n); reject(new Error("ANNULE")); };
+      xhr.send(blob);
+    }, reject);
+  });
+
+  const worker = async () => {
+    while (queue.length && job.state !== "canceled") {
+      const n = queue.shift();
+      for (let attempt = 0; ; attempt++) {
+        try {
+          await putPart(n);
+          break;
+        } catch (err) {
+          if (job.state === "canceled" || err.message === "ANNULE") throw err;
+          if (attempt >= B2_RETRIES.length) throw err;
+          await new Promise((r) => setTimeout(r, B2_RETRIES[attempt]));
+        }
+      }
+    }
+  };
+
+  await Promise.all(Array.from({ length: Math.min(B2_PARALLEL, Math.max(1, queue.length)) }, worker));
+  if (job.state === "canceled") throw new Error("ANNULE");
+
+  await storageCall("upload-complete", { key: st.key, upload_id: st.uploadId });
+  forgetResume(rk);
+  return { fileId: st.fileId, key: st.key };
+}
+
+function cancelB2(job) {
+  for (const xhr of job.b2.xhrs) xhr.abort();
+  forgetResume(job.b2.rk);
+  storageCall("upload-abort", { key: job.b2.key, upload_id: job.b2.uploadId }).catch(() => {});
+}
+
 function explain(err) {
+  const code = String((err && err.message) || "");
+  if (/TROP_LOURD/.test(code)) return "Trop lourd pour cet espace.";
+  if (/FICHIER_EXISTANT/.test(code)) return "Conflit d'identifiant, réessaie.";
+  if (/NON_MEMBRE|NON_AUTHENTIFIE/.test(code)) return "Accès refusé : reconnecte-toi à l'espace.";
+  if (/FORMAT_REFUSE/.test(code)) return "Format non accepté.";
+  if (/RESEAU|Failed to fetch|Load failed/.test(code)) return "Réseau coupé. Touche réessayer : l'upload reprendra où il en était.";
+  if (/ERREUR_STOCKAGE|B2/.test(code)) return "Le stockage ne répond pas, réessaie dans un instant.";
   const res = err && err.originalResponse;
   const status = res && res.getStatus ? res.getStatus() : 0;
   const body = res && res.getBody ? String(res.getBody() || "") : "";

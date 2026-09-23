@@ -1,14 +1,14 @@
 // Écoute d'une version : grande waveform, transport, commentaires
 // horodatés façon SoundCloud ("à 1:23, la voix sature").
 
-import { getFile, listComments, addComment, deleteComment, signUrls, withDownloadName, deleteFile, updateFile } from "../api.js?v=6";
-import { Waveform, formatTime } from "../waveform.js?v=6";
-import { play, toggle, isCurrent, onPlayer, seekRatio, seekSeconds, skip, state as playerState, trackFromFile } from "../player.js?v=6";
-import { icon } from "../icons.js?v=6";
+import { getFile, listComments, addComment, deleteComment, signFiles, cachedDownload, deleteFile, updateFile } from "../api.js?v=8";
+import { Waveform, formatTime } from "../waveform.js?v=8";
+import { play, toggle, isCurrent, onPlayer, seekRatio, seekSeconds, skip, state as playerState, trackFromFile } from "../player.js?v=8";
+import { icon } from "../icons.js?v=8";
 import {
   esc, h, kindBadge, timeAgo, formatBytes, avatar, toast, errorText, triggerDownload,
   confirmSheet, actionSheet, KINDS, openSheet
-} from "../ui.js?v=6";
+} from "../ui.js?v=8";
 
 export const title = () => "Écoute";
 
@@ -176,8 +176,8 @@ export async function mount(root, ctx, params) {
 
     root.querySelector("[data-dl]").onclick = async () => {
       try {
-        const urls = await signUrls([file.storage_path]);
-        triggerDownload(withDownloadName(urls[file.storage_path], file.original_name), file.original_name);
+        await signFiles([file.id]);
+        triggerDownload(cachedDownload(file.id), file.original_name);
       } catch (err) { toast(errorText(err), "err"); }
     };
 
@@ -283,7 +283,7 @@ export async function mount(root, ctx, params) {
         '<a class="btn" href="#/projects">Retour</a></div>';
       return;
     }
-    signUrls([file.storage_path]).catch(() => {});
+    signFiles([file.id]).catch(() => {});
     if (wave) { wave.destroy(); wave = null; }
     drawShell();
     drawComments();

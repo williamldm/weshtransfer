@@ -1,22 +1,25 @@
 // Coquille de l'appli : démarrage, routeur à hash, en-tête, bus
 // d'événements, temps réel. Chaque vue est un module avec mount().
 
-import { restore, getSpace } from "./session.js?v=6";
-import { connectSpace } from "./realtime.js?v=6";
-import { bindPlayerBar } from "./player.js?v=6";
-import { activeCount, onUploads } from "./upload.js?v=6";
-import { openPeopleSheet } from "./views/people.js?v=6";
-import { icon } from "./icons.js?v=6";
-import { toast, errorText, esc } from "./ui.js?v=6";
+import { restore, getSpace } from "./session.js?v=8";
+import { connectSpace } from "./realtime.js?v=8";
+import { bindPlayerBar } from "./player.js?v=8";
+import { activeCount, onUploads } from "./upload.js?v=8";
+import { openPeopleSheet } from "./views/people.js?v=8";
+import { openUploadSheet } from "./views/upload-sheet.js?v=8";
+import { icon } from "./icons.js?v=8";
+import { toast, errorText, esc } from "./ui.js?v=8";
 
-import * as home from "./views/home.js?v=6";
-import * as project from "./views/project.js?v=6";
-import * as file from "./views/file.js?v=6";
-import * as send from "./views/send.js?v=6";
-import * as transfers from "./views/transfers.js?v=6";
+import * as home from "./views/home.js?v=8";
+import * as project from "./views/project.js?v=8";
+import * as file from "./views/file.js?v=8";
+import * as send from "./views/send.js?v=8";
+import * as transfers from "./views/transfers.js?v=8";
 
+// L'accueil dépend du mode de l'espace : morceaux (séminaire) ou
+// directement le composeur d'envoi (espace dédié aux envois).
 const ROUTES = [
-  { re: /^\/projects$/, view: home, root: true },
+  { re: /^\/projects$/, view: () => (ctx.space.mode === "envoi" ? send : home), root: true },
   { re: /^\/p\/([\w-]+)$/, view: project },
   { re: /^\/f\/([\w-]+)$/, view: file },
   { re: /^\/send$/, view: send },
@@ -43,15 +46,22 @@ function createBus() {
 
 // ------------------------------------------------------------- en-tête
 
-const view = document.getElementById("view");
+const viewEl = document.getElementById("view");
 const header = document.getElementById("header");
 let ctx = null;
 let unmount = null;
 let token = 0;
 let backHash = "#/projects";
+let dropHandler = null;
 
 function setBack(hash) {
   backHash = hash || "#/projects";
+}
+
+// Une vue peut prendre la main sur les fichiers glissés (le composeur
+// d'envoi, un morceau...). Sinon : feuille d'upload classique.
+function setDrop(fn) {
+  dropHandler = fn || null;
 }
 
 function drawHeader(isRoot) {
@@ -61,7 +71,7 @@ function drawHeader(isRoot) {
       : '<button class="btn btn-ghost btn-icon" data-back aria-label="Retour">' + icon("back") + "</button>") +
     '<div class="title" data-title></div>' +
     '<span class="up-pill" data-up hidden></span>' +
-    '<a class="btn btn-ghost btn-icon" href="#/send" aria-label="Envoyer">' + icon("send") + "</a>" +
+    (ctx.space.mode === "envoi" ? "" : '<a class="btn btn-ghost btn-icon" href="#/send" aria-label="Envoyer">' + icon("send") + "</a>") +
     '<button class="btn btn-ghost btn-icon people-btn" data-people aria-label="Participants">' + icon("users") +
       '<span class="badge" data-online></span></button>';
 
@@ -115,20 +125,64 @@ async function route() {
   const my = ++token;
   if (unmount) { try { unmount(); } catch (err) { console.error(err); } unmount = null; }
 
+  const view = typeof match.r.view === "function" ? match.r.view() : match.r.view;
   backHash = "#/projects";
+  dropHandler = null;
   drawHeader(!!match.r.root);
-  setTitle(match.r.view.title(ctx));
+  setTitle(view.title(ctx));
   window.scrollTo(0, 0);
 
   try {
-    const cleanup = await match.r.view.mount(view, ctx, { id: match.m[1], query });
+    const cleanup = await view.mount(viewEl, ctx, { id: match.m[1], query });
     // une navigation a eu lieu pendant le chargement : on démonte aussitôt
     if (my !== token) { if (cleanup) cleanup(); return; }
     unmount = cleanup || null;
   } catch (err) {
     console.error(err);
-    view.innerHTML = '<p class="empty">' + esc(errorText(err)) + "</p>";
+    viewEl.innerHTML = '<p class="empty">' + esc(errorText(err)) + "</p>";
   }
+}
+
+// ----------------------------------------------------- glisser-déposer
+// Des fichiers lâchés n'importe où sur la page (ordinateur) : voile
+// "Dépose tes sons", puis la vue courante décide où ils vont.
+
+function bindDrop() {
+  const veil = document.createElement("div");
+  veil.className = "drop-veil";
+  veil.innerHTML = '<div class="drop-box">' + icon("upload", 40) + "<strong>Dépose tes sons</strong></div>";
+  veil.hidden = true;
+  document.body.appendChild(veil);
+
+  let depth = 0;
+  const hasFiles = (e) => e.dataTransfer && Array.from(e.dataTransfer.types || []).includes("Files");
+
+  document.addEventListener("dragenter", (e) => {
+    if (!hasFiles(e)) return;
+    e.preventDefault();
+    depth++;
+    veil.hidden = false;
+  });
+  document.addEventListener("dragover", (e) => {
+    if (!hasFiles(e)) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "copy";
+  });
+  document.addEventListener("dragleave", (e) => {
+    if (!hasFiles(e)) return;
+    depth = Math.max(0, depth - 1);
+    if (!depth) veil.hidden = true;
+  });
+  document.addEventListener("drop", (e) => {
+    if (!hasFiles(e)) return;
+    e.preventDefault();
+    depth = 0;
+    veil.hidden = true;
+    const files = e.dataTransfer.files;
+    if (!files || !files.length) return;
+    if (dropHandler) dropHandler(files);
+    else openUploadSheet(ctx, files);
+  });
 }
 
 // ------------------------------------------------------------- démarrage
@@ -139,7 +193,7 @@ async function boot() {
     space = await restore();
   } catch (err) {
     const config = /CONFIG_MANQUANTE|CLE_SECRETE/.test(err.message);
-    view.innerHTML = '<div class="empty-state">' + icon("alert", 36) +
+    viewEl.innerHTML = '<div class="empty-state">' + icon("alert", 36) +
       "<p>" + esc(errorText(err)) + "</p>" +
       (config ? "" : '<button class="btn btn-primary" onclick="location.reload()">Réessayer</button>') + "</div>";
     return;
@@ -152,7 +206,7 @@ async function boot() {
   }
 
   const bus = createBus();
-  ctx = { space, bus, navigate, setTitle, setBack, online: new Set([space.participantId]) };
+  ctx = { space, bus, navigate, setTitle, setBack, setDrop, online: new Set([space.participantId]) };
 
   bus.on("presence", (ids) => {
     ctx.online = new Set(ids.length ? ids : [space.participantId]);
@@ -191,6 +245,7 @@ async function boot() {
   });
 
   bindPlayerBar(navigate);
+  bindDrop();
   connectSpace(space, bus);
   window.addEventListener("hashchange", route);
   window.addEventListener("offline", () => toast("Hors ligne : les uploads reprendront au retour du réseau", "err"));

@@ -8,6 +8,43 @@ Front HTML/JS vanilla sans build, back Supabase (auth anonyme, Postgres,
 Storage, Realtime, Edge Functions). Projet autonome : son propre dépôt, son
 propre projet Supabase, aucune dépendance à un autre projet.
 
+## Espaces
+
+Deux modes, fixés à la création :
+
+- **séminaire** : morceaux, versions, commentaires horodatés, envois.
+- **envoi** : l'accueil est directement le composeur façon WeTransfer ; les
+  sons déposés sont rangés en coulisse, sans question.
+
+    select code from create_space('Salon', 30, 'seminaire');
+    select code from create_space('Envois', 30, 'envoi');
+
+Un même appareil peut rejoindre plusieurs espaces et passer de l'un à
+l'autre (feuille Participants > Mes espaces). Le premier qui entre dans un
+espace en devient host.
+
+## Stockage : Backblaze B2
+
+Les fichiers audio vont sur un bucket B2 privé (API compatible S3). Le
+navigateur envoie les octets directement à B2, en parties de 16 Mo, via des
+URLs signées par l'Edge Function `storage` : reprise après coupure, et plus
+de limite de 50 Mo par fichier. Tant que B2 n'est pas configuré, l'appli
+bascule d'elle-même sur le Storage Supabase ; chaque fichier retient où il
+est stocké (`files.backend`).
+
+Mise en place (interface web B2) :
+
+1. **Bucket** : Create a Bucket, fichiers **privés**, Object Lock désactivé.
+2. **CORS** (Bucket Settings > CORS Rules) : partager avec toutes les
+   origines, pour l'API **compatible S3**. Ça autorise le navigateur à envoyer
+   et lire via URL signée ; les fichiers restent privés.
+3. **Lifecycle** : garder uniquement la dernière version (filet de
+   sécurité : l'appli supprime déjà toutes les versions elle-même).
+4. **Clé d'application** restreinte à ce bucket, accès lecture + écriture.
+5. Secrets :
+
+       supabase secrets set B2_KEY_ID=... B2_APP_KEY=... B2_BUCKET=... B2_ENDPOINT=https://s3.<region>.backblazeb2.com
+
 ## Fonctionnement
 
 - **Entrée** : code d'espace + blaze. Chaque appareil reçoit un utilisateur
@@ -37,7 +74,7 @@ propre projet Supabase, aucune dépendance à un autre projet.
 3. **Auth** : Authentication > Sign In / Providers > Anonymous sign-ins : ON.
 4. **Edge Functions** (toutes en `--no-verify-jwt`, elles vérifient elles-mêmes) :
 
-       supabase functions deploy send-transfer transfer-open purge-spaces --no-verify-jwt --use-api
+       supabase functions deploy storage send-transfer transfer-open purge-spaces --no-verify-jwt --use-api
 
 5. **Emails** (facultatif, sinon mode lien) : compte Resend + domaine vérifié.
 
@@ -49,13 +86,10 @@ propre projet Supabase, aucune dépendance à un autre projet.
        select vault.create_secret('<secret>', 'seminaire_cron_secret');   -- SQL editor
 
    La migration `..._seminar_cron.sql` planifie l'appel chaque nuit à 04h17 UTC.
-7. **Créer un espace** (SQL editor) :
+7. **Créer un espace** (SQL editor), voir la section Espaces.
 
-       select code, expires_at, purge_at from create_space('Villa septembre', 14);
-
-8. **Stockage** : en plan Free, 1 Go au total et **50 Mo par fichier**. Pour des
-   WAV et des stems, passer le projet en Pro et relever la limite par fichier
-   (Storage > Settings).
+8. **Stockage** : voir la section B2. Sans B2, le Storage Supabase du plan Free
+   limite à 1 Go au total et **50 Mo par fichier**.
 
 ## Développement local
 

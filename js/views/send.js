@@ -4,17 +4,19 @@
 
 import {
   getProject, getFilesByIds, listSpaceFiles, createTransfer, sendTransfer, emailEnabled,
-  getTransfer, transferUrl
-} from "../api.js?v=6";
-import { openUploadSheet } from "./upload-sheet.js?v=6";
-import { onUploads } from "../upload.js?v=6";
-import { icon } from "../icons.js?v=6";
+  getTransfer, transferUrl, createProject
+} from "../api.js?v=8";
+import { openUploadSheet } from "./upload-sheet.js?v=8";
+import { mountUploads } from "./uploads.js?v=8";
+import { onUploads, enqueue, checkFile } from "../upload.js?v=8";
+import { icon } from "../icons.js?v=8";
 import {
   esc, h, kindBadge, formatBytes, plural, toast, errorText, openSheet, copyText, shareLink,
   canShare, formatDate, daysLeft
-} from "../ui.js?v=6";
+} from "../ui.js?v=8";
 
-export const title = () => "Envoyer";
+// Dans un espace "envoi", ce composeur EST l'accueil.
+export const title = (ctx) => (ctx && ctx.space.mode === "envoi" ? ctx.space.name : "Envoyer");
 
 const REPLY_KEY = "seminaire.replyTo";
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
@@ -35,6 +37,9 @@ export async function mount(root, ctx, params) {
     sending: false
   };
   const tag = "send-" + Date.now();
+  const envoiMode = ctx.space.mode === "envoi";
+  let draft = null;   // morceau créé en coulisse pour les fichiers de cet envoi
+  let waiting = 0;    // fichiers de cet envoi encore en cours d'upload
   const maxDays = ctx.space.purgeAt ? daysLeft(ctx.space.purgeAt) : 30;
 
   root.innerHTML = '<div class="skeleton tall"></div>';
@@ -63,8 +68,8 @@ export async function mount(root, ctx, params) {
   // ------------------------------------------------------ rendu
   root.innerHTML =
     '<header class="page-head">' +
-      '<div class="eyebrow">Envoi</div>' +
-      "<h1>Envoyer des fichiers</h1>" +
+      '<div class="eyebrow">' + (envoiMode ? esc(ctx.space.name) : "Envoi") + "</div>" +
+      "<h1>" + (envoiMode ? "Envoyer des sons" : "Envoyer des fichiers") + "</h1>" +
       '<div class="meta">Tes destinataires reçoivent un lien pour écouter et télécharger. Pas de compte, pas de code.</div>' +
     "</header>" +
 
@@ -78,12 +83,18 @@ export async function mount(root, ctx, params) {
       '<section class="card">' +
         '<div class="card-head"><h2>Fichiers</h2><span class="muted" data-total></span></div>' +
         '<ul class="send-files" data-files></ul>' +
-        '<div class="row-2 stack-sm">' +
+        (envoiMode
+          ? '<label class="dropzone" data-dropzone>' + icon("upload", 30) +
+              "<strong>Ajoute tes sons</strong><span>Touche ici, ou glisse-les sur la page</span>" +
+              '<input type="file" multiple hidden accept=".mp3,.wav,.aif,.aiff,.m4a,.flac,.ogg,.zip,audio/*" data-upload></label>'
+          : "") +
+        '<div class="row-2 stack-sm"' + (envoiMode ? " hidden" : "") + ">" +
           '<button type="button" class="btn btn-block" data-pick>' + icon("music", 18) + "<span>Depuis l'espace</span></button>" +
           '<label class="btn btn-block">' + icon("upload", 18) + "<span>Nouveaux fichiers</span>" +
-            '<input type="file" multiple hidden accept=".mp3,.wav,.aif,.aiff,.m4a,.flac,.ogg,.zip,audio/*" data-upload></label>' +
+            '<input type="file" multiple hidden accept=".mp3,.wav,.aif,.aiff,.m4a,.flac,.ogg,.zip,audio/*" data-upload-sheet></label>' +
         "</div>" +
         '<div class="send-pending" data-pending hidden></div>' +
+        (envoiMode ? '<button type="button" class="btn btn-ghost btn-block btn-sm" data-pick-more>' + icon("music", 16) + " Reprendre un son déjà envoyé</button>" : "") +
       "</section>" +
 
       '<section class="card">' +
@@ -116,7 +127,10 @@ export async function mount(root, ctx, params) {
       "</section>" +
 
       '<button class="btn btn-primary btn-block btn-xl" type="submit" data-submit></button>' +
-    "</form>";
+    "</form>" +
+    (envoiMode
+      ? '<a class="link-row" href="#/transfers">' + icon("mail", 18) + "<span>Mes envois : qui a ouvert, qui a téléchargé</span>" + icon("chevron", 18) + "</a>"
+      : "");
 
   const form = root.querySelector("[data-form]");
   const titleInput = form.querySelector("[name=title]");
@@ -158,6 +172,7 @@ export async function mount(root, ctx, params) {
   }
 
   function drawSubmit() {
+    if (waiting > 0) return drawPending();
     const n = state.emails.length;
     const label = n && emailOn ? "Envoyer à " + plural(n, "personne", "personnes") : "Créer le lien";
     submitEl.innerHTML = icon(n && emailOn ? "send" : "link", 22) + "<span>" + label + "</span>";
@@ -233,27 +248,75 @@ export async function mount(root, ctx, params) {
 
   // Nouveaux fichiers : uploadés dans un morceau de l'espace, puis ajoutés
   // automatiquement à l'envoi dès qu'ils sont en ligne.
-  let waiting = 0;
-  root.querySelector("[data-upload]").addEventListener("change", (e) => {
-    const title = titleInput.value.trim();
-    openUploadSheet(ctx, e.target.files, {
-      tag,
-      newTitle: title || null,
-      onQueued: (jobs) => {
-        waiting += jobs.length;
-        drawPending();
-        if (!titleInput.value.trim() && jobs[0]) titleInput.value = jobs[0].meta.projectTitle;
-      }
+
+  // Mode séminaire : on choisit le morceau dans la feuille habituelle.
+  const sheetInput = root.querySelector("[data-upload-sheet]");
+  if (sheetInput) {
+    sheetInput.addEventListener("change", (e) => {
+      const title = titleInput.value.trim();
+      openUploadSheet(ctx, e.target.files, {
+        tag,
+        newTitle: title || null,
+        onQueued: (jobs) => {
+          waiting += jobs.length;
+          drawPending();
+          if (!titleInput.value.trim() && jobs[0]) titleInput.value = jobs[0].meta.projectTitle;
+        }
+      });
+      e.target.value = "";
     });
-    e.target.value = "";
+  }
+
+  // Mode envoi : pas de question, les sons vont dans un morceau créé en
+  // coulisse pour cet envoi (retrouvable ensuite via "Reprendre un son").
+  async function addDirect(fileList) {
+    const files = Array.from(fileList || []);
+    const refused = files.map((f) => [f, checkFile(f, ctx.space.maxFileBytes)]).filter(([, err]) => err);
+    for (const [f, err] of refused) toast(f.name + " : " + err, "err");
+    const ok = files.filter((f) => !checkFile(f, ctx.space.maxFileBytes));
+    if (!ok.length) return;
+    try {
+      if (!draft) {
+        const stamp = new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }).format(new Date());
+        draft = await createProject(ctx.space.id, titleInput.value.trim() || "Envoi du " + stamp);
+        if (!titleInput.value.trim()) titleInput.value = draft.title;
+      }
+      const jobs = enqueue(ok, {
+        spaceId: ctx.space.id, projectId: draft.id, projectTitle: draft.title,
+        kind: null, label: null, bpm: null, musicalKey: null, tag
+      });
+      waiting += jobs.length;
+      drawPending();
+    } catch (err) {
+      toast(errorText(err), "err");
+    }
+  }
+
+  const directInput = root.querySelector("[data-upload]");
+  if (directInput) {
+    directInput.addEventListener("change", (e) => { addDirect(e.target.files); e.target.value = ""; });
+  }
+
+  // Fichiers glissés sur la page
+  ctx.setDrop((files) => {
+    if (envoiMode) addDirect(files);
+    else openUploadSheet(ctx, files, {
+      tag,
+      newTitle: titleInput.value.trim() || null,
+      onQueued: (jobs) => { waiting += jobs.length; drawPending(); }
+    });
   });
 
+  const pickMore = root.querySelector("[data-pick-more]");
+  if (pickMore) pickMore.onclick = () => root.querySelector("[data-pick]").click();
+
+  // Progression des fichiers de CET envoi, dans la carte "Fichiers"
+  const offJobs = mountUploads(pendingEl, (j) => j.meta.tag === tag);
+
   function drawPending() {
-    pendingEl.hidden = waiting <= 0;
-    pendingEl.innerHTML = waiting > 0
-      ? '<span class="spinner"></span> ' + plural(waiting, "fichier en cours d'upload", "fichiers en cours d'upload") + ", ils s'ajoutent tout seuls."
-      : "";
     submitEl.disabled = state.sending || !state.files.length;
+    if (waiting > 0) submitEl.innerHTML = '<span class="spinner"></span><span>Upload en cours...</span>';
+    else drawSubmit();
   }
 
   const offUploads = onUploads(async (job) => {
@@ -263,7 +326,13 @@ export async function mount(root, ctx, params) {
       waiting--;
       try {
         const [f] = await getFilesByIds([job.result.id]);
-        if (f && !state.files.some((x) => x.id === f.id)) { state.files.push(f); drawFiles(); }
+        if (f && !state.files.some((x) => x.id === f.id)) {
+          // ordre de dépôt, pas ordre d'arrivée (le petit fichier finit avant le gros)
+          f.order = job.id;
+          state.files.push(f);
+          state.files.sort((a, b) => (a.order || 0) - (b.order || 0));
+          drawFiles();
+        }
       } catch (err) { /* réseau */ }
       drawPending();
     }
@@ -334,7 +403,7 @@ export async function mount(root, ctx, params) {
   drawFiles();
   drawChips();
 
-  return () => { offUploads(); };
+  return () => { offUploads(); offJobs(); };
 }
 
 // ---------------------------------------------------------------- succès

@@ -1,9 +1,9 @@
 // Feuille "Participants" : qui est là, inviter, réglages du host.
 
-import { listParticipants, updateSpace } from "../api.js?v=6";
-import { icon } from "../icons.js?v=6";
-import { esc, h, openSheet, avatar, shareLink, copyText, toast, errorText, formatDate, confirmSheet, canShare } from "../ui.js?v=6";
-import { leaveSpace } from "../session.js?v=6";
+import { listParticipants, updateSpace } from "../api.js?v=8";
+import { icon } from "../icons.js?v=8";
+import { esc, h, openSheet, avatar, shareLink, copyText, toast, errorText, formatDate, confirmSheet, canShare } from "../ui.js?v=8";
+import { leaveSpace, knownSpaces, switchTo } from "../session.js?v=8";
 
 export function inviteUrl(code) {
   return new URL("index.html?c=" + encodeURIComponent(code), location.href).href;
@@ -26,6 +26,8 @@ export async function openPeopleSheet(ctx) {
       '<div class="section-head"><h2>Dans l\'espace</h2></div>' +
       '<ul class="people-list" data-list><li class="muted">Chargement...</li></ul>' +
       (s.isHost ? '<div class="section-head"><h2>Réglages (host)</h2></div><div data-host></div>' : "") +
+      '<div class="section-head"><h2>Mes espaces</h2></div>' +
+      '<div class="space-list" data-spaces></div>' +
       '<button class="btn btn-ghost btn-block" data-leave>' + icon("logout", 18) + " Quitter cet espace sur cet appareil</button>" +
     "</div>"
   );
@@ -50,6 +52,23 @@ export async function openPeopleSheet(ctx) {
     leaveSpace();
     location.href = "index.html?c=" + encodeURIComponent(s.code);
   };
+
+  // Passer d'un espace à l'autre sans ressaisir de code
+  const others = knownSpaces().filter((k) => k.id !== s.id);
+  body.querySelector("[data-spaces]").innerHTML =
+    '<div class="space-item is-current">' + icon(s.mode === "envoi" ? "send" : "music", 18) +
+      "<span>" + esc(s.name) + '</span><span class="tag">ici</span></div>' +
+    others.map((k) =>
+      '<button class="space-item" data-switch="' + esc(k.id) + '">' + icon(k.mode === "envoi" ? "send" : "music", 18) +
+        "<span>" + esc(k.name) + "</span>" + icon("chevron", 18) + "</button>").join("") +
+    '<a class="space-item" href="index.html">' + icon("plus", 18) + "<span>Rejoindre un autre espace</span></a>";
+  body.querySelector("[data-spaces]").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-switch]");
+    if (b && switchTo(b.dataset.switch)) {
+      location.href = "app.html#/projects";
+      location.reload();
+    }
+  });
 
   const listEl = body.querySelector("[data-list]");
   try {

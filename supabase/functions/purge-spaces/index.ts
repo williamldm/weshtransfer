@@ -8,6 +8,7 @@
 
 import { admin } from "../_shared/supabase.ts";
 import { json } from "../_shared/http.ts";
+import { b2Config, deletePrefix } from "../_shared/b2.ts";
 
 const BUCKET = "seminar";
 
@@ -58,9 +59,13 @@ Deno.serve(async (req) => {
         const { error: rmError } = await db.storage.from(BUCKET).remove(paths.slice(i, i + 100));
         if (rmError) throw new Error(`remove : ${rmError.message}`);
       }
+      // B2 : toutes les versions et les uploads abandonnés de l'espace
+      const b2 = b2Config();
+      const onB2 = b2 ? await deletePrefix(b2, `spaces/${space.id}/`) : 0;
+
       const { error: delError } = await db.from("spaces").delete().eq("id", space.id);
       if (delError) throw new Error(`delete : ${delError.message}`);
-      report.push({ space: space.name, files: paths.length, ok: true });
+      report.push({ space: space.name, files: paths.length + onB2, ok: true });
     } catch (err) {
       // on continue avec les autres espaces ; celui-ci sera retente demain
       report.push({ space: space.name, files: 0, ok: false, error: (err as Error).message });

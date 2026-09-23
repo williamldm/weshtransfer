@@ -10,6 +10,7 @@
 import { admin } from "../_shared/supabase.ts";
 import { json, preflight, readJson } from "../_shared/http.ts";
 import { downloadNoticeMail, mailConfig, sendBatch } from "../_shared/email.ts";
+import { b2Config, presignGet } from "../_shared/b2.ts";
 
 const URL_TTL = 6 * 3600;
 
@@ -104,7 +105,7 @@ Deno.serve(async (req) => {
     .from("transfer_files")
     .select(`position, file:files(
       id, original_name, size_bytes, kind, duration_sec, peaks, label, version_no,
-      mime_type, storage_path,
+      mime_type, storage_path, backend,
       project:projects(title),
       uploader:participants(pseudo)
     )`)
@@ -116,7 +117,7 @@ Deno.serve(async (req) => {
   type FileRow = {
     id: string; original_name: string; size_bytes: number | null; kind: string;
     duration_sec: number | null; peaks: number[] | null; label: string | null;
-    version_no: number; mime_type: string | null; storage_path: string;
+    version_no: number; mime_type: string | null; storage_path: string; backend: string;
     project: { title: string } | null; uploader: { pseudo: string } | null;
   };
 
@@ -124,10 +125,27 @@ Deno.serve(async (req) => {
     .map((i) => (i as unknown as { file: FileRow | null }).file)
     .filter((f): f is FileRow => !!f);
 
-  const signed = files.length
-    ? (await db.storage.from("seminar").createSignedUrls(files.map((f) => f.storage_path), URL_TTL)).data ?? []
-    : [];
-  const urlByPath = new Map(signed.map((s) => [s.path, s.signedUrl]));
+  // URLs signées selon l'endroit où vit chaque fichier (Storage ou B2)
+  const urls = new Map<string, { url: string; download: string }>();
+  const onSupabase = files.filter((f) => f.backend !== "b2");
+  if (onSupabase.length) {
+    const { data } = await db.storage.from("seminar")
+      .createSignedUrls(onSupabase.map((f) => f.storage_path), URL_TTL);
+    const byPath = new Map((data ?? []).map((d) => [d.path, d.signedUrl]));
+    for (const f of onSupabase) {
+      const url = byPath.get(f.storage_path);
+      if (url) urls.set(f.id, { url, download: `${url}&download=${encodeURIComponent(f.original_name)}` });
+    }
+  }
+  const b2 = b2Config();
+  if (b2) {
+    await Promise.all(files.filter((f) => f.backend === "b2").map(async (f) => {
+      urls.set(f.id, {
+        url: await presignGet(b2, f.storage_path, URL_TTL),
+        download: await presignGet(b2, f.storage_path, URL_TTL, f.original_name),
+      });
+    }));
+  }
 
   return json({
     title: transfer.title,
@@ -137,7 +155,7 @@ Deno.serve(async (req) => {
     expires_at: transfer.expires_at,
     recipient: recipient?.email ?? null,
     files: files.map((f) => {
-      const url = urlByPath.get(f.storage_path) ?? null;
+      const signed = urls.get(f.id);
       return {
         id: f.id,
         name: f.original_name,
@@ -150,8 +168,8 @@ Deno.serve(async (req) => {
         mime: f.mime_type,
         project: f.project?.title ?? null,
         uploader: f.uploader?.pseudo ?? null,
-        url,
-        download_url: url ? `${url}&download=${encodeURIComponent(f.original_name)}` : null,
+        url: signed?.url ?? null,
+        download_url: signed?.download ?? null,
       };
     }),
   });

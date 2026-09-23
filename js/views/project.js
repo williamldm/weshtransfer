@@ -1,17 +1,17 @@
 // Un morceau : ses versions de la plus récente à la plus ancienne, chacune
 // avec sa mini-waveform jouable d'un tap.
 
-import { getProject, signUrls, cachedUrl, updateProject, deleteProject, deleteFile, withDownloadName } from "../api.js?v=6";
-import { mountUploads } from "./uploads.js?v=6";
-import { openUploadSheet } from "./upload-sheet.js?v=6";
-import { Waveform } from "../waveform.js?v=6";
-import { play, toggle, isCurrent, onPlayer, seekRatio, state as playerState, trackFromFile } from "../player.js?v=6";
-import { saveZip, canStreamToDisk, MEMORY_LIMIT } from "../zip.js?v=6";
-import { icon } from "../icons.js?v=6";
+import { getProject, signFiles, cachedUrl, cachedDownload, updateProject, deleteProject, deleteFile } from "../api.js?v=8";
+import { mountUploads } from "./uploads.js?v=8";
+import { openUploadSheet } from "./upload-sheet.js?v=8";
+import { Waveform } from "../waveform.js?v=8";
+import { play, toggle, isCurrent, onPlayer, seekRatio, state as playerState, trackFromFile } from "../player.js?v=8";
+import { saveZip, canStreamToDisk, MEMORY_LIMIT } from "../zip.js?v=8";
+import { icon } from "../icons.js?v=8";
 import {
   esc, kindBadge, timeAgo, formatBytes, formatDuration, plural, promptSheet,
   confirmSheet, actionSheet, toast, errorText, triggerDownload
-} from "../ui.js?v=6";
+} from "../ui.js?v=8";
 
 export const title = () => "Morceau";
 
@@ -121,6 +121,11 @@ export async function mount(root, ctx, params) {
 
     bind();
     ctx.setTitle(project.title);
+    // fichiers glissés ici = nouvelles versions de CE morceau
+    ctx.setDrop((files) => openUploadSheet(ctx, files, {
+      projectId: project.id,
+      onQueued: () => toast("Upload lancé", "ok")
+    }));
     offUploads();
     offUploads = mountUploads(root.querySelector("[data-uploads]"), (j) => j.meta.projectId === project.id);
   }
@@ -198,8 +203,8 @@ export async function mount(root, ctx, params) {
 
   async function downloadOne(f) {
     try {
-      const urls = await signUrls([f.storage_path]);
-      triggerDownload(withDownloadName(urls[f.storage_path], f.original_name), f.original_name);
+      await signFiles([f.id]);
+      triggerDownload(cachedDownload(f.id), f.original_name);
     } catch (err) { toast(errorText(err), "err"); }
   }
 
@@ -213,12 +218,12 @@ export async function mount(root, ctx, params) {
     // URLs déjà signées au rendu : le sélecteur de fichier reste dans le geste.
     const entries = files.map((f) => ({
       name: "v" + f.version_no + " - " + f.original_name,
-      url: cachedUrl(f.storage_path),
+      url: cachedUrl(f.id),
       size: f.size_bytes
     }));
     if (entries.some((e) => !e.url)) {
-      await signUrls(files.map((f) => f.storage_path));
-      entries.forEach((e, i) => { e.url = cachedUrl(files[i].storage_path); });
+      await signFiles(files.map((f) => f.id));
+      entries.forEach((e, i) => { e.url = cachedUrl(files[i].id); });
     }
     const label = btn.innerHTML;
     btn.disabled = true;
@@ -247,7 +252,7 @@ export async function mount(root, ctx, params) {
       return;
     }
     // Pré-signature : le premier tap sur lecture part sans attendre.
-    signUrls(readyFiles().map((f) => f.storage_path)).catch(() => {});
+    signFiles(readyFiles().map((f) => f.id)).catch(() => {});
     draw();
   }
 

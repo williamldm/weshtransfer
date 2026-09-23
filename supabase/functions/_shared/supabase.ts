@@ -38,3 +38,19 @@ export async function callerId(req: Request, client: SupabaseClient): Promise<st
   if (error || !data.user) return null;
   return data.user.id;
 }
+
+// Client qui agit AVEC la session de l'appelant : la RLS s'applique comme
+// dans le navigateur. Sert à vérifier les droits sans les réécrire ici.
+export function asUser(req: Request): SupabaseClient {
+  let key = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
+  if (!key) {
+    try {
+      const parsed = JSON.parse(Deno.env.get("SUPABASE_PUBLISHABLE_KEYS") ?? "{}") as Record<string, string>;
+      key = parsed.default ?? Object.values(parsed)[0] ?? "";
+    } catch { /* rien */ }
+  }
+  return createClient(Deno.env.get("SUPABASE_URL")!, key, {
+    auth: { persistSession: false, autoRefreshToken: false },
+    global: { headers: { Authorization: req.headers.get("Authorization") ?? "" } },
+  });
+}

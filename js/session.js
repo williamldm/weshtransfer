@@ -1,19 +1,49 @@
 // Session anonyme + appartenance à un espace. Aucun compte : l'appareil
 // reçoit un utilisateur anonyme Supabase, puis rejoint un espace via son code.
 
-import { sb, q, requireClient } from "./db.js?v=6";
+import { sb, q, requireClient } from "./db.js?v=8";
 
-const SPACE_KEY = "seminaire.space";
+const SPACE_KEY = "seminaire.space";      // espace actif
+const KNOWN_KEY = "seminaire.spaces";     // tous les espaces rejoints sur cet appareil
+
+function read(key, fallback) {
+  try { return JSON.parse(localStorage.getItem(key)) || fallback; } catch (err) { return fallback; }
+}
+
+function write(key, value) {
+  try { localStorage.setItem(key, JSON.stringify(value)); } catch (err) { /* navigation privée */ }
+}
 
 export function getSpace() {
-  try { return JSON.parse(localStorage.getItem(SPACE_KEY)); } catch (err) { return null; }
+  return read(SPACE_KEY, null);
+}
+
+// Espaces connus de cet appareil (un même téléphone peut être dans
+// "Envois" et dans "Salon" : on passe de l'un à l'autre sans recode).
+export function knownSpaces() {
+  return read(KNOWN_KEY, []);
+}
+
+function remember(space) {
+  const list = knownSpaces().filter((s) => s.id !== space.id);
+  list.unshift({ id: space.id, name: space.name, code: space.code, mode: space.mode });
+  write(KNOWN_KEY, list.slice(0, 10));
 }
 
 function setSpace(space) {
-  try { localStorage.setItem(SPACE_KEY, JSON.stringify(space)); } catch (err) { /* navigation privée */ }
+  write(SPACE_KEY, space);
+  remember(space);
+}
+
+export function switchTo(id) {
+  const target = knownSpaces().find((s) => s.id === id);
+  if (target) write(SPACE_KEY, target);
+  return !!target;
 }
 
 export function leaveSpace() {
+  const current = getSpace();
+  if (current) write(KNOWN_KEY, knownSpaces().filter((s) => s.id !== current.id));
   try { localStorage.removeItem(SPACE_KEY); } catch (err) { /* idem */ }
 }
 
@@ -44,6 +74,7 @@ export async function joinSpace(code, pseudo) {
     participantId: s.participant_id,
     name: s.name,
     code: s.code,
+    mode: s.mode || "seminaire",
     isHost: s.is_host,
     isLocked: s.is_locked,
     expiresAt: s.expires_at,
@@ -66,7 +97,7 @@ export async function restore() {
 
   const [spaceRes, meRes] = await Promise.all([
     sb.from("spaces")
-      .select("id, name, code, is_locked, expires_at, purge_at, max_file_bytes")
+      .select("id, name, code, mode, is_locked, expires_at, purge_at, max_file_bytes")
       .eq("id", space.id)
       .maybeSingle(),
     sb.from("participants")
@@ -82,6 +113,7 @@ export async function restore() {
   Object.assign(space, {
     name: spaceRes.data.name,
     code: spaceRes.data.code,
+    mode: spaceRes.data.mode,
     isLocked: spaceRes.data.is_locked,
     expiresAt: spaceRes.data.expires_at,
     purgeAt: spaceRes.data.purge_at,

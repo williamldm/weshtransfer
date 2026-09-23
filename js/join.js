@@ -1,6 +1,6 @@
 // Écran d'entrée : code + blaze. Aucune notion de compte.
 
-import { errorText, esc } from "./ui.js?v=6";
+import { errorText, esc } from "./ui.js?v=8";
 
 const form = document.getElementById("join-form");
 const codeInput = document.getElementById("code");
@@ -16,12 +16,23 @@ const params = new URLSearchParams(location.search);
 const fromLink = (params.get("c") || params.get("code") || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
 if (fromLink) codeInput.value = fromLink.slice(0, 8);
 
-// Déjà dans un espace sur cet appareil : raccourci pour y retourner.
+// Espaces déjà rejoints sur cet appareil : un raccourci par espace.
 try {
-  const saved = JSON.parse(localStorage.getItem("seminaire.space"));
-  if (saved && saved.name && (!fromLink || fromLink === saved.code)) {
+  const known = (JSON.parse(localStorage.getItem("seminaire.spaces")) || [])
+    .filter((k) => k && k.id && (!fromLink || fromLink === k.code));
+  if (known.length) {
     resume.hidden = false;
-    resume.innerHTML = "<span>Reprendre</span><strong>" + esc(saved.name) + "</strong><span class=\"mono\">" + esc(saved.code) + "</span>";
+    resume.innerHTML = known.map((k) =>
+      '<button type="button" class="resume" data-id="' + esc(k.id) + '">' +
+        "<span>Reprendre</span><strong>" + esc(k.name) + '</strong><span class="mono">' + esc(k.code) + "</span></button>"
+    ).join("");
+    resume.addEventListener("click", (e) => {
+      const b = e.target.closest("[data-id]");
+      const k = b && known.find((x) => x.id === b.dataset.id);
+      if (!k) return;
+      localStorage.setItem("seminaire.space", JSON.stringify(k));
+      location.href = "app.html#/projects";
+    });
   }
 } catch (err) { /* rien d'enregistré */ }
 
@@ -61,7 +72,7 @@ form.addEventListener("submit", async (event) => {
   try {
     // Import dynamique : si Supabase n'est pas configuré, l'écran reste
     // utilisable et l'erreur est explicite.
-    const session = await import("./session.js?v=6");
+    const session = await import("./session.js?v=8");
     try { localStorage.setItem(PSEUDO_KEY, pseudo); } catch (err) { /* privé */ }
     await session.joinSpace(code, pseudo);
     location.href = "app.html#/projects";

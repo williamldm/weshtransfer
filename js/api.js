@@ -1,7 +1,7 @@
 // Accès aux données. Toutes les requêtes de l'appli passent par ici : les
 // vues ne connaissent ni PostgREST ni le Storage.
 
-import { sb, q, invoke, BUCKET, requireClient } from "./db.js?v=6";
+import { sb, q, invoke, requireClient } from "./db.js?v=8";
 
 // Toute requête passe par ici : sans config, message clair plutôt
 // qu'un "Cannot read properties of null".
@@ -83,12 +83,6 @@ export function updateFile(id, patch) {
   return q(db().from("files").update(patch).eq("id", id).select("id").single());
 }
 
-export async function deleteFile(file) {
-  await q(db().from("files").delete().eq("id", file.id));
-  // Si ça échoue (fichier d'un autre, supprimé par le host), l'objet
-  // restera jusqu'à la purge de l'espace : pas bloquant.
-  await db().storage.from(BUCKET).remove([file.storage_path]);
-}
 
 // Tous les fichiers de l'espace, pour le sélecteur d'envoi.
 export function listSpaceFiles(spaceId) {
@@ -121,36 +115,61 @@ export function updateSpace(id, patch) {
     .select("id, name, is_locked, expires_at, purge_at").single());
 }
 
-// ------------------------------------------------------- URLs signées
-// Cache par chemin : une URL signée vaut 2 h. Les vues pré-signent tout ce
-// qu'elles affichent, pour que le tap sur "lecture" lance le son sans
-// attendre le réseau (iOS refuse play() hors du geste de l'utilisateur).
+// ---------------------------------------------------------- stockage
+// Tout passe par l'Edge Function storage, qui signe selon l'endroit où vit
+// chaque fichier (Storage Supabase ou Backblaze B2). Cache par fichier :
+// les vues pré-signent ce qu'elles affichent, pour que le tap sur
+// "lecture" lance le son sans attendre le réseau (iOS refuse play() hors
+// du geste de l'utilisateur).
 
-const URL_TTL = 7200;
-const urlCache = new Map();
+const urlCache = new Map();   // fileId -> { url, download, exp }
 
-export function cachedUrl(path) {
-  const hit = urlCache.get(path);
-  return hit && hit.exp - Date.now() > 10 * 60 * 1000 ? hit.url : null;
+function fresh(fileId) {
+  const hit = urlCache.get(fileId);
+  return hit && hit.exp - Date.now() > 10 * 60 * 1000 ? hit : null;
 }
 
-export async function signUrls(paths) {
-  const missing = [...new Set(paths)].filter((p) => p && !cachedUrl(p));
-  for (let i = 0; i < missing.length; i += 100) {
-    const chunk = missing.slice(i, i + 100);
-    const data = await q(db().storage.from(BUCKET).createSignedUrls(chunk, URL_TTL));
-    const exp = Date.now() + URL_TTL * 1000;
-    for (const item of data) {
-      if (item.signedUrl && !item.error) urlCache.set(item.path, { url: item.signedUrl, exp });
+export function cachedUrl(fileId) {
+  const hit = fresh(fileId);
+  return hit ? hit.url : null;
+}
+
+export function cachedDownload(fileId) {
+  const hit = fresh(fileId);
+  return hit ? hit.download : null;
+}
+
+export async function signFiles(fileIds) {
+  const missing = [...new Set(fileIds)].filter((id) => id && !fresh(id));
+  for (let i = 0; i < missing.length; i += 200) {
+    const res = await invoke("storage", { action: "sign", file_ids: missing.slice(i, i + 200) });
+    const exp = Date.now() + ((res && res.ttl) || 3600) * 1000;
+    for (const [id, u] of Object.entries((res && res.urls) || {})) {
+      urlCache.set(id, { url: u.url, download: u.download_url, exp });
     }
   }
   const out = {};
-  for (const p of paths) out[p] = cachedUrl(p);
+  for (const id of fileIds) out[id] = cachedUrl(id);
   return out;
 }
 
-export function withDownloadName(url, name) {
-  return url + (url.includes("?") ? "&" : "?") + "download=" + encodeURIComponent(name);
+// Suppression côté serveur : la RLS décide (auteur ou host), puis le
+// fichier est réellement effacé du stockage, quel qu'il soit.
+export function deleteFile(file) {
+  return invoke("storage", { action: "delete", file_id: file.id });
+}
+
+export function storageCall(action, params) {
+  return invoke("storage", Object.assign({ action }, params || {}));
+}
+
+let storageConf = null;
+export function storageConfig() {
+  if (!storageConf) {
+    storageConf = storageCall("config")
+      .catch(() => ({ backend: "supabase" }));
+  }
+  return storageConf;
 }
 
 // --------------------------------------------------------------- envois
