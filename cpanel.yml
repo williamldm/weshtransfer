@@ -1,0 +1,5 @@
+---
+deployment:
+  tasks:
+    - export DEPLOYPATH=/home/TONUSER/public_html/weshtransfer.fr/
+    - /bin/cp -R * $DEPLOYPATH
