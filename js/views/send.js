@@ -6,17 +6,17 @@ import {
   getProject, getFilesByIds, listSpaceFiles, createTransfer, sendTransfer, emailEnabled,
   getTransfer, transferUrl, createProject, signFiles, cachedUrl,
   emailVerified, knownVerified, requestEmailCode, confirmEmailCode
-} from "../api.js?v=28";
-import { openUploadSheet } from "./upload-sheet.js?v=28";
-import { mountUploads } from "./uploads.js?v=28";
-import { onUploads, enqueue, checkFile } from "../upload.js?v=28";
-import { categoryOf, canPreview } from "../files.js?v=28";
-import { takePending } from "../pending.js?v=28";
-import { icon } from "../icons.js?v=28";
+} from "../api.js?v=29";
+import { openUploadSheet } from "./upload-sheet.js?v=29";
+import { mountUploads } from "./uploads.js?v=29";
+import { onUploads, enqueue, checkFile } from "../upload.js?v=29";
+import { categoryOf, canPreview } from "../files.js?v=29";
+import { takePending } from "../pending.js?v=29";
+import { icon } from "../icons.js?v=29";
 import {
   esc, h, formatBytes, formatDuration, plural, toast, errorText, openSheet, copyText, shareLink,
   canShare, formatDate, daysLeft, fileBadge, fileTile
-} from "../ui.js?v=28";
+} from "../ui.js?v=29";
 
 // Dans un espace "envoi", ce composeur EST l'accueil.
 export const title = (ctx) => (ctx && ctx.space.mode === "envoi" ? ctx.space.name : "Envoyer");
@@ -27,6 +27,53 @@ const DURATIONS = [1, 3, 7, 14];
 
 function remembered() {
   try { return localStorage.getItem(REPLY_KEY) || ""; } catch (err) { return ""; }
+}
+
+// Destinataires déjà utilisés, gardés sur CET appareil seulement (rien de
+// plus sur le serveur) : { email, n: nombre d'envois, t: dernier envoi }.
+const RECENT_KEY = "seminaire.recentRecipients";
+const RECENT_MAX = 40;
+
+export function recentRecipients() {
+  try {
+    const list = JSON.parse(localStorage.getItem(RECENT_KEY) || "[]");
+    return Array.isArray(list) ? list.filter((r) => r && EMAIL_RE.test(r.email)) : [];
+  } catch (err) {
+    return [];
+  }
+}
+
+function saveRecent(list) {
+  try { localStorage.setItem(RECENT_KEY, JSON.stringify(list.slice(0, RECENT_MAX))); } catch (err) { /* privé */ }
+}
+
+export function rememberRecipients(emails) {
+  const now = Date.now();
+  const list = recentRecipients();
+  for (const email of emails) {
+    if (!EMAIL_RE.test(email)) continue;
+    const known = list.find((r) => r.email === email);
+    if (known) { known.n = (known.n || 1) + 1; known.t = now; }
+    else list.push({ email, n: 1, t: now });
+  }
+  list.sort((a, b) => b.t - a.t);
+  saveRecent(list);
+}
+
+function forgetRecipient(email) {
+  saveRecent(recentRecipients().filter((r) => r.email !== email));
+}
+
+// Suggestions pour ce qui est tapé : début de l'adresse, du nom de
+// domaine, ou d'un morceau séparé par un point, un tiret...
+function suggest(query, exclude) {
+  const q = query.trim().toLowerCase();
+  const list = recentRecipients().filter((r) => !exclude.includes(r.email));
+  if (!q) return list.slice(0, 6);
+  return list
+    .filter((r) => r.email.startsWith(q) || r.email.split(/[@._+-]/).some((part) => part.startsWith(q)))
+    .sort((a, b) => Number(b.email.startsWith(q)) - Number(a.email.startsWith(q)) || b.t - a.t)
+    .slice(0, 6);
 }
 
 export async function mount(root, ctx, params) {
@@ -75,25 +122,25 @@ export async function mount(root, ctx, params) {
   root.innerHTML =
     (envoiMode
       ? '<section class="send-hero">' +
-          '<div class="eyebrow">' + esc(ctx.space.name) + "</div>" +
-          "<h1>Envoie tes fichiers.<br><span class=\"grad-text\">Ils écoutent avant de télécharger.</span></h1>" +
+          '<div class="eyebrow">' + esc(ctx.space.name) + " · guichet d'expédition</div>" +
+          "<h1>Envoie tes fichiers.<br><em>On s'occupe du kérosène.</em></h1>" +
           "<p>Sons, stems, clips, visuels, projets : jusqu'à " + formatBytes(ctx.space.maxFileBytes || 3221225472) +
-          " par fichier. Pas de compte, ni pour toi ni pour eux.</p>" +
+          " par fichier. Tes destinataires écoutent avant de télécharger. Pas de compte, ni pour toi ni pour eux.</p>" +
         "</section>"
       : '<header class="page-head">' +
-          '<div class="eyebrow">Envoi</div>' +
+          '<div class="eyebrow">Guichet d\'expédition</div>' +
           "<h1>Envoyer des fichiers</h1>" +
-          '<div class="meta">Tes destinataires reçoivent un lien pour écouter et télécharger. Pas de compte, pas de code.</div>' +
+          '<div class="meta">Tes destinataires reçoivent un lien pour écouter et télécharger. Pas de compte, pas de code, pas de compensation carbone.</div>' +
         "</header>") +
 
     '<form class="send-card" novalidate data-form>' +
 
       '<section class="step">' +
-        stepHead(1, "Fichiers", '<span class="muted small" data-total></span>') +
+        stepHead(1, "Le colis", '<span class="muted small" data-total></span>') +
         '<ul class="send-files" data-files></ul>' +
         (envoiMode
           ? '<label class="dropzone" data-dropzone>' + icon("upload", 28) +
-              "<strong>Ajoute des fichiers</strong><span>Touche ici, ou glisse-les sur la page</span>" +
+              "<strong>Charge la soute</strong><span>Touche ici, ou glisse tes fichiers n'importe où sur la page</span>" +
               '<input type="file" multiple hidden data-upload></label>'
           : "") +
         '<div class="row-2 stack-sm"' + (envoiMode ? " hidden" : "") + ">" +
@@ -115,6 +162,7 @@ export async function mount(root, ctx, params) {
           '<input type="text" inputmode="email" autocomplete="email" autocapitalize="off" spellcheck="false" ' +
             'placeholder="email@exemple.fr" data-email>' +
         "</div>" +
+        '<div class="recents" data-recents hidden></div>' +
         '<p class="hint">Plusieurs adresses : sépare-les par un espace. Sans adresse, tu récupères juste le lien.</p>' +
       "</section>" +
 
@@ -127,15 +175,17 @@ export async function mount(root, ctx, params) {
         '<label class="field"><span class="label">Ton email</span>' +
           '<input class="input" type="email" name="reply" inputmode="email" autocomplete="email" autocapitalize="off" value="' + esc(state.replyTo) + '" placeholder="pour les réponses">' +
           '<span class="hint" data-reply-hint></span></label>' +
-        '<div class="field"><span class="label">Disponible pendant</span><div class="chips" data-days>' +
+        '<div class="field"><span class="label">Conservation</span><div class="chips" data-days>' +
           DURATIONS.map((d) => '<button type="button" class="chip' + (d === state.days ? " is-on" : "") + '" data-d="' + d + '"' +
             (d > maxDays ? " disabled" : "") + ">" + plural(d, "jour", "jours") + "</button>").join("") +
         "</div>" +
-        (ctx.space.purgeAt ? '<span class="hint">Au plus tard jusqu\'au ' + esc(formatDate(ctx.space.purgeAt)) + ", date de suppression de l'espace.</span>" : "") +
+        '<span class="hint">Après, tout est effacé pour faire de la place à la prochaine fournée de charbon.' +
+          (ctx.space.purgeAt ? " Au plus tard le " + esc(formatDate(ctx.space.purgeAt)) + ", date de suppression de l'espace." : "") + "</span>" +
         "</div>" +
       "</section>" +
 
       '<div class="send-go">' +
+        '<div class="waybill" data-waybill aria-live="off"></div>' +
         '<button class="btn btn-primary btn-block btn-xl" type="submit" data-submit></button>' +
         (emailOn ? "" :
           '<p class="hint center">' + icon("link", 14) + " Emails automatiques pas encore branchés : tu obtiens un lien à partager, et un lien personnel par destinataire.</p>") +
@@ -153,9 +203,33 @@ export async function mount(root, ctx, params) {
   const totalEl = root.querySelector("[data-total]");
   const chipsEl = root.querySelector("[data-chips]");
   const emailEl = root.querySelector("[data-email]");
+  const recentsEl = root.querySelector("[data-recents]");
   const submitEl = root.querySelector("[data-submit]");
   const pendingEl = root.querySelector("[data-pending]");
   const replyHint = root.querySelector("[data-reply-hint]");
+  const waybillEl = root.querySelector("[data-waybill]");
+  const shipNo = "WT-" + Math.random().toString(36).slice(2, 6).toUpperCase();
+
+  // Bordereau d'expédition : le récapitulatif de l'envoi, en direct, façon
+  // ticket de fret. Le CO2 est une pure blague (la même que sur l'accueil).
+  function drawWaybill() {
+    const n = state.files.length;
+    const bytes = state.files.reduce((s, f) => s + (f.size_bytes || 0), 0);
+    const to = state.emails.filter((e) => EMAIL_RE.test(e)).length;
+    const until = new Date(Date.now() + state.days * 86400e3).toISOString();
+    const kg = n ? Math.max(0.4, (bytes / 1073741824) * 38 * Math.max(1, to) + 0.4 * Math.max(1, to)) : 0;
+    const rows = [
+      ["Colis", n ? plural(n, "fichier", "fichiers") + " · " + formatBytes(bytes) : "vide pour l'instant"],
+      ["Destinataires", to ? plural(to, "adresse", "adresses") : "un lien à partager"],
+      ["Transport", "jet privé, vol direct"],
+      ["Conservation", plural(state.days, "jour", "jours") + ", jusqu'au " + formatDate(until)],
+      ["CO₂ estimé", n ? kg.toFixed(1).replace(".", ",") + " kg*" : "en attente du colis"]
+    ];
+    waybillEl.innerHTML =
+      '<div class="wb-head"><span>Bordereau d\'expédition</span><span>N° ' + shipNo + "</span></div>" +
+      "<dl>" + rows.map(([k, v]) => "<dt>" + k + "</dt><dd>" + esc(v) + "</dd>").join("") + "</dl>" +
+      '<p class="wb-foot">' + (n ? "* Estimation totalement fantaisiste. Aucun jet n'a été affrété." : "Ajoute des fichiers pour lancer la chaudière.") + "</p>";
+  }
 
   // Sous "Ton email" : vérifiée ou pas, et pourquoi on la demande.
   function drawReplyHint() {
@@ -212,11 +286,26 @@ export async function mount(root, ctx, params) {
     drawSubmit();
   }
 
+  // Destinataires déjà utilisés : proposés sous le champ, filtrés par la saisie
+  function drawRecents() {
+    const list = suggest(emailEl.value, state.emails);
+    recentsEl.hidden = !list.length;
+    if (!list.length) { recentsEl.innerHTML = ""; return; }
+    recentsEl.innerHTML =
+      '<span class="recents-label">' + (emailEl.value.trim() ? "Déjà utilisées" : "Récents") + "</span>" +
+      list.map((r) =>
+        '<span class="recent">' +
+          '<button type="button" class="recent-add" data-add="' + esc(r.email) + '">' + icon("plus", 14) + "<span>" + esc(r.email) + "</span></button>" +
+          '<button type="button" class="recent-forget" data-forget="' + esc(r.email) + '" aria-label="Oublier ' + esc(r.email) + '">' + icon("x", 12) + "</button>" +
+        "</span>").join("");
+  }
+
   function drawChips() {
     chipsEl.innerHTML = state.emails.map((e, i) =>
       '<span class="email-chip' + (EMAIL_RE.test(e) ? "" : " is-bad") + '">' + esc(e) +
       '<button type="button" data-rm="' + i + '" aria-label="Retirer ' + esc(e) + '">' + icon("x", 14) + "</button></span>").join("");
     drawSubmit();
+    drawRecents();
   }
 
   function drawSubmit() {
@@ -226,6 +315,7 @@ export async function mount(root, ctx, params) {
     submitEl.innerHTML = icon(n && emailOn ? "send" : "link", 22) + "<span>" + label + "</span>";
     submitEl.disabled = state.sending || !state.files.length;
     if (replyHint) drawReplyHint();
+    if (waybillEl) drawWaybill();
   }
 
   // ------------------------------------------- saisie des emails en pastilles
@@ -248,24 +338,43 @@ export async function mount(root, ctx, params) {
   // aussi le collage d'une liste d'adresses.
   emailEl.addEventListener("input", () => {
     const value = emailEl.value;
-    if (!/[\s,;]/.test(value)) return;
+    if (!/[\s,;]/.test(value)) return drawRecents();
     const parts = value.split(/[\s,;]+/);
     const rest = /[\s,;]$/.test(value) ? "" : parts.pop();
     commitEmails(parts.join(" "));
     emailEl.value = rest;
+    drawRecents();
   });
   emailEl.addEventListener("keydown", (e) => {
     if (e.key === "Enter") {
       e.preventDefault();
-      if (emailEl.value.trim()) { commitEmails(emailEl.value); emailEl.value = ""; }
+      if (emailEl.value.trim()) { const v = emailEl.value; emailEl.value = ""; commitEmails(v); drawRecents(); }
     } else if (e.key === "Backspace" && !emailEl.value && state.emails.length) {
       state.emails.pop();
       drawChips();
     }
   });
   emailEl.addEventListener("blur", () => {
-    if (emailEl.value.trim()) { commitEmails(emailEl.value); emailEl.value = ""; }
+    if (emailEl.value.trim()) { const v = emailEl.value; emailEl.value = ""; commitEmails(v); drawRecents(); }
   });
+  // mousedown/pointerdown sans défaut : le champ garde le focus, sinon son
+  // "blur" validerait le début tapé comme une adresse avant le clic
+  for (const type of ["mousedown", "pointerdown"]) {
+    recentsEl.addEventListener(type, (e) => { if (e.target.closest("button")) e.preventDefault(); });
+  }
+  recentsEl.addEventListener("click", (e) => {
+    const add = e.target.closest("[data-add]");
+    const forget = e.target.closest("[data-forget]");
+    if (add) {
+      emailEl.value = "";
+      commitEmails(add.dataset.add);
+      emailEl.focus();
+    } else if (forget) {
+      forgetRecipient(forget.dataset.forget);
+      drawRecents();
+    }
+  });
+
   root.querySelector("[data-emailbox]").addEventListener("click", (e) => {
     const rm = e.target.closest("[data-rm]");
     if (rm) {
@@ -363,8 +472,9 @@ export async function mount(root, ctx, params) {
   const offJobs = mountUploads(pendingEl, (j) => j.meta.tag === tag);
 
   function drawPending() {
+    drawWaybill();
     submitEl.disabled = state.sending || !state.files.length;
-    if (waiting > 0) submitEl.innerHTML = '<span class="spinner"></span><span>Upload en cours...</span>';
+    if (waiting > 0) submitEl.innerHTML = '<span class="spinner"></span><span>Chargement de la soute...</span>';
     else drawSubmit();
   }
 
@@ -397,6 +507,7 @@ export async function mount(root, ctx, params) {
     const b = e.target.closest("[data-d]");
     if (!b || b.disabled) return;
     state.days = Number(b.dataset.d);
+    drawWaybill();
     for (const x of root.querySelectorAll("[data-d]")) x.classList.toggle("is-on", x === b);
   });
 
@@ -439,7 +550,7 @@ export async function mount(root, ctx, params) {
       if (outcome === "skip") replyTo = "";
       drawReplyHint();
     }
-    submitEl.innerHTML = '<span class="spinner"></span><span>' + (state.emails.length && emailOn ? "Envoi..." : "Création du lien...") + "</span>";
+    submitEl.innerHTML = '<span class="spinner"></span><span>' + (state.emails.length && emailOn ? "Décollage..." : "Impression du billet...") + "</span>";
 
     try {
       const created = await createTransfer({
@@ -451,6 +562,7 @@ export async function mount(root, ctx, params) {
         replyTo,
         days: state.days
       });
+      rememberRecipients(state.emails);
 
       let results = [];
       if (state.emails.length && emailOn) {

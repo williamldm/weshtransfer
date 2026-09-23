@@ -1,5 +1,5 @@
-@import url("fonts.css?v=28");
-@import url("tokens.css?v=28");
+@import url("fonts.css?v=29");
+@import url("tokens.css?v=29");
 
 /* ================================================================= base */
 *, *::before, *::after { box-sizing: border-box; }
@@ -798,3 +798,23 @@ body.public .scene { position: fixed; inset: 0; z-index: -1; }
 .verify-more { gap: var(--sp-2); }
 .verify-more .btn { width: 100%; }
 .hint .verified { display: inline-flex; align-items: center; gap: 6px; color: var(--ok); }
+
+/* ------------------------------------------ destinataires déjà utilisés */
+.recents { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: var(--sp-2); }
+.recents[hidden] { display: none; }
+.recents-label { margin-right: 2px; color: var(--text-faint); font-family: var(--mono); font-size: var(--fs-xs); letter-spacing: .06em; text-transform: uppercase; }
+.recent { display: inline-flex; align-items: center; max-width: 100%; border: 1px dashed var(--line-strong); border-radius: var(--r-sm); }
+.recent button { display: inline-flex; align-items: center; border: none; background: none; color: var(--text-dim, var(--text)); font: inherit; cursor: pointer; }
+.recent-add { gap: 4px; min-width: 0; min-height: 32px; padding: 3px 4px 3px 8px; font-size: var(--fs-sm); }
+.recent-add span { overflow-wrap: anywhere; text-align: left; }
+.recent-add .ic { flex: none; color: var(--accent-bright); }
+.recent-forget { padding: 6px 7px; color: var(--text-faint) !important; }
+.recent:hover { border-color: var(--accent-bright); }
+
+/* ------------------------------------------- bordereau d'expédition */
+.waybill { margin-bottom: var(--sp-4); padding: var(--sp-3) var(--sp-4) var(--sp-3); border: 1px dashed var(--line-strong); border-radius: var(--r-md); background: var(--field); font-family: var(--mono); font-size: var(--fs-xs); }
+.wb-head { display: flex; justify-content: space-between; gap: var(--sp-3); padding-bottom: var(--sp-2); margin-bottom: var(--sp-2); border-bottom: 1px dashed var(--line-strong); color: var(--accent-bright); letter-spacing: .08em; text-transform: uppercase; }
+.waybill dl { display: grid; grid-template-columns: auto 1fr; gap: 5px var(--sp-4); margin: 0; }
+.waybill dt { color: var(--text-faint); text-transform: uppercase; letter-spacing: .06em; }
+.waybill dd { margin: 0; color: var(--text); text-align: right; overflow-wrap: anywhere; }
+.wb-foot { margin: var(--sp-2) 0 0; color: var(--text-faint); }
