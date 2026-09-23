@@ -81,7 +81,7 @@ Réglages du bucket (posés par l'API `b2_update_bucket`) :
 3. **Auth** : Authentication > Sign In / Providers > Anonymous sign-ins : ON.
 4. **Edge Functions** (toutes en `--no-verify-jwt`, elles vérifient elles-mêmes) :
 
-       supabase functions deploy storage send-transfer transfer-open verify-email contacts purge-spaces --no-verify-jwt --use-api
+       supabase functions deploy storage send-transfer transfer-open verify-email contacts invite purge-spaces --no-verify-jwt --use-api
 
 5. **Emails** (facultatif, sinon mode lien). Deux voies, essayées dans cet
    ordre, chaque message refusé par la première repartant par la seconde :
@@ -167,6 +167,20 @@ Netlify (`netlify.toml`) reste possible pour une copie de test : même
 `_deploy`, mêmes en-têtes.
 
 ## Sécurité
+
+### Entrée sur invitation (salons et retours)
+
+Les salons et espaces de retours créés depuis l'accueil sont **sur
+invitation** (`spaces.access = 'invite'`) : le code d'espace ne fait plus
+entrer que ceux qui sont déjà dedans. L'hôte invite par email (fiche
+Participants) ; chaque invité reçoit un lien personnel (`index.html?i=`,
+jeton de 128 bits dont seul le sha256 est stocké), puis un code à 6
+chiffres envoyé à l'adresse invitée : un lien transféré ne suffit pas.
+Une fois vérifiée, l'adresse est retenue pour l'appareil (plus de code) ;
+sur un nouvel appareil, la même personne revérifie et reprend sa place
+(même blaze). L'hôte peut repasser en "entrée avec le code". Codes :
+`_shared/codes.ts` (mêmes limites que la vérification de l'expéditeur).
+Edge Function `invite`, table `space_invites`.
 
 ### Garde-fous contre les abus
 

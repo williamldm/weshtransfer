@@ -1,7 +1,7 @@
 // Session anonyme + appartenance à un espace. Aucun compte : l'appareil
 // reçoit un utilisateur anonyme Supabase, puis rejoint un espace via son code.
 
-import { sb, q, requireClient } from "./db.js?v=35";
+import { sb, q, invoke, requireClient } from "./db.js?v=36";
 
 const SPACE_KEY = "seminaire.space";      // espace actif
 const KNOWN_KEY = "seminaire.spaces";     // tous les espaces rejoints sur cet appareil
@@ -82,6 +82,7 @@ function toSpace(s, pseudo) {
     name: s.name,
     code: s.code,
     mode: s.mode || "seminaire",
+    access: s.access || "code",
     isHost: s.is_host,
     isLocked: s.is_locked,
     expiresAt: s.expires_at,
@@ -105,20 +106,55 @@ export async function joinSpace(code, pseudo) {
   // code faux : renvoyé et non levé, pour que le serveur garde la trace
   // de l'essai (limite anti-énumération des codes)
   if (s && s.error) throw new Error(s.error);
-  const space = {
-    id: s.space_id,
-    participantId: s.participant_id,
-    name: s.name,
-    code: s.code,
-    mode: s.mode || "seminaire",
-    isHost: s.is_host,
-    isLocked: s.is_locked,
-    expiresAt: s.expires_at,
-    maxFileBytes: s.max_file_bytes,
-    pseudo
-  };
+  const space = toSpace(s, pseudo);
   setSpace(space);
   return space;
+}
+
+// ------------------------------------------------ invitations par email
+// Le lien d'invitation (index.html?i=...) ne suffit pas : il faut aussi le
+// code reçu à l'adresse invitée, sauf sur un appareil qui l'a déjà vérifiée.
+
+export async function inviteInfo(token) {
+  await ensureAuth();
+  return invoke("invite", { action: "info", token });
+}
+
+export function inviteSendCode(token) {
+  return invoke("invite", { action: "send-code", token });
+}
+
+export async function acceptInvite(token, code, pseudo) {
+  const s = await invoke("invite", { action: "accept", token, code, pseudo });
+  const space = toSpace(s, s.pseudo);
+  setSpace(space);
+  return space;
+}
+
+// ----------------------------------------------------- changer de blaze
+
+// Dans l'espace donné, pour cet appareil. Blaze déjà pris : PSEUDO_PRIS.
+export async function renameMe(spaceId, pseudo) {
+  const clean = String(pseudo || "").trim();
+  if (clean.length < 2 || clean.length > 24) throw new Error("PSEUDO_INVALIDE");
+  const uid = await currentUserId();
+  if (!uid) throw new Error("NON_AUTHENTIFIE");
+  try {
+    await q(sb.from("participants").update({ pseudo: clean }).eq("space_id", spaceId).eq("user_id", uid).select("id").single());
+  } catch (err) {
+    throw new Error(err.code === "23505" ? "PSEUDO_PRIS" : err.message);
+  }
+  const current = getSpace();
+  if (current && current.id === spaceId) write(SPACE_KEY, Object.assign(current, { pseudo: clean }));
+  return clean;
+}
+
+// Renommer un espace connu de cet appareil (host), dans la liste locale aussi.
+export async function renameSpace(spaceId, name) {
+  await q(sb.from("spaces").update({ name }).eq("id", spaceId).select("id").single());
+  write(KNOWN_KEY, knownSpaces().map((k) => (k.id === spaceId ? Object.assign(k, { name }) : k)));
+  const current = getSpace();
+  if (current && current.id === spaceId) write(SPACE_KEY, Object.assign(current, { name }));
 }
 
 // Au démarrage de l'appli : la session et l'appartenance tiennent-elles ?
@@ -133,7 +169,7 @@ export async function restore() {
 
   const [spaceRes, meRes] = await Promise.all([
     sb.from("spaces")
-      .select("id, name, code, mode, is_locked, expires_at, purge_at, max_file_bytes")
+      .select("id, name, code, mode, access, is_locked, expires_at, purge_at, max_file_bytes")
       .eq("id", space.id)
       .maybeSingle(),
     sb.from("participants")
@@ -150,6 +186,7 @@ export async function restore() {
     name: spaceRes.data.name,
     code: spaceRes.data.code,
     mode: spaceRes.data.mode,
+    access: spaceRes.data.access,
     isLocked: spaceRes.data.is_locked,
     expiresAt: spaceRes.data.expires_at,
     purgeAt: spaceRes.data.purge_at,

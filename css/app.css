@@ -1,5 +1,5 @@
-@import url("fonts.css?v=35");
-@import url("tokens.css?v=35");
+@import url("fonts.css?v=36");
+@import url("tokens.css?v=36");
 
 /* ================================================================= base */
 *, *::before, *::after { box-sizing: border-box; }
@@ -918,3 +918,17 @@ body.app .app-header { view-transition-name: topbar; }
 .wp-next { display: inline-block; margin-top: 6px; padding: 0; border: none; background: none; color: var(--accent-bright); font: inherit; letter-spacing: inherit; text-transform: inherit; cursor: pointer; }
 .wp-next:hover { text-decoration: underline; }
 .wallpaper-note [data-wp-text] { display: block; }
+
+/* ------------------------------------------- invitations, blaze */
+.link-btn { padding: 0; border: none; background: none; color: var(--accent-bright); font: inherit; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.invite-kind { margin: 0 0 var(--sp-1); color: var(--accent-bright); font-family: var(--mono); font-size: 11px; letter-spacing: .12em; text-transform: uppercase; }
+.invite-title { margin: 0 0 var(--sp-2); font-family: var(--display); font-size: 26px; font-weight: 700; letter-spacing: -0.02em; overflow-wrap: anywhere; }
+.invite-codebox .input-code { letter-spacing: .4em; }
+.invite-mail { display: flex; gap: var(--sp-2); margin-bottom: var(--sp-2); }
+.invite-mail .input { flex: 1; min-width: 0; }
+.invites { margin: var(--sp-3) 0 0; padding: 0; list-style: none; border-top: 1px solid var(--line); }
+.invites li { display: flex; align-items: center; gap: var(--sp-2); padding: var(--sp-2) 0; border-bottom: 1px solid var(--line); font-size: var(--fs-sm); }
+.invites .iv-mail { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.invites .iv-state { color: var(--text-faint); font-family: var(--mono); font-size: 11px; white-space: nowrap; }
+.invites .iv-state.is-in { color: var(--ok); }
+.code-chip.is-invite { font-family: var(--font); letter-spacing: 0; }

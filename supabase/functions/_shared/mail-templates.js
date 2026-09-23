@@ -232,17 +232,19 @@ export function transferMail(input) {
 
 // ------------------------------------------------ code de vérification
 
-// input : { site, email, code, minutes }
+// input : { site, email, code, minutes, purpose? }
+// purpose : "pour rejoindre le salon Villa septembre" (sinon : envoyer des fichiers)
 export function verifyCodeMail(input) {
   const site = input.site;
   const code = String(input.code);
   const subject = `${code} est ton code WeshTransfer`;
-  const preheader = `Valable ${input.minutes} minutes. À taper dans WeshTransfer pour envoyer tes fichiers.`;
+  const why = input.purpose || "pour envoyer tes fichiers";
+  const preheader = `Valable ${input.minutes} minutes. À taper dans WeshTransfer ${why}.`;
 
   const body =
     eyebrow("Vérification") +
     heading("Ton code") +
-    para(`Tape-le dans WeshTransfer pour confirmer que <strong style="color:${C.text};font-weight:600;">${esc(input.email)}</strong> est bien à toi. Une seule fois par appareil.`) +
+    para(`Tape-le dans WeshTransfer ${esc(why)} : il confirme que <strong style="color:${C.text};font-weight:600;">${esc(input.email)}</strong> est bien à toi. Une seule fois par appareil.`) +
     `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:28px 0 0;"><tr>` +
     `<td align="center" class="wt-code" bgcolor="${C.raised}" style="background:${C.raised};border:1px solid ${C.line};border-radius:14px;padding:24px 10px 24px 22px;font-family:${MONO};font-size:40px;line-height:1;font-weight:600;letter-spacing:12px;color:${C.text};">${esc(code)}</td>` +
     `</tr></table>` +
@@ -255,8 +257,51 @@ export function verifyCodeMail(input) {
   const text = tidy([
     `Ton code WeshTransfer : ${code}`,
     "",
-    `Tape-le dans WeshTransfer pour confirmer que ${input.email} est bien à toi. Valable ${input.minutes} minutes.`,
+    `Tape-le dans WeshTransfer ${why} : il confirme que ${input.email} est bien à toi. Valable ${input.minutes} minutes.`,
     "Ce n'est pas toi ? Ignore ce message : rien ne partira en ton nom.",
+    "",
+    textFooter(site),
+  ]);
+  return { subject, html, text };
+}
+
+// ---------------------------------------------------------- invitation
+
+// input : { site, email, host, spaceName, mode ("seminaire" | "revue"), link, expiresAt }
+export function inviteMail(input) {
+  const site = input.site;
+  const revue = input.mode === "revue";
+  const what = revue ? "l'espace de retours" : "le salon";
+  const subject = `${input.host} t'invite dans ${what} ${LQ}${input.spaceName}${RQ}`;
+  const preheader = revue
+    ? "Écoute le mix et laisse tes retours à la seconde près."
+    : "Sons, versions et commentaires du groupe, en temps réel.";
+  const until = formatDate(input.expiresAt);
+
+  const body =
+    eyebrow(revue ? "Retours de mix" : "Salon") +
+    heading(esc(input.spaceName)) +
+    para(`<strong style="color:${C.text};font-weight:600;">${esc(input.host)}</strong> t'invite à le rejoindre. ` +
+      (revue
+        ? "Tu écoutes les mix, tu mets en pause là où quelque chose cloche, et tu écris : l'ingé retrouve chaque retour à la seconde près."
+        : "Chacun y dépose ses sons ; versions et commentaires arrivent chez tout le monde en temps réel.")) +
+    button(input.link, "Rejoindre&nbsp;&rarr;") +
+    small(`Pour vérifier que c'est bien toi, on t'enverra un code à 6 chiffres à cette adresse (${esc(input.email)}). ` +
+      "Une seule fois par appareil ; ensuite, tu entres directement.") +
+    small(`Invitation valable jusqu'au ${esc(until)}. Elle ne marche qu'avec cette adresse : la transférer ne sert à rien.`, "10px 0 0");
+
+  const footer =
+    `<p style="margin:0;">Le bouton ne marche pas ? Copie ce lien :<br><a href="${esc(input.link)}" style="color:${C.soft};word-break:break-all;">${esc(input.link)}</a></p>` +
+    `<p style="margin:14px 0 0;">Tu reçois cet email parce que ${esc(input.host)} a saisi ton adresse sur WeshTransfer. Pas intéressé ? Ignore-le, rien ne se passera.</p>`;
+
+  const html = layout({ site, title: subject, preheader, body, footer });
+  const text = tidy([
+    `${input.host} t'invite dans ${what} "${input.spaceName}".`,
+    "",
+    `Rejoindre : ${input.link}`,
+    "",
+    `Pour vérifier que c'est bien toi, on t'enverra un code à 6 chiffres à ${input.email}. Une seule fois par appareil.`,
+    `Invitation valable jusqu'au ${until}. Elle ne marche qu'avec cette adresse.`,
     "",
     textFooter(site),
   ]);

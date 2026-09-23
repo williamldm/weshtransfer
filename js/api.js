@@ -1,7 +1,7 @@
 // Accès aux données. Toutes les requêtes de l'appli passent par ici : les
 // vues ne connaissent ni PostgREST ni le Storage.
 
-import { sb, q, invoke, requireClient } from "./db.js?v=35";
+import { sb, q, invoke, requireClient } from "./db.js?v=36";
 
 // Toute requête passe par ici : sans config, message clair plutôt
 // qu'un "Cannot read properties of null".
@@ -144,7 +144,24 @@ export function listParticipants(spaceId) {
 
 export function updateSpace(id, patch) {
   return q(db().from("spaces").update(patch).eq("id", id)
-    .select("id, name, is_locked, expires_at, purge_at").single());
+    .select("id, name, access, is_locked, expires_at, purge_at").single());
+}
+
+// ----------------------------------------------------------- invitations
+
+export function inviteByEmail(spaceId, emails) {
+  return invoke("invite", { action: "create", space_id: spaceId, emails });
+}
+
+export function listInvites(spaceId) {
+  return q(db().from("space_invites")
+    .select("id, email, created_at, expires_at, accepted_at")
+    .eq("space_id", spaceId)
+    .order("created_at", { ascending: false }));
+}
+
+export function deleteInvite(id) {
+  return q(db().from("space_invites").delete().eq("id", id));
 }
 
 // ---------------------------------------------------------- stockage

@@ -1,9 +1,11 @@
 // Feuille "Participants" : qui est là, inviter, réglages du host.
 
-import { listParticipants, updateSpace, deleteSpace } from "../api.js?v=35";
-import { icon } from "../icons.js?v=35";
-import { esc, h, openSheet, avatar, shareLink, copyText, toast, errorText, formatDate, confirmSheet, canShare } from "../ui.js?v=35";
-import { leaveSpace, knownSpaces, switchTo, forgetSpace } from "../session.js?v=35";
+import { listParticipants, updateSpace, deleteSpace, inviteByEmail, listInvites, deleteInvite } from "../api.js?v=36";
+import { icon } from "../icons.js?v=36";
+import { esc, h, openSheet, avatar, shareLink, copyText, toast, errorText, formatDate, confirmSheet, canShare, promptSheet } from "../ui.js?v=36";
+import { leaveSpace, knownSpaces, switchTo, forgetSpace, renameMe } from "../session.js?v=36";
+
+const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
 export function inviteUrl(code) {
   return new URL("index.html?c=" + encodeURIComponent(code), location.href).href;
@@ -12,17 +14,32 @@ export function inviteUrl(code) {
 export async function openPeopleSheet(ctx) {
   const s = ctx.space;
   const url = inviteUrl(s.code);
+  const byInvite = s.access === "invite" && s.mode !== "envoi";
 
   const body = h(
     '<div class="people">' +
-      '<div class="invite">' +
-        '<div class="invite-code mono">' + esc(s.code) + "</div>" +
-        '<p class="muted">Donne ce code ou le lien : chacun choisit juste un blaze.</p>' +
-        '<div class="row-2">' +
-          '<button class="btn btn-block" data-copy>' + icon("copy", 18) + " Copier le lien</button>" +
-          (canShare() ? '<button class="btn btn-primary btn-block" data-share>' + icon("share", 18) + " Partager</button>" : "") +
-        "</div>" +
-      "</div>" +
+      (byInvite
+        ? '<div class="invite">' +
+            (s.isHost
+              ? '<form data-invite-form novalidate>' +
+                  '<label class="label" for="invite-mails">Inviter par email</label>' +
+                  '<div class="invite-mail"><input class="input" id="invite-mails" type="text" inputmode="email" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="email@exemple.fr, autre@exemple.fr">' +
+                  '<button class="btn btn-primary" type="submit">' + icon("send", 16) + " Inviter</button></div>" +
+                  '<p class="muted">Chacun reçoit un lien personnel et vérifie son adresse avec un code avant d\'entrer : un lien transféré ne suffit pas.</p>' +
+                "</form>" +
+                '<ul class="invites" data-invites></ul>'
+              : '<p class="muted">' + icon("lock", 14) + " Cet espace est sur invitation. Demande à l'hôte d'inviter quelqu'un par email.</p>") +
+          "</div>"
+        : '<div class="invite">' +
+            '<div class="invite-code mono">' + esc(s.code) + "</div>" +
+            '<p class="muted">Donne ce code ou le lien : chacun choisit juste un blaze.</p>' +
+            '<div class="row-2">' +
+              '<button class="btn btn-block" data-copy>' + icon("copy", 18) + " Copier le lien</button>" +
+              (canShare() ? '<button class="btn btn-primary btn-block" data-share>' + icon("share", 18) + " Partager</button>" : "") +
+            "</div>" +
+          "</div>") +
+      '<div class="setting"><div><strong>Ton blaze</strong><div class="muted" data-my-pseudo>' + esc(s.pseudo || "") + "</div></div>" +
+        '<button class="btn btn-sm" data-rename>' + icon("edit", 16) + " Changer</button></div>" +
       '<div class="section-head"><h2>Dans l\'espace</h2></div>' +
       '<ul class="people-list" data-list><li class="muted">Chargement...</li></ul>' +
       (s.isHost ? '<div class="section-head"><h2>Réglages (host)</h2></div><div data-host></div>' : "") +
@@ -34,9 +51,84 @@ export async function openPeopleSheet(ctx) {
 
   openSheet({ title: "Participants", body });
 
-  body.querySelector("[data-copy]").onclick = async () => {
-    toast(await copyText(url) ? "Lien d'invitation copié" : "Copie impossible", "ok");
+  const copyBtn = body.querySelector("[data-copy]");
+  if (copyBtn) {
+    copyBtn.onclick = async () => {
+      toast(await copyText(url) ? "Lien d'invitation copié" : "Copie impossible", "ok");
+    };
+  }
+
+  // Changer de blaze (dans cet espace)
+  body.querySelector("[data-rename]").onclick = async () => {
+    const next = await promptSheet("Ton blaze", s.pseudo || "", { max: 24, ok: "Changer" });
+    if (!next || next === s.pseudo) return;
+    try {
+      s.pseudo = await renameMe(s.id, next);
+      try { localStorage.setItem("seminaire.pseudo", s.pseudo); } catch (err) { /* privé */ }
+      body.querySelector("[data-my-pseudo]").textContent = s.pseudo;
+      toast("Tu t'appelles maintenant " + s.pseudo, "ok");
+      drawPeople();
+    } catch (err) { toast(errorText(err), "err"); }
   };
+
+  // Invitations par email (host, espace sur invitation)
+  const inviteForm = body.querySelector("[data-invite-form]");
+  const invitesEl = body.querySelector("[data-invites]");
+  const drawInvites = async () => {
+    if (!invitesEl) return;
+    try {
+      const list = await listInvites(s.id);
+      const now = Date.now();
+      invitesEl.innerHTML = list.map((iv) => {
+        const state = iv.accepted_at ? '<span class="iv-state is-in">entré·e</span>'
+          : new Date(iv.expires_at).getTime() < now ? '<span class="iv-state">expirée</span>'
+          : '<span class="iv-state">en attente</span>';
+        return '<li data-id="' + esc(iv.id) + '" data-email="' + esc(iv.email) + '"><span class="iv-mail">' + esc(iv.email) + "</span>" + state +
+          (iv.accepted_at ? "" : '<button class="btn btn-ghost btn-sm" data-resend>Renvoyer</button>') +
+          '<button class="btn btn-ghost btn-icon btn-sm" data-cancel aria-label="Annuler l\'invitation">' + icon("x", 16) + "</button></li>";
+      }).join("");
+    } catch (err) {
+      invitesEl.innerHTML = '<li class="muted">' + esc(errorText(err)) + "</li>";
+    }
+  };
+  const sendInvites = async (emails, btn) => {
+    if (btn) btn.disabled = true;
+    try {
+      const r = await inviteByEmail(s.id, emails);
+      const sent = (r.results || []).filter((x) => x.status === "sent").length;
+      const failed = (r.results || []).filter((x) => x.status !== "sent");
+      toast(failed.length ? failed.length + " invitation(s) non partie(s) : " + failed.map((x) => x.email).join(", ")
+        : sent > 1 ? sent + " invitations envoyées" : "Invitation envoyée", failed.length ? "err" : "ok");
+      await drawInvites();
+      return true;
+    } catch (err) {
+      toast(errorText(err), "err");
+      return false;
+    } finally {
+      if (btn) btn.disabled = false;
+    }
+  };
+  if (inviteForm) {
+    inviteForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const input = inviteForm.querySelector("input");
+      const emails = input.value.split(/[\s,;]+/).map((x) => x.trim().toLowerCase()).filter(Boolean);
+      const bad = emails.find((x) => !EMAIL_RE.test(x));
+      if (!emails.length) { input.focus(); return; }
+      if (bad) { toast("Adresse invalide : " + bad, "err"); return; }
+      if (await sendInvites(emails, inviteForm.querySelector("[type=submit]"))) input.value = "";
+    });
+    invitesEl.addEventListener("click", async (e) => {
+      const li = e.target.closest("li[data-id]");
+      if (!li) return;
+      if (e.target.closest("[data-resend]")) { sendInvites([li.dataset.email], e.target.closest("button")); return; }
+      if (e.target.closest("[data-cancel]")) {
+        try { await deleteInvite(li.dataset.id); li.remove(); toast("Invitation annulée : son lien ne marche plus", "ok"); }
+        catch (err) { toast(errorText(err), "err"); }
+      }
+    });
+    drawInvites();
+  }
   const shareBtn = body.querySelector("[data-share]");
   if (shareBtn) {
     shareBtn.onclick = () => shareLink({
@@ -47,10 +139,12 @@ export async function openPeopleSheet(ctx) {
   }
 
   body.querySelector("[data-leave]").onclick = async () => {
-    const ok = await confirmSheet("Tu pourras revenir avec le code " + s.code + ". Tes fichiers restent dans l'espace.", { ok: "Quitter" });
+    const ok = await confirmSheet((byInvite
+      ? "Pour revenir, rouvre ton lien d'invitation (ou demande-en un nouveau à l'hôte)."
+      : "Tu pourras revenir avec le code " + s.code + ".") + " Tes fichiers restent dans l'espace.", { ok: "Quitter" });
     if (!ok) return;
     leaveSpace();
-    location.href = "index.html?c=" + encodeURIComponent(s.code);
+    location.href = byInvite ? "index.html" : "index.html?c=" + encodeURIComponent(s.code);
   };
 
   // Passer d'un espace à l'autre sans ressaisir de code
@@ -71,24 +165,34 @@ export async function openPeopleSheet(ctx) {
   });
 
   const listEl = body.querySelector("[data-list]");
-  try {
-    const people = await listParticipants(s.id);
-    listEl.innerHTML = people.map((p) => {
-      const online = ctx.online.has(p.id);
-      return "<li>" + avatar(p.pseudo, online) +
-        '<span class="p-name">' + esc(p.pseudo) + (p.id === s.participantId ? ' <span class="muted">(toi)</span>' : "") + "</span>" +
-        (p.is_host ? '<span class="tag">host</span>' : "") +
-        '<span class="p-state">' + (online ? "en ligne" : "") + "</span></li>";
-    }).join("");
-  } catch (err) {
-    listEl.innerHTML = '<li class="muted">' + esc(errorText(err)) + "</li>";
+  async function drawPeople() {
+    try {
+      const people = await listParticipants(s.id);
+      listEl.innerHTML = people.map((p) => {
+        const online = ctx.online.has(p.id);
+        return "<li>" + avatar(p.pseudo, online) +
+          '<span class="p-name">' + esc(p.pseudo) + (p.id === s.participantId ? ' <span class="muted">(toi)</span>' : "") + "</span>" +
+          (p.is_host ? '<span class="tag">host</span>' : "") +
+          '<span class="p-state">' + (online ? "en ligne" : "") + "</span></li>";
+      }).join("");
+    } catch (err) {
+      listEl.innerHTML = '<li class="muted">' + esc(errorText(err)) + "</li>";
+    }
   }
+  await drawPeople();
 
   const host = body.querySelector("[data-host]");
   if (!host) return;
 
   const drawHost = () => {
     host.innerHTML =
+      (s.mode !== "envoi"
+        ? '<div class="setting"><div><strong>' + (s.access === "invite" ? "Sur invitation par email" : "Entrée avec le code") + "</strong>" +
+            '<div class="muted">' + (s.access === "invite"
+              ? "Chacun vérifie son adresse avant d'entrer. Le plus sûr."
+              : "Toute personne qui a le code ou le lien peut entrer. Plus simple, moins sûr.") + "</div></div>" +
+            '<button class="btn btn-sm" data-access>' + (s.access === "invite" ? "Passer au code" : icon("lock", 16) + " Sur invitation") + "</button></div>"
+        : "") +
       '<div class="setting"><div><strong>Entrées ' + (s.isLocked ? "fermées" : "ouvertes") + "</strong>" +
         '<div class="muted">' + (s.isLocked ? "Seuls les participants actuels peuvent revenir." : "Toute personne avec le code peut entrer.") + "</div></div>" +
         '<button class="btn btn-sm" data-lock>' + icon("lock", 16) + (s.isLocked ? " Rouvrir" : " Fermer") + "</button></div>" +
@@ -98,6 +202,24 @@ export async function openPeopleSheet(ctx) {
       '<div class="setting"><div><strong>Supprimer l\'espace</strong>' +
         '<div class="muted">Fichiers, envois et commentaires, pour tout le monde. Définitif.</div></div>' +
         '<button class="btn btn-sm btn-danger" data-destroy>Supprimer</button></div>';
+
+    const accessBtn = host.querySelector("[data-access]");
+    if (accessBtn) {
+      accessBtn.onclick = async () => {
+        const next = s.access === "invite" ? "code" : "invite";
+        if (next === "code") {
+          const ok = await confirmSheet("Toute personne qui a le code " + s.code + " ou le lien pourra entrer, sans vérifier son email.",
+            { ok: "Passer au code", title: "Entrée avec le code" });
+          if (!ok) return;
+        }
+        try {
+          const row = await updateSpace(s.id, { access: next });
+          s.access = row.access;
+          toast(s.access === "invite" ? "Espace sur invitation : rouvre cette fiche pour inviter" : "Entrée avec le code", "ok");
+          drawHost();
+        } catch (err) { toast(errorText(err), "err"); }
+      };
+    }
 
     host.querySelector("[data-lock]").onclick = async () => {
       try {

@@ -1,13 +1,13 @@
 // Accueil de l'espace : gros boutons d'action, uploads en cours, morceaux
 // triés par activité récente.
 
-import { listProjects, createProject, listReviewComments, deleteProject, deleteFile } from "../api.js?v=35";
-import { stateOf, isEngineerOf } from "./review.js?v=35";
-import { mountUploads } from "./uploads.js?v=35";
-import { openUploadSheet } from "./upload-sheet.js?v=35";
-import { openPeopleSheet } from "./people.js?v=35";
-import { icon } from "../icons.js?v=35";
-import { esc, h, kindBadge, timeAgo, plural, promptSheet, toast, errorText, daysLeft, formatDate, actionSheet, confirmSheet } from "../ui.js?v=35";
+import { listProjects, createProject, listReviewComments, deleteProject, deleteFile } from "../api.js?v=36";
+import { stateOf, isEngineerOf } from "./review.js?v=36";
+import { mountUploads } from "./uploads.js?v=36";
+import { openUploadSheet } from "./upload-sheet.js?v=36";
+import { openPeopleSheet } from "./people.js?v=36";
+import { icon } from "../icons.js?v=36";
+import { esc, h, kindBadge, timeAgo, plural, promptSheet, toast, errorText, daysLeft, formatDate, actionSheet, confirmSheet } from "../ui.js?v=36";
 
 export const title = (ctx) => ctx.space.name;
 
@@ -75,9 +75,11 @@ export async function mount(root, ctx) {
     '<section class="space-card">' +
       '<div class="space-top">' +
         '<div><div class="eyebrow">' + (review ? "Retours de mix" : "Espace") + "</div><h1>" + esc(s.name) + "</h1></div>" +
-        '<button class="code-chip" data-invite aria-label="Inviter">' +
-          '<span class="mono">' + esc(s.code) + "</span>" + icon("share", 16) +
-        "</button>" +
+        (s.access === "invite" && s.mode !== "envoi"
+          ? '<button class="code-chip is-invite" data-invite aria-label="Inviter par email">' + icon("mail", 16) + "<span>Inviter</span></button>"
+          : '<button class="code-chip" data-invite aria-label="Inviter">' +
+              '<span class="mono">' + esc(s.code) + "</span>" + icon("share", 16) +
+            "</button>") +
       "</div>" +
       '<div class="space-meta" data-meta></div>' +
     "</section>" +

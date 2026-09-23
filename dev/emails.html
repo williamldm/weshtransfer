@@ -29,7 +29,7 @@
 <pre id="text"></pre>
 
 <script type="module">
-import { transferMail, verifyCodeMail, downloadNoticeMail } from "../supabase/functions/_shared/mail-templates.js";
+import { transferMail, verifyCodeMail, downloadNoticeMail, inviteMail } from "../supabase/functions/_shared/mail-templates.js";
 
 const site = location.origin;
 const inAWeek = new Date(Date.now() + 7 * 86400e3).toISOString();
@@ -56,6 +56,9 @@ const cases = {
     link: site + "/t.html?k=x", expiresAt: inAWeek, canReply: true,
   }),
   "Code": () => verifyCodeMail({ site, email: "lil.brume@gmail.com", code: "048213", minutes: 15 }),
+  "Code (invitation)": () => verifyCodeMail({ site, email: "kenza@gmail.com", code: "731905", minutes: 15, purpose: "pour rejoindre le salon Villa septembre" }),
+  "Invitation salon": () => inviteMail({ site, email: "kenza@gmail.com", host: "Lil Brume", spaceName: "Villa septembre", mode: "seminaire", link: site + "/index.html?i=0123456789abcdef0123456789abcdef", expiresAt: inAWeek }),
+  "Invitation retours": () => inviteMail({ site, email: "kenza@gmail.com", host: "Ingé Max", spaceName: "Kenza, EP Nuit blanche", mode: "revue", link: site + "/index.html?i=0123456789abcdef0123456789abcdef", expiresAt: inAWeek }),
   "Téléchargé (destinataire)": () => downloadNoticeMail({ site, who: "ingé@studio.fr", title: "Nuit blanche, mix du jour 2" }),
   "Téléchargé (lien partagé)": () => downloadNoticeMail({ site, who: null, title: "Nuit blanche, mix du jour 2" }),
 };

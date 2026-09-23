@@ -3,11 +3,11 @@
 // les espaces déjà ouverts sur cet appareil (ouvrir, oublier, supprimer).
 // session.js / api.js ne sont chargés qu'au moment d'agir.
 
-import { icon } from "./icons.js?v=35";
-import { esc, h, errorText, formatBytes, plural, actionSheet, confirmSheet, toast } from "./ui.js?v=35";
-import { isBlocked } from "./files.js?v=35";
-import { putPending, MAX_BYTES } from "./pending.js?v=35";
-import { mountWallpaperNote } from "./wallpapers.js?v=35";
+import { icon } from "./icons.js?v=36";
+import { esc, h, errorText, formatBytes, plural, actionSheet, confirmSheet, toast } from "./ui.js?v=36";
+import { isBlocked } from "./files.js?v=36";
+import { putPending, MAX_BYTES } from "./pending.js?v=36";
+import { mountWallpaperNote } from "./wallpapers.js?v=36";
 
 const PSEUDO_KEY = "seminaire.pseudo";
 const MODE_LABEL = { envoi: "Envois", seminaire: "Salon", revue: "Retours" };
@@ -16,6 +16,7 @@ const deck = document.getElementById("deck");
 const spacesLink = document.getElementById("spaces-link");
 let picked = [];          // fichiers choisis sur l'accueil
 let tab = "send";
+let renaming = false;     // onglet Envoyer : changer de blaze
 
 // --------------------------------------------------------------- mémoire
 
@@ -62,8 +63,8 @@ const VIEWS = {
             '<button type="button" class="btn btn-ghost btn-icon btn-sm" data-unpick="' + i + '" aria-label="Retirer ' + esc(f.name) + '">' + icon("x", 16) + "</button></li>").join("") +
           '</ul><p class="picked-total mono">' + plural(picked.length, "fichier", "fichiers") + " · " + formatBytes(total) + "</p>"
         : "") +
-      (mine
-        ? '<p class="as-who">Envoyé par <strong>' + esc(savedPseudo() || "toi") + "</strong> depuis \"" + esc(mine.name) + "\"</p>"
+      (mine && !renaming
+        ? '<p class="as-who">Envoyé par <strong>' + esc(savedPseudo() || "toi") + '</strong> <button type="button" class="link-btn" data-rename>changer</button></p>'
         : pseudoField()) +
       '<p class="form-error" data-err hidden></p>' +
       '<button class="btn btn-primary btn-block btn-xl" type="submit">Transférer</button>' +
@@ -77,7 +78,7 @@ const VIEWS = {
       pseudoField() +
       '<p class="form-error" data-err hidden></p>' +
       '<button class="btn btn-primary btn-block btn-xl" type="submit">Ouvrir le salon</button>' +
-      '<p class="deck-note">Tu en deviens le host. Tu recevras un code à 6 caractères à partager.</p>' +
+      '<p class="deck-note">Tu en deviens le host. Tu invites les membres par email : chacun vérifie son adresse avant d\'entrer.</p>' +
     "</form>";
   },
   revue() {
@@ -87,7 +88,7 @@ const VIEWS = {
       pseudoField() +
       '<p class="form-error" data-err hidden></p>' +
       '<button class="btn btn-primary btn-block btn-xl" type="submit">Ouvrir l\'espace de retours</button>' +
-      '<p class="deck-note">L\'artiste n\'a besoin que du lien que tu lui enverras.</p>' +
+      '<p class="deck-note">L\'artiste reçoit une invitation par email et vérifie son adresse avant d\'entrer. Pas de compte.</p>' +
     "</form>";
   },
   join(code) {
@@ -98,6 +99,9 @@ const VIEWS = {
       '<p class="form-error" data-err hidden></p>' +
       '<button class="btn btn-primary btn-block btn-xl" type="submit">Entrer</button>' +
     "</form>";
+  },
+  invite() {
+    return '<div class="deck-form invite-view" data-invite-view><div class="skeleton"></div><div class="skeleton"></div></div>';
   },
   spaces() {
     const list = known();
@@ -173,7 +177,7 @@ function spaceMenu(k) {
     {
       label: "Oublier sur cet appareil", icon: "logout",
       run: async () => {
-        const session = await import("./session.js?v=35");
+        const session = await import("./session.js?v=36");
         session.forgetSpace(k.id);
         toast("\"" + k.name + "\" n'apparaît plus ici. Rien n'a été supprimé.", "ok");
         drawSpacesLink();
@@ -188,9 +192,9 @@ function spaceMenu(k) {
           { ok: "Tout supprimer", danger: true, title: "Supprimer l'espace" });
         if (!ok) return;
         try {
-          const session = await import("./session.js?v=35");
+          const session = await import("./session.js?v=36");
           await session.ensureAuth();
-          const api = await import("./api.js?v=35");
+          const api = await import("./api.js?v=36");
           await api.deleteSpace(k.id);
           session.forgetSpace(k.id);
           toast("\"" + k.name + "\" a été supprimé.", "ok");
@@ -208,6 +212,7 @@ deck.addEventListener("submit", async (e) => {
   e.preventDefault();
   const form = e.target;
   const kind = form.dataset.form;
+  if (kind === "invite") return;   // formulaire géré par openInvite()
   const err = form.querySelector("[data-err]");
   const btn = form.querySelector("[type=submit]");
   const val = (n) => { const i = form.querySelector("[name=" + n + "]"); return i ? i.value.trim() : ""; };
@@ -215,7 +220,8 @@ deck.addEventListener("submit", async (e) => {
   err.hidden = true;
 
   const mine = kind === "send" && known().find((k) => k.mode === "envoi");
-  const pseudo = mine ? savedPseudo() : val("pseudo");
+  const pseudoBefore = savedPseudo();
+  const pseudo = mine && !renaming ? pseudoBefore : val("pseudo");
   if (!mine && pseudo.length < 2) return fail("Ton blaze doit faire au moins 2 caractères.");
   if (kind === "join" && val("code").length < 5) return fail("Le code fait au moins 5 caractères.");
   if (kind === "salon" && !val("name")) return fail("Donne un nom à ton salon.");
@@ -234,9 +240,19 @@ deck.addEventListener("submit", async (e) => {
         sessionStorage.setItem("seminaire.readd", picked.reduce((s, f) => s + f.size, 0) > MAX_BYTES ? "lourd" : "perdu");
       }
     }
-    if (mine) { goTo(mine); return; }
+    if (mine) {
+      // nouveau blaze : dans l'espace d'envoi, et dans son nom "Envois de ..."
+      if (renaming && pseudo !== pseudoBefore) {
+        const session = await import("./session.js?v=36");
+        await session.renameMe(mine.id, pseudo);
+        if (/^Envois de /.test(mine.name)) await session.renameSpace(mine.id, "Envois de " + pseudo).catch(() => {});
+      }
+      renaming = false;
+      goTo(known().find((k) => k.id === mine.id) || mine);
+      return;
+    }
 
-    const session = await import("./session.js?v=35");
+    const session = await import("./session.js?v=36");
     if (kind === "join") await session.joinSpace(val("code"), pseudo);
     else if (kind === "salon") await session.createSpace(val("name"), "seminaire", pseudo);
     else if (kind === "revue") await session.createSpace(val("project"), "revue", pseudo);
@@ -252,7 +268,118 @@ deck.addEventListener("submit", async (e) => {
 document.addEventListener("click", (e) => {
   const b = e.target.closest(".deck-tabs [data-tab], .deck-foot [data-tab]");
   if (b) show(b.dataset.tab);
+  if (e.target.closest("[data-rename]")) {
+    renaming = true;
+    show("send");
+    const input = deck.querySelector("[name=pseudo]");
+    if (input) { input.focus(); input.select(); }
+  }
 });
+
+// ------------------------------------------------ invitation par email
+// index.html?i=<jeton> : l'invité choisit son blaze, reçoit un code à
+// l'adresse invitée, le tape, et entre. Appareil déjà vérifié : il entre
+// directement.
+
+async function openInvite(token) {
+  show("invite");
+  const box = deck.querySelector("[data-invite-view]");
+  const session = await import("./session.js?v=36");
+  let info;
+  try {
+    info = await session.inviteInfo(token);
+  } catch (err) {
+    box.innerHTML = '<p class="form-error">' + esc(errorText(err)) + "</p>" +
+      '<button type="button" class="btn btn-block" data-tab="join">J\'ai un code</button>';
+    return;
+  }
+  const revue = info.mode === "revue";
+  const back = info.returning || info.member;
+  box.innerHTML =
+    '<form data-form="invite" novalidate>' +
+      '<p class="invite-kind">' + (revue ? "Retours de mix" : "Salon") + "</p>" +
+      '<h2 class="invite-title">' + esc(info.space_name) + "</h2>" +
+      '<p class="deck-lead">' + (info.host ? "<strong>" + esc(info.host) + "</strong> t'invite. " : "") +
+        "Invitation pour <strong>" + esc(info.email) + "</strong>." + "</p>" +
+      (back
+        ? '<p class="as-who">Tu y es déjà, sous le blaze <strong>' + esc(back) + "</strong>." + (info.verified ? "" : " Vérifie ton email pour y entrer depuis cet appareil.") + "</p>"
+        : pseudoField()) +
+      (info.verified
+        ? ""
+        : '<div class="invite-codebox" data-code-box hidden>' +
+            '<label class="field"><span class="label">Code reçu par email</span>' +
+            '<input class="input input-code" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000"></label>' +
+            '<p class="deck-note" data-code-note></p>' +
+          "</div>") +
+      '<p class="form-error" data-err hidden></p>' +
+      '<button class="btn btn-primary btn-block btn-xl" type="submit" data-go>' + (info.verified ? "Entrer" : "Recevoir mon code") + "</button>" +
+      (info.verified ? '<p class="deck-note">Adresse déjà vérifiée sur cet appareil.</p>'
+        : '<p class="deck-note">Le code part à l\'adresse invitée : seul son propriétaire peut entrer.</p>') +
+    "</form>";
+
+  const form = box.querySelector("form");
+  const err = form.querySelector("[data-err]");
+  const go = form.querySelector("[data-go]");
+  const codeBox = form.querySelector("[data-code-box]");
+  let codeSent = false;
+  const fail = (m) => { err.textContent = m; err.hidden = false; };
+
+  const enter = async () => {
+    const pseudoInput = form.querySelector("[name=pseudo]");
+    const pseudo = pseudoInput ? pseudoInput.value.trim() : "";
+    if (pseudoInput && pseudo.length < 2) { pseudoInput.focus(); return fail("Ton blaze doit faire au moins 2 caractères."); }
+    const code = codeBox ? form.querySelector("[name=code]").value.replace(/\D/g, "") : "";
+    if (codeBox && code.length !== 6) { form.querySelector("[name=code]").focus(); return fail("Le code fait 6 chiffres."); }
+    go.disabled = true;
+    go.innerHTML = '<span class="spinner"></span><span>Un instant…</span>';
+    try {
+      if (pseudo) savePseudo(pseudo);
+      await session.acceptInvite(token, code, pseudo);
+      location.href = "app.html#/projects";
+    } catch (e2) {
+      fail(errorText(e2));
+      go.disabled = false;
+      go.textContent = "Entrer";
+    }
+  };
+
+  const sendCode = async () => {
+    const pseudoInput = form.querySelector("[name=pseudo]");
+    if (pseudoInput && pseudoInput.value.trim().length < 2) { pseudoInput.focus(); return fail("Choisis d'abord ton blaze."); }
+    go.disabled = true;
+    go.innerHTML = '<span class="spinner"></span><span>Envoi du code…</span>';
+    try {
+      const r = await session.inviteSendCode(token);
+      if (r && r.verified) return enter();
+      codeSent = true;
+      codeBox.hidden = false;
+      form.querySelector("[data-code-note]").innerHTML = "Envoyé à " + esc(info.email) +
+        ' (regarde aussi les spams). <button type="button" class="link-btn" data-resend>Renvoyer</button>';
+      go.disabled = false;
+      go.textContent = "Entrer";
+      const input = form.querySelector("[name=code]");
+      input.focus();
+      input.addEventListener("input", () => {
+        input.value = input.value.replace(/\D/g, "").slice(0, 6);
+        if (input.value.length === 6) enter();
+      });
+    } catch (e2) {
+      fail(errorText(e2));
+      go.disabled = false;
+      go.textContent = "Recevoir mon code";
+    }
+  };
+
+  form.addEventListener("submit", (e) => {
+    e.preventDefault();
+    err.hidden = true;
+    if (info.verified || codeSent) enter();
+    else sendCode();
+  });
+  form.addEventListener("click", (e) => {
+    if (e.target.closest("[data-resend]")) { codeSent = false; sendCode(); }
+  });
+}
 
 // -------------------------------------------------- compteur de CO₂
 // Pure blague : ~49 kg/h, soit un trajet Paris-Marseille en SUV toutes les
@@ -270,8 +397,11 @@ setInterval(() => {
 drawSpacesLink();
 for (const el of document.querySelectorAll("[data-icon]")) el.innerHTML = icon(el.dataset.icon, 20);
 
-const invited = (new URLSearchParams(location.search).get("c") || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
-if (invited) show("join", invited.slice(0, 8));
+const params = new URLSearchParams(location.search);
+const inviteToken = (params.get("i") || "").toLowerCase();
+const invited = (params.get("c") || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+if (/^[0-9a-f]{32}$/.test(inviteToken)) openInvite(inviteToken);
+else if (invited) show("join", invited.slice(0, 8));
 else show("send");
 
 // Légende du décor et bouton "Fond suivant" (le décor lui-même est posé
