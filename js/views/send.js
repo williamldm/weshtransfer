@@ -4,16 +4,17 @@
 
 import {
   getProject, getFilesByIds, listSpaceFiles, createTransfer, sendTransfer, emailEnabled,
-  getTransfer, transferUrl, createProject
-} from "../api.js?v=8";
-import { openUploadSheet } from "./upload-sheet.js?v=8";
-import { mountUploads } from "./uploads.js?v=8";
-import { onUploads, enqueue, checkFile } from "../upload.js?v=8";
-import { icon } from "../icons.js?v=8";
+  getTransfer, transferUrl, createProject, signFiles, cachedUrl
+} from "../api.js?v=12";
+import { openUploadSheet } from "./upload-sheet.js?v=12";
+import { mountUploads } from "./uploads.js?v=12";
+import { onUploads, enqueue, checkFile } from "../upload.js?v=12";
+import { categoryOf, canPreview } from "../files.js?v=12";
+import { icon } from "../icons.js?v=12";
 import {
-  esc, h, kindBadge, formatBytes, plural, toast, errorText, openSheet, copyText, shareLink,
-  canShare, formatDate, daysLeft
-} from "../ui.js?v=8";
+  esc, h, formatBytes, formatDuration, plural, toast, errorText, openSheet, copyText, shareLink,
+  canShare, formatDate, daysLeft, fileBadge, fileTile
+} from "../ui.js?v=12";
 
 // Dans un espace "envoi", ce composeur EST l'accueil.
 export const title = (ctx) => (ctx && ctx.space.mode === "envoi" ? ctx.space.name : "Envoyer");
@@ -66,39 +67,44 @@ export async function mount(root, ctx, params) {
   const emailOn = await emailEnabled();
 
   // ------------------------------------------------------ rendu
+  const stepHead = (n, title, aside) =>
+    '<div class="step-head"><span class="step-n">' + n + "</span><h2>" + title + "</h2>" + (aside || "") + "</div>";
+
   root.innerHTML =
-    '<header class="page-head">' +
-      '<div class="eyebrow">' + (envoiMode ? esc(ctx.space.name) : "Envoi") + "</div>" +
-      "<h1>" + (envoiMode ? "Envoyer des sons" : "Envoyer des fichiers") + "</h1>" +
-      '<div class="meta">Tes destinataires reçoivent un lien pour écouter et télécharger. Pas de compte, pas de code.</div>' +
-    "</header>" +
+    (envoiMode
+      ? '<section class="send-hero">' +
+          '<div class="eyebrow">' + esc(ctx.space.name) + "</div>" +
+          "<h1>Envoie tes fichiers.<br><span class=\"grad-text\">Ils écoutent avant de télécharger.</span></h1>" +
+          "<p>Sons, stems, clips, visuels, projets : jusqu'à " + formatBytes(ctx.space.maxFileBytes || 3221225472) +
+          " par fichier. Pas de compte, ni pour toi ni pour eux.</p>" +
+        "</section>"
+      : '<header class="page-head">' +
+          '<div class="eyebrow">Envoi</div>' +
+          "<h1>Envoyer des fichiers</h1>" +
+          '<div class="meta">Tes destinataires reçoivent un lien pour écouter et télécharger. Pas de compte, pas de code.</div>' +
+        "</header>") +
 
-    (emailOn ? "" :
-      '<div class="notice">' + icon("alert", 18) +
-        "<div><strong>Envoi d'emails pas encore activé.</strong> Tu obtiendras un lien à partager (WhatsApp, SMS, ta messagerie), " +
-        "et un lien personnel par destinataire.</div></div>") +
+    '<form class="send-card" novalidate data-form>' +
 
-    '<form class="send-form" novalidate data-form>' +
-
-      '<section class="card">' +
-        '<div class="card-head"><h2>Fichiers</h2><span class="muted" data-total></span></div>' +
+      '<section class="step">' +
+        stepHead(1, "Fichiers", '<span class="muted small" data-total></span>') +
         '<ul class="send-files" data-files></ul>' +
         (envoiMode
-          ? '<label class="dropzone" data-dropzone>' + icon("upload", 30) +
-              "<strong>Ajoute tes sons</strong><span>Touche ici, ou glisse-les sur la page</span>" +
-              '<input type="file" multiple hidden accept=".mp3,.wav,.aif,.aiff,.m4a,.flac,.ogg,.zip,audio/*" data-upload></label>'
+          ? '<label class="dropzone" data-dropzone>' + icon("upload", 28) +
+              "<strong>Ajoute des fichiers</strong><span>Touche ici, ou glisse-les sur la page</span>" +
+              '<input type="file" multiple hidden data-upload></label>'
           : "") +
         '<div class="row-2 stack-sm"' + (envoiMode ? " hidden" : "") + ">" +
           '<button type="button" class="btn btn-block" data-pick>' + icon("music", 18) + "<span>Depuis l'espace</span></button>" +
           '<label class="btn btn-block">' + icon("upload", 18) + "<span>Nouveaux fichiers</span>" +
-            '<input type="file" multiple hidden accept=".mp3,.wav,.aif,.aiff,.m4a,.flac,.ogg,.zip,audio/*" data-upload-sheet></label>' +
+            '<input type="file" multiple hidden data-upload-sheet></label>' +
         "</div>" +
         '<div class="send-pending" data-pending hidden></div>' +
-        (envoiMode ? '<button type="button" class="btn btn-ghost btn-block btn-sm" data-pick-more>' + icon("music", 16) + " Reprendre un son déjà envoyé</button>" : "") +
+        (envoiMode ? '<button type="button" class="btn btn-ghost btn-block btn-sm" data-pick-more>' + icon("retry", 16) + " Reprendre un fichier déjà envoyé</button>" : "") +
       "</section>" +
 
-      '<section class="card">' +
-        '<div class="card-head"><h2>À qui ?</h2><span class="muted">facultatif</span></div>' +
+      '<section class="step">' +
+        stepHead(2, "À qui ?", '<span class="muted small">facultatif</span>') +
         '<div class="email-input" data-emailbox>' +
           '<span data-chips></span>' +
           // type="text" et non "email" : un champ email efface lui-même les
@@ -107,17 +113,18 @@ export async function mount(root, ctx, params) {
           '<input type="text" inputmode="email" autocomplete="email" autocapitalize="off" spellcheck="false" ' +
             'placeholder="email@exemple.fr" data-email>' +
         "</div>" +
-        '<p class="hint">Sépare les adresses par un espace ou une virgule. Sans adresse : tu récupères juste le lien.</p>' +
+        '<p class="hint">Plusieurs adresses : sépare-les par un espace. Sans adresse, tu récupères juste le lien.</p>' +
       "</section>" +
 
-      '<section class="card">' +
+      '<section class="step">' +
+        stepHead(3, "Le mot qui va avec") +
         '<label class="field"><span class="label">Titre</span>' +
           '<input class="input" name="title" maxlength="80" required placeholder="Ex : Nuit blanche, mix du jour 2" value="' + esc(state.title) + '"></label>' +
         '<label class="field"><span class="label">Message</span>' +
-          '<textarea class="input" name="message" rows="3" maxlength="2000" placeholder="Un mot pour accompagner les sons"></textarea></label>' +
+          '<textarea class="input" name="message" rows="3" maxlength="2000" placeholder="Dis-leur ce qu\'ils vont écouter"></textarea></label>' +
         '<label class="field"><span class="label">Ton email</span>' +
           '<input class="input" type="email" name="reply" inputmode="email" autocomplete="email" autocapitalize="off" value="' + esc(state.replyTo) + '" placeholder="pour les réponses">' +
-          '<span class="hint">Les réponses t\'arrivent directement, et tu es prévenu à chaque téléchargement.</span></label>' +
+          '<span class="hint">Les réponses t\'arrivent directement, et tu sais quand c\'est téléchargé.</span></label>' +
         '<div class="field"><span class="label">Disponible pendant</span><div class="chips" data-days>' +
           DURATIONS.map((d) => '<button type="button" class="chip' + (d === state.days ? " is-on" : "") + '" data-d="' + d + '"' +
             (d > maxDays ? " disabled" : "") + ">" + plural(d, "jour", "jours") + "</button>").join("") +
@@ -126,7 +133,11 @@ export async function mount(root, ctx, params) {
         "</div>" +
       "</section>" +
 
-      '<button class="btn btn-primary btn-block btn-xl" type="submit" data-submit></button>' +
+      '<div class="send-go">' +
+        '<button class="btn btn-primary btn-block btn-xl" type="submit" data-submit></button>' +
+        (emailOn ? "" :
+          '<p class="hint center">' + icon("link", 14) + " Emails automatiques pas encore branchés : tu obtiens un lien à partager, et un lien personnel par destinataire.</p>") +
+      "</div>" +
     "</form>" +
     (envoiMode
       ? '<a class="link-row" href="#/transfers">' + icon("mail", 18) + "<span>Mes envois : qui a ouvert, qui a téléchargé</span>" + icon("chevron", 18) + "</a>"
@@ -150,16 +161,36 @@ export async function mount(root, ctx, params) {
     for (const b of root.querySelectorAll("[data-d]")) b.classList.toggle("is-on", Number(b.dataset.d) === best);
   }
 
+  // Vignettes : les images de la sélection sont signées une fois, puis
+  // affichées dans leur tuile.
+  const thumbRequested = new Set();
+
   function drawFiles() {
-    filesEl.innerHTML = state.files.length
-      ? state.files.map((f) =>
-          '<li data-id="' + f.id + '">' + kindBadge(f.kind) +
-            '<div class="sf-main"><div class="sf-name">' + esc(f.original_name) + "</div>" +
-            '<div class="sf-meta">' + esc((f.project ? f.project.title + " · " : "") + "v" + f.version_no + " · " + formatBytes(f.size_bytes)) + "</div></div>" +
-            '<button type="button" class="btn btn-ghost btn-icon btn-sm" data-remove aria-label="Retirer">' + icon("x", 18) + "</button>" +
-          "</li>").join("")
-      : '<li class="sf-empty">Aucun fichier sélectionné.</li>';
-    const total = state.files.reduce((s, f) => s + (f.size_bytes || 0), 0);
+    const toSign = state.files
+      .filter((f) => categoryOf(f.original_name, f.mime_type) === "image" && canPreview(f.original_name, f.mime_type))
+      .map((f) => f.id)
+      .filter((id) => !cachedUrl(id) && !thumbRequested.has(id));
+    if (toSign.length) {
+      toSign.forEach((id) => thumbRequested.add(id));
+      signFiles(toSign).then(drawFiles).catch(() => {});
+    }
+
+    filesEl.innerHTML = state.files.map((f) => {
+      const cat = categoryOf(f.original_name, f.mime_type);
+      const thumb = cat === "image" && canPreview(f.original_name, f.mime_type) ? cachedUrl(f.id) : null;
+      const bits = [
+        !envoiMode && f.project ? f.project.title + " · v" + f.version_no : "",
+        cat === "audio" && f.duration_sec ? formatDuration(Number(f.duration_sec)) : "",
+        formatBytes(f.size_bytes)
+      ].filter(Boolean).join(" · ");
+      return '<li data-id="' + f.id + '">' + fileTile(f.original_name, f.mime_type, thumb) +
+        '<div class="sf-main"><div class="sf-name">' + esc(f.original_name) + "</div>" +
+        '<div class="sf-meta">' + fileBadge(f.original_name, f.mime_type, f.kind) + " " + esc(bits) + "</div></div>" +
+        '<button type="button" class="btn btn-ghost btn-icon btn-sm" data-remove aria-label="Retirer">' + icon("x", 18) + "</button>" +
+      "</li>";
+    }).join("");
+    filesEl.hidden = !state.files.length;
+    const total = state.files.reduce((sum, f) => sum + (f.size_bytes || 0), 0);
     totalEl.textContent = state.files.length ? plural(state.files.length, "fichier", "fichiers") + " · " + formatBytes(total) : "";
     drawSubmit();
   }
@@ -504,7 +535,7 @@ async function openPicker(ctx, selectedIds, onDone) {
         p.files.filter((f) => f.status === "ready").map((f) =>
           '<label class="pick-file"><input type="checkbox" value="' + f.id + '"' + (selected.has(f.id) ? " checked" : "") + ">" +
             '<span class="pf-main"><span class="pf-name">v' + f.version_no + " " + esc(f.label || f.original_name) + "</span>" +
-            '<span class="pf-meta">' + kindBadge(f.kind) + " " + formatBytes(f.size_bytes) + "</span></span></label>").join("") +
+            '<span class="pf-meta">' + fileBadge(f.original_name, f.mime_type, f.kind) + " " + formatBytes(f.size_bytes) + "</span></span></label>").join("") +
       "</details>").join("") +
     '<div class="sheet-actions sticky"><button class="btn btn-primary btn-block" data-ok>Valider</button></div>';
 

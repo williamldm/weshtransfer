@@ -5,20 +5,17 @@
 // va couper. TUS reprend là où ça s'est arrêté au lieu de tout recommencer.
 
 import { Upload } from "https://cdn.jsdelivr.net/npm/tus-js-client@4.3.1/+esm";
-import { sb, BUCKET } from "./db.js?v=8";
-import { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, ALLOWED_EXT, PEAKS_MAX_BYTES } from "./config.js?v=8";
-import { computePeaks } from "./peaks.js?v=8";
-import { insertFile, storageCall, storageConfig } from "./api.js?v=8";
+import { sb, BUCKET } from "./db.js?v=12";
+import { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, PEAKS_MAX_BYTES } from "./config.js?v=12";
+import { extOf as fileExt, isBlocked, isAudio, mimeOf } from "./files.js?v=12";
+import { computePeaks } from "./peaks.js?v=12";
+import { insertFile, storageCall, storageConfig } from "./api.js?v=12";
 
 // Hôte de stockage direct : recommandé par Supabase pour les gros fichiers.
 const ENDPOINT = SUPABASE_URL.replace(".supabase.co", ".storage.supabase.co") + "/storage/v1/upload/resumable";
 const CHUNK = 6 * 1024 * 1024;   // imposé par Supabase pour TUS
 const PARALLEL = 2;
 
-const MIME = {
-  mp3: "audio/mpeg", wav: "audio/wav", aif: "audio/aiff", aiff: "audio/aiff",
-  m4a: "audio/mp4", flac: "audio/flac", ogg: "audio/ogg", zip: "application/zip"
-};
 
 const jobs = [];
 const listeners = new Set();
@@ -46,14 +43,10 @@ export function activeCount() {
 
 // ------------------------------------------------------------ validation
 
-export function extOf(name) {
-  const m = /\.([a-z0-9]+)$/i.exec(name || "");
-  return m ? m[1].toLowerCase() : "";
-}
+export const extOf = fileExt;
 
 export function checkFile(file, maxBytes) {
-  const ext = extOf(file.name);
-  if (!ALLOWED_EXT.includes(ext)) return "Format non accepté (." + (ext || "?") + ")";
+  if (isBlocked(file.name)) return "Les programmes (." + extOf(file.name) + ") ne sont pas acceptés";
   if (maxBytes && file.size > maxBytes) return "Trop lourd pour cet espace";
   if (!file.size) return "Fichier vide";
   return null;
@@ -63,6 +56,9 @@ export function checkFile(file, maxBytes) {
 export function guessKind(name) {
   const n = (name || "").toLowerCase();
   if (/\.zip$/.test(n) || /(stem|multitrack|multipiste|trackout)/.test(n)) return "stems";
+  // une pochette "cover_mix.png" n'est pas un mix : les types musicaux
+  // ne concernent que l'audio
+  if (!isAudio(name)) return "autre";
   if (/(freestyle|impro)/.test(n)) return "freestyle";
   if (/(master|mixdown|\bmix\b|_mix|mix_|final|bounce)/.test(n)) return "mix";
   if (/(voix|vocal|\bvox|take|prise|couplet|refrain|hook|verse|topline)/.test(n)) return "voix";
@@ -179,14 +175,15 @@ async function run(job) {
   emit(job);
 
   const { file, meta } = job;
-  const ext = extOf(file.name);
+  const ext = extOf(file.name) || "bin";
   let fileId = crypto.randomUUID();
   let path = "spaces/" + meta.spaceId + "/" + meta.projectId + "/" + fileId + "." + ext;
   let backend = "supabase";
-  const mime = file.type && file.type !== "application/octet-stream" ? file.type : (MIME[ext] || "application/octet-stream");
+  const mime = mimeOf(file.name, file.type);
+  const audio = isAudio(file.name, mime);
 
   // La waveform se calcule pendant que ça monte : aucun temps perdu.
-  const peaksPromise = ext === "zip"
+  const peaksPromise = !audio
     ? Promise.resolve({ peaks: null, duration: null })
     : computePeaks(file, { maxBytes: PEAKS_MAX_BYTES }).catch(() => ({ peaks: null, duration: null }));
 

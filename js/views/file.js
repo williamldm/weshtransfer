@@ -1,14 +1,15 @@
 // Écoute d'une version : grande waveform, transport, commentaires
 // horodatés façon SoundCloud ("à 1:23, la voix sature").
 
-import { getFile, listComments, addComment, deleteComment, signFiles, cachedDownload, deleteFile, updateFile } from "../api.js?v=8";
-import { Waveform, formatTime } from "../waveform.js?v=8";
-import { play, toggle, isCurrent, onPlayer, seekRatio, seekSeconds, skip, state as playerState, trackFromFile } from "../player.js?v=8";
-import { icon } from "../icons.js?v=8";
+import { getFile, listComments, addComment, deleteComment, signFiles, cachedUrl, cachedDownload, deleteFile, updateFile } from "../api.js?v=12";
+import { Waveform, formatTime } from "../waveform.js?v=12";
+import { play, toggle, isCurrent, onPlayer, seekRatio, seekSeconds, skip, state as playerState, trackFromFile } from "../player.js?v=12";
+import { icon } from "../icons.js?v=12";
+import { isAudio, canPreview, categoryOf } from "../files.js?v=12";
 import {
-  esc, h, kindBadge, timeAgo, formatBytes, avatar, toast, errorText, triggerDownload,
+  esc, h, fileBadge, fileTile, timeAgo, formatBytes, avatar, toast, errorText, triggerDownload,
   confirmSheet, actionSheet, KINDS, openSheet
-} from "../ui.js?v=8";
+} from "../ui.js?v=12";
 
 export const title = () => "Écoute";
 
@@ -43,13 +44,15 @@ export function renderFileShell(file, space) {
     .filter((v) => v.status === "ready")
     .sort((a, b) => a.version_no - b.version_no);
   const mine = file.uploaded_by === space.participantId;
-  const zip = /\.zip$/i.test(file.original_name);
+  const audio = isAudio(file.original_name, file.mime_type) && canPreview(file.original_name, file.mime_type);
+  const cat = categoryOf(file.original_name, file.mime_type);
+  const media = !audio && canPreview(file.original_name, file.mime_type) && (cat === "image" || cat === "video");
 
   return (
     '<header class="page-head">' +
       (file.project ? '<a class="eyebrow link" href="#/p/' + file.project.id + '">' + icon("back", 14) + " " + esc(file.project.title) + "</a>" : "") +
       '<h1 class="break">' + esc(file.original_name) + "</h1>" +
-      '<div class="meta">' + kindBadge(file.kind) + " v" + file.version_no +
+      '<div class="meta">' + fileBadge(file.original_name, file.mime_type, file.kind) + " v" + file.version_no +
         (file.label ? " · " + esc(file.label) : "") + " · " + esc(file.uploader ? file.uploader.pseudo : "?") +
         " · " + timeAgo(file.created_at) + " · " + formatBytes(file.size_bytes) +
         (file.bpm ? " · " + file.bpm + " BPM" : "") + (file.musical_key ? " · " + esc(file.musical_key) : "") +
@@ -62,8 +65,12 @@ export function renderFileShell(file, space) {
           (v.label ? " " + esc(v.label) : "") + "</a>").join("") + "</nav>"
       : "") +
 
-    (zip
-      ? '<div class="player-card zip-card">' + icon("archive", 32) + "<p>Archive zip : pas d'écoute, télécharge-la.</p></div>"
+    (!audio
+      ? (media
+          ? '<div class="player-card media-card">' +
+              (cat === "image" ? '<img alt="" data-media>' : '<video controls playsinline preload="metadata" data-media></video>') + "</div>"
+          : '<div class="player-card zip-card">' + fileTile(file.original_name, file.mime_type) +
+              "<p>Pas d'aperçu pour ce type de fichier : télécharge-le.</p></div>")
       : '<section class="player-card">' +
           '<div class="wave wave-lg"><canvas></canvas></div>' +
           '<div class="transport">' +
@@ -86,7 +93,7 @@ export function renderFileShell(file, space) {
       '<form class="comment-form" data-form>' +
         '<textarea class="input" name="body" rows="2" maxlength="1000" placeholder="Ex : la voix est trop en avant ici"></textarea>' +
         '<div class="row">' +
-          (zip ? "" : '<button type="button" class="chip chip-time is-on" data-timechip>' + icon("clock", 14) + ' <span>à 0:00</span></button>') +
+          (!audio ? "" : '<button type="button" class="chip chip-time is-on" data-timechip>' + icon("clock", 14) + ' <span>à 0:00</span></button>') +
           '<span class="spacer"></span>' +
           '<button class="btn btn-primary btn-sm" type="submit">Publier</button>' +
         "</div>" +
@@ -113,15 +120,21 @@ export async function mount(root, ctx, params) {
   }
 
   function drawShell() {
-    const zip = /\.zip$/i.test(file.original_name);
+    const audio = isAudio(file.original_name, file.mime_type) && canPreview(file.original_name, file.mime_type);
     root.innerHTML = renderFileShell(file, ctx.space);
 
-    if (!zip) {
+    // image ou vidéo : l'URL signée arrive juste après le rendu
+    const mediaEl = root.querySelector("[data-media]");
+    if (mediaEl) {
+      signFiles([file.id]).then(() => { mediaEl.src = cachedUrl(file.id) || ""; }).catch(() => {});
+    }
+
+    if (audio) {
       const cs = getComputedStyle(document.documentElement);
       wave = new Waveform(root.querySelector(".wave canvas"), {
         idleColor: cs.getPropertyValue("--wave-idle").trim(),
-        playedColor: cs.getPropertyValue("--accent").trim(),
-        markerColor: cs.getPropertyValue("--accent").trim(),
+        playedColor: cs.getPropertyValue("--wave-played").trim() || "#a78bfa",
+        markerColor: cs.getPropertyValue("--accent-hi").trim() || "#c4b5fd",
         onSeek: (ratio, done) => {
           if (!isCurrent(file.id)) {
             if (done) play(track(), { at: ratio * durationSec() });

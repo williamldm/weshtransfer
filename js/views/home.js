@@ -1,12 +1,12 @@
 // Accueil de l'espace : gros boutons d'action, uploads en cours, morceaux
 // triés par activité récente.
 
-import { listProjects, createProject } from "../api.js?v=8";
-import { mountUploads } from "./uploads.js?v=8";
-import { openUploadSheet } from "./upload-sheet.js?v=8";
-import { openPeopleSheet } from "./people.js?v=8";
-import { icon } from "../icons.js?v=8";
-import { esc, h, kindBadge, timeAgo, plural, promptSheet, toast, errorText, daysLeft, formatDate } from "../ui.js?v=8";
+import { listProjects, createProject } from "../api.js?v=12";
+import { mountUploads } from "./uploads.js?v=12";
+import { openUploadSheet } from "./upload-sheet.js?v=12";
+import { openPeopleSheet } from "./people.js?v=12";
+import { icon } from "../icons.js?v=12";
+import { esc, h, kindBadge, timeAgo, plural, promptSheet, toast, errorText, daysLeft, formatDate } from "../ui.js?v=12";
 
 export const title = (ctx) => ctx.space.name;
 
@@ -48,7 +48,7 @@ export async function mount(root, ctx) {
 
     '<div class="hero-actions">' +
       '<label class="btn btn-primary btn-xl">' + icon("upload", 22) + "<span>Ajouter des sons</span>" +
-        '<input type="file" multiple hidden accept=".mp3,.wav,.aif,.aiff,.m4a,.flac,.ogg,.zip,audio/*" data-pick>' +
+        '<input type="file" multiple hidden data-pick>' +
       "</label>" +
       '<a class="btn btn-xl" href="#/send">' + icon("send", 22) + "<span>Envoyer par email</span></a>" +
     "</div>" +

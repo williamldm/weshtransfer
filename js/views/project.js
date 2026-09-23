@@ -1,17 +1,18 @@
 // Un morceau : ses versions de la plus récente à la plus ancienne, chacune
 // avec sa mini-waveform jouable d'un tap.
 
-import { getProject, signFiles, cachedUrl, cachedDownload, updateProject, deleteProject, deleteFile } from "../api.js?v=8";
-import { mountUploads } from "./uploads.js?v=8";
-import { openUploadSheet } from "./upload-sheet.js?v=8";
-import { Waveform } from "../waveform.js?v=8";
-import { play, toggle, isCurrent, onPlayer, seekRatio, state as playerState, trackFromFile } from "../player.js?v=8";
-import { saveZip, canStreamToDisk, MEMORY_LIMIT } from "../zip.js?v=8";
-import { icon } from "../icons.js?v=8";
+import { getProject, signFiles, cachedUrl, cachedDownload, updateProject, deleteProject, deleteFile } from "../api.js?v=12";
+import { mountUploads } from "./uploads.js?v=12";
+import { openUploadSheet } from "./upload-sheet.js?v=12";
+import { Waveform } from "../waveform.js?v=12";
+import { play, toggle, isCurrent, onPlayer, seekRatio, state as playerState, trackFromFile } from "../player.js?v=12";
+import { saveZip, canStreamToDisk, MEMORY_LIMIT } from "../zip.js?v=12";
+import { icon } from "../icons.js?v=12";
+import { isAudio, canPreview } from "../files.js?v=12";
 import {
-  esc, kindBadge, timeAgo, formatBytes, formatDuration, plural, promptSheet,
+  esc, fileBadge, fileTile, timeAgo, formatBytes, formatDuration, plural, promptSheet,
   confirmSheet, actionSheet, toast, errorText, triggerDownload
-} from "../ui.js?v=8";
+} from "../ui.js?v=12";
 
 export const title = () => "Morceau";
 
@@ -19,8 +20,8 @@ function waveColors() {
   const cs = getComputedStyle(document.documentElement);
   return {
     idleColor: cs.getPropertyValue("--wave-idle").trim() || "#3a4150",
-    playedColor: cs.getPropertyValue("--accent").trim() || "#ff9142",
-    markerColor: cs.getPropertyValue("--accent").trim() || "#ff9142"
+    playedColor: cs.getPropertyValue("--wave-played").trim() || "#a78bfa",
+    markerColor: cs.getPropertyValue("--accent-hi").trim() || "#c4b5fd"
   };
 }
 
@@ -32,15 +33,15 @@ export function renderVersion(f, me) {
     f.duration_sec ? formatDuration(Number(f.duration_sec)) : "",
     formatBytes(f.size_bytes)
   ].filter(Boolean);
-  const playable = f.kind !== "stems" || !/\.zip$/i.test(f.original_name);
+  const playable = isAudio(f.original_name, f.mime_type) && canPreview(f.original_name, f.mime_type);
   return '<article class="version' + (isCurrent(f.id) ? " is-current" : "") + '" data-id="' + f.id + '">' +
     '<div class="version-top">' +
       (playable
         ? '<button class="play-btn" data-play aria-label="Lire">' + icon(isCurrent(f.id) && playerState().playing ? "pause" : "play", 20) + "</button>"
-        : '<span class="play-btn is-static">' + icon("archive", 20) + "</span>") +
+        : fileTile(f.original_name, f.mime_type)) +
       '<a class="version-main" href="#/f/' + f.id + '">' +
         '<div class="version-title"><span class="vno">v' + f.version_no + "</span>" +
-          (f.label ? '<span class="vlabel">' + esc(f.label) + "</span>" : "") + kindBadge(f.kind) + "</div>" +
+          (f.label ? '<span class="vlabel">' + esc(f.label) + "</span>" : "") + fileBadge(f.original_name, f.mime_type, f.kind) + "</div>" +
         '<div class="version-meta">' + esc(bits.join(" · ")) +
           (n ? ' · <span class="ccount">' + icon("comment", 13) + n + "</span>" : "") + "</div>" +
       "</a>" +
@@ -83,7 +84,7 @@ export async function mount(root, ctx, params) {
       "</header>" +
       '<div class="actions-row">' +
         '<label class="btn btn-primary">' + icon("plus", 18) + "<span>Nouvelle version</span>" +
-          '<input type="file" multiple hidden accept=".mp3,.wav,.aif,.aiff,.m4a,.flac,.ogg,.zip,audio/*" data-pick></label>' +
+          '<input type="file" multiple hidden data-pick></label>' +
         '<a class="btn" href="#/send?p=' + project.id + '">' + icon("send", 18) + "<span>Envoyer</span></a>" +
         (files.length ? '<button class="btn" data-zip>' + icon("download", 18) + "<span>Tout (zip)</span></button>" : "") +
         (mine || ctx.space.isHost ? '<button class="btn btn-ghost btn-icon" data-pmore aria-label="Plus">' + icon("more") + "</button>" : "") +

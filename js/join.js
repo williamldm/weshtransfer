@@ -1,6 +1,6 @@
 // Écran d'entrée : code + blaze. Aucune notion de compte.
 
-import { errorText, esc } from "./ui.js?v=8";
+import { errorText, esc } from "./ui.js?v=12";
 
 const form = document.getElementById("join-form");
 const codeInput = document.getElementById("code");
@@ -72,7 +72,7 @@ form.addEventListener("submit", async (event) => {
   try {
     // Import dynamique : si Supabase n'est pas configuré, l'écran reste
     // utilisable et l'erreur est explicite.
-    const session = await import("./session.js?v=8");
+    const session = await import("./session.js?v=12");
     try { localStorage.setItem(PSEUDO_KEY, pseudo); } catch (err) { /* privé */ }
     await session.joinSpace(code, pseudo);
     location.href = "app.html#/projects";

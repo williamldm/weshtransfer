@@ -1,7 +1,7 @@
 // Accès aux données. Toutes les requêtes de l'appli passent par ici : les
 // vues ne connaissent ni PostgREST ni le Storage.
 
-import { sb, q, invoke, requireClient } from "./db.js?v=8";
+import { sb, q, invoke, requireClient } from "./db.js?v=12";
 
 // Toute requête passe par ici : sans config, message clair plutôt
 // qu'un "Cannot read properties of null".
@@ -87,7 +87,7 @@ export function updateFile(id, patch) {
 // Tous les fichiers de l'espace, pour le sélecteur d'envoi.
 export function listSpaceFiles(spaceId) {
   return q(db().from("projects")
-    .select("id, title, last_activity_at, files(id, version_no, label, kind, status, original_name, size_bytes, duration_sec)")
+    .select("id, title, last_activity_at, files(id, version_no, label, kind, status, original_name, mime_type, size_bytes, duration_sec)")
     .eq("space_id", spaceId)
     .eq("archived", false)
     .order("last_activity_at", { ascending: false })
@@ -97,7 +97,7 @@ export function listSpaceFiles(spaceId) {
 export function getFilesByIds(ids) {
   if (!ids.length) return Promise.resolve([]);
   return q(db().from("files")
-    .select("id, version_no, label, kind, status, original_name, size_bytes, duration_sec, project:projects(id, title)")
+    .select("id, version_no, label, kind, status, original_name, mime_type, size_bytes, duration_sec, project:projects(id, title)")
     .in("id", ids));
 }
 

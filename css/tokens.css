@@ -1,39 +1,46 @@
-/* Seminaire : jetons de design. Ambiance studio, sombre, fort contraste.
+/* Seminaire : jetons de design. Violet et noir, fort contraste.
    Mobile d'abord : tout se lit et se touche a bout de bras dans une villa
    mal eclairee, telephone dans une main. */
 
 :root {
   color-scheme: dark;
 
-  /* ---- fonds, du plus profond au plus proche */
-  --bg:          #0b0c0f;
-  --surface:     #14161b;
-  --surface-2:   #1c1f26;
-  --surface-3:   #252932;
+  /* ---- fonds : noir teinté de violet, du plus profond au plus proche */
+  --bg:          #0b0911;
+  --surface:     #13101c;
+  --surface-2:   #1b1627;
+  --surface-3:   #251e35;
 
   /* ---- traits */
-  --line:        #2a2f39;
-  --line-strong: #3a4150;
+  --line:        #2a2339;
+  --line-strong: #3b3152;
 
-  /* ---- texte */
-  --text:        #e9ebf0;
-  --text-dim:    #a2a9b8;
-  --text-faint:  #6c7484;
+  /* ---- texte (blanc légèrement lavande) */
+  --text:        #efeaf8;
+  --text-dim:    #aba2bf;
+  --text-faint:  #71698a;
 
-  /* ---- accent : ambre de VU-metre, chaud, tres lisible sur noir */
-  --accent:      #ff9142;
-  --accent-dim:  #b85f22;
-  --accent-soft: rgba(255, 145, 66, 0.14);
+  /* ---- accent violet
+     --accent : fonds de boutons (texte blanc, contraste 5,7:1)
+     --accent-bright : texte, icônes et waveform sur fond noir */
+  --accent:        #7c3aed;
+  --accent-bright: #a78bfa;
+  --accent-hi:     #c4b5fd;
+  --accent-dim:    #6d28d9;
+  --accent-soft:   rgba(139, 92, 246, 0.14);
+  --accent-glow:   rgba(124, 58, 237, 0.38);
+  --on-accent:     #ffffff;
+  --accent-grad:   linear-gradient(135deg, #6d28d9 0%, #8b5cf6 55%, #a855f7 100%);
 
-  /* ---- etats */
+  /* ---- états */
   --ok:          #4ade80;
   --warn:        #fbbf24;
   --danger:      #f87171;
   --live:        #ef4444;
 
   /* ---- waveform */
-  --wave-idle:   #3a4150;
-  --wave-played: var(--accent);
+  --wave-idle:   #3b3152;
+  --wave-played: var(--accent-bright);
   --wave-cursor: #ffffff;
 
   /* ---- typographie */
@@ -80,8 +87,19 @@
 :root {
   --kind-instru:    #60a5fa;
   --kind-voix:      #f472b6;
-  --kind-freestyle: #a78bfa;
+  --kind-freestyle: #2dd4bf;
   --kind-mix:       #4ade80;
   --kind-stems:     #fbbf24;
   --kind-autre:     #94a3b8;
+}
+
+/* Catégories de fichiers non audio : reconnaissables d'un coup d'oeil. */
+:root {
+  --cat-audio:    var(--accent-bright);
+  --cat-image:    #f472b6;
+  --cat-video:    #38bdf8;
+  --cat-document: #fbbf24;
+  --cat-archive:  #94a3b8;
+  --cat-project:  #4ade80;
+  --cat-other:    #aba2bf;
 }

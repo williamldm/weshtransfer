@@ -1,6 +1,7 @@
 // Briques d'interface partagées : DOM, messages, formatage, feuilles.
 
-import { icon } from "./icons.js?v=8";
+import { icon } from "./icons.js?v=12";
+import { CATEGORY, categoryOf } from "./files.js?v=12";
 
 // ------------------------------------------------------------------ DOM
 
@@ -79,7 +80,8 @@ export function formatBytes(bytes) {
     value /= 1024;
     i++;
   }
-  return (value >= 10 ? Math.round(value) : value.toFixed(1)).toString().replace(".", ",") + " " + units[i];
+  // "3 Go" plutôt que "3,0 Go"
+  return (value >= 10 ? String(Math.round(value)) : value.toFixed(1).replace(/\.0$/, "")).replace(".", ",") + " " + units[i];
 }
 
 export function formatDuration(seconds) {
@@ -140,6 +142,23 @@ export const KIND_LABEL = Object.fromEntries(KINDS);
 export function kindBadge(kind) {
   const k = KIND_LABEL[kind] ? kind : "autre";
   return '<span class="kind kind-' + k + '">' + KIND_LABEL[k] + "</span>";
+}
+
+// Badge d'un fichier : le type musical pour l'audio (voix, mix...), la
+// catégorie pour le reste (image, vidéo, projet...).
+export function fileBadge(name, mime, kind) {
+  const cat = categoryOf(name, mime);
+  if (cat === "audio") return kindBadge(kind);
+  return '<span class="cat cat-' + cat + '">' + CATEGORY[cat].label + "</span>";
+}
+
+// Tuile d'icône colorée par catégorie (ou vignette d'image si url fournie).
+export function fileTile(name, mime, thumbUrl) {
+  const cat = categoryOf(name, mime);
+  const inner = thumbUrl
+    ? '<img src="' + esc(thumbUrl) + '" alt="" loading="lazy">'
+    : icon(CATEGORY[cat].icon, 20);
+  return '<span class="ft ft-' + cat + '">' + inner + "</span>";
 }
 
 // Pastille avec initiale, couleur stable par pseudo.

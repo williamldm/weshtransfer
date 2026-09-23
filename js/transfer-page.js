@@ -2,11 +2,12 @@
 // Pas de supabase-js ici : un simple appel à l'Edge Function transfer-open,
 // qui vérifie le lien et renvoie des URLs signées. Page légère, rapide en 4G.
 
-import { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from "./config.js?v=8";
-import { Waveform, formatTime } from "./waveform.js?v=8";
-import { saveZip, canStreamToDisk, MEMORY_LIMIT } from "./zip.js?v=8";
-import { icon } from "./icons.js?v=8";
-import { esc, kindBadge, formatBytes, formatDuration, formatDate, plural, toast, triggerDownload } from "./ui.js?v=8";
+import { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from "./config.js?v=12";
+import { Waveform, formatTime } from "./waveform.js?v=12";
+import { saveZip, canStreamToDisk, MEMORY_LIMIT } from "./zip.js?v=12";
+import { icon } from "./icons.js?v=12";
+import { esc, formatBytes, formatDuration, formatDate, plural, toast, triggerDownload, avatar, fileBadge, fileTile } from "./ui.js?v=12";
+import { categoryOf, canPreview } from "./files.js?v=12";
 
 const root = document.getElementById("tp");
 const k = new URLSearchParams(location.search).get("k") || "";
@@ -75,57 +76,114 @@ audio.addEventListener("error", () => {
 
 // ------------------------------------------------------------- rendu
 
+// Chaque fichier va dans un groupe selon ce que le navigateur sait en
+// montrer : lecteur audio, lecteur vidéo, galerie d'images, ou liste.
+function groupOf(f) {
+  const cat = categoryOf(f.name, f.mime);
+  if (!f.url) return "other";
+  if (cat === "audio" && canPreview(f.name, f.mime)) return "audio";
+  if (cat === "video" && canPreview(f.name, f.mime)) return "video";
+  if (cat === "image" && canPreview(f.name, f.mime)) return "image";
+  return "other";
+}
+
+function dlButton(f) {
+  return f.download_url
+    ? '<button class="btn btn-ghost btn-icon" data-dl="' + f.id + '" aria-label="Télécharger ' + esc(f.name) + '">' + icon("download") + "</button>"
+    : "";
+}
+
+function renderAudio(f) {
+  return '<li class="tp-file tp-audio">' +
+    '<div class="tp-top">' +
+      '<button class="play-btn" data-play="' + f.id + '" aria-label="Écouter">' + icon("play", 20) + "</button>" +
+      '<div class="tp-main">' +
+        '<div class="tp-name">' + esc(f.name) + "</div>" +
+        '<div class="tp-meta">' + fileBadge(f.name, f.mime, f.kind) + " " +
+          (f.duration ? '<span class="mono"><span data-time="' + f.id + '"></span>' + formatDuration(Number(f.duration)) + "</span> · " : "") +
+          formatBytes(f.size) + (f.uploader ? " · " + esc(f.uploader) : "") + "</div>" +
+      "</div>" + dlButton(f) +
+    "</div>" +
+    '<div class="wave wave-sm"><canvas data-wave="' + f.id + '"></canvas></div>' +
+  "</li>";
+}
+
+function renderVideo(f) {
+  return '<li class="tp-file tp-video">' +
+    '<video controls playsinline preload="metadata" src="' + esc(f.url) + '"></video>' +
+    '<div class="tp-top">' + fileTile(f.name, f.mime) +
+      '<div class="tp-main"><div class="tp-name">' + esc(f.name) + "</div>" +
+      '<div class="tp-meta">' + fileBadge(f.name, f.mime) + " " + formatBytes(f.size) + "</div></div>" + dlButton(f) +
+    "</div>" +
+  "</li>";
+}
+
+function renderImage(f) {
+  return '<button class="tp-thumb" data-open="' + f.id + '" aria-label="Voir ' + esc(f.name) + '">' +
+    '<img src="' + esc(f.url) + '" alt="" loading="lazy">' +
+    '<span class="tp-thumb-name">' + esc(f.name) + "</span>" +
+  "</button>";
+}
+
+function renderOther(f) {
+  const pdf = /\.pdf$/i.test(f.name) && f.url;
+  return '<li class="tp-file tp-row">' +
+    '<div class="tp-top">' + fileTile(f.name, f.mime) +
+      '<div class="tp-main"><div class="tp-name">' + esc(f.name) + "</div>" +
+      '<div class="tp-meta">' + fileBadge(f.name, f.mime, f.kind) + " " + formatBytes(f.size) + "</div></div>" +
+      (pdf ? '<a class="btn btn-ghost btn-icon" href="' + esc(f.url) + '" target="_blank" rel="noopener" aria-label="Ouvrir">' + icon("external") + "</a>" : "") +
+      dlButton(f) +
+    "</div>" +
+  "</li>";
+}
+
 function render(d) {
-  const total = d.files.reduce((s, f) => s + (f.size || 0), 0);
+  const total = d.files.reduce((sum, f) => sum + (f.size || 0), 0);
   const single = d.files.length === 1;
   document.title = d.title + (d.sender ? " · de " + d.sender : "");
 
+  const groups = { audio: [], video: [], image: [], other: [] };
+  for (const f of d.files) groups[groupOf(f)].push(f);
+  const several = Object.values(groups).filter((g) => g.length).length > 1;
+  const head = (label, n) => several ? '<h2 class="tp-group">' + label + ' <span class="count">' + n + "</span></h2>" : "";
+
   root.innerHTML =
     '<section class="tp-hero">' +
-      (d.space ? '<div class="eyebrow">' + esc(d.space) + "</div>" : "") +
-      '<p class="tp-from">' + (d.sender ? "<strong>" + esc(d.sender) + "</strong> t'a envoyé " : "") +
-        plural(d.files.length, "fichier", "fichiers") + "</p>" +
+      '<div class="tp-from">' + avatar(d.sender || "?") +
+        "<div><div>" + (d.sender ? "<strong>" + esc(d.sender) + "</strong> t'a envoyé " : "") +
+          plural(d.files.length, "fichier", "fichiers") + "</div>" +
+        (d.space ? '<div class="tp-space">' + esc(d.space) + "</div>" : "") + "</div>" +
+      "</div>" +
       "<h1>" + esc(d.title) + "</h1>" +
       (d.message ? '<blockquote class="tp-msg">' + esc(d.message) + "</blockquote>" : "") +
+      '<div class="tp-stats">' +
+        "<span>" + icon("file", 14) + plural(d.files.length, "fichier", "fichiers") + "</span>" +
+        "<span>" + icon("archive", 14) + formatBytes(total) + "</span>" +
+        "<span>" + icon("clock", 14) + "jusqu'au " + esc(formatDate(d.expires_at)) + "</span>" +
+      "</div>" +
       (d.files.length
         ? '<button class="btn btn-primary btn-xl btn-block" data-all>' + icon("download", 22) +
-            "<span>" + (single ? "Télécharger" : "Tout télécharger") + '</span><span class="btn-sub">' + formatBytes(total) + "</span></button>"
+            "<span>" + (single ? "Télécharger" : "Tout télécharger") + "</span></button>"
         : "") +
-      '<p class="tp-exp">' + icon("clock", 14) + " Disponible jusqu'au " + esc(formatDate(d.expires_at)) + "</p>" +
     "</section>" +
 
-    (d.files.length
-      ? '<ul class="tp-files">' + d.files.map((f) => {
-          const zip = /\.zip$/i.test(f.name);
-          return '<li class="tp-file">' +
-            '<div class="tp-top">' +
-              (zip || !f.url
-                ? '<span class="play-btn is-static">' + icon("archive", 20) + "</span>"
-                : '<button class="play-btn" data-play="' + f.id + '" aria-label="Écouter">' + icon("play", 20) + "</button>") +
-              '<div class="tp-main">' +
-                '<div class="tp-name">' + esc(f.name) + "</div>" +
-                '<div class="tp-meta">' + kindBadge(f.kind) + " " +
-                  (f.duration ? '<span class="mono"><span data-time="' + f.id + '"></span>' + formatDuration(Number(f.duration)) + "</span> · " : "") +
-                  formatBytes(f.size) + (f.uploader ? " · " + esc(f.uploader) : "") + "</div>" +
-              "</div>" +
-              (f.download_url ? '<button class="btn btn-ghost btn-icon" data-dl="' + f.id + '" aria-label="Télécharger ' + esc(f.name) + '">' + icon("download") + "</button>" : "") +
-            "</div>" +
-            (zip ? "" : '<div class="wave wave-sm"><canvas data-wave="' + f.id + '"></canvas></div>') +
-          "</li>";
-        }).join("") + "</ul>"
-      : '<div class="tp-state"><p>Les fichiers de cet envoi ont été supprimés.</p></div>') +
+    (d.files.length ? "" : '<div class="tp-state"><p>Les fichiers de cet envoi ont été supprimés.</p></div>') +
+    (groups.audio.length ? '<section class="tp-section">' + head("Sons", groups.audio.length) + '<ul class="tp-files">' + groups.audio.map(renderAudio).join("") + "</ul></section>" : "") +
+    (groups.video.length ? '<section class="tp-section">' + head("Vidéos", groups.video.length) + '<ul class="tp-files">' + groups.video.map(renderVideo).join("") + "</ul></section>" : "") +
+    (groups.image.length ? '<section class="tp-section">' + head("Images", groups.image.length) + '<div class="tp-gallery">' + groups.image.map(renderImage).join("") + "</div></section>" : "") +
+    (groups.other.length ? '<section class="tp-section">' + head("Autres fichiers", groups.other.length) + '<ul class="tp-files">' + groups.other.map(renderOther).join("") + "</ul></section>" : "") +
 
-    '<p class="tp-foot">Envoyé depuis Séminaire · les fichiers sont supprimés automatiquement après expiration.</p>';
+    '<p class="tp-foot">Envoyé avec Séminaire · les fichiers sont supprimés automatiquement à expiration.</p>';
 
   const cs = getComputedStyle(document.documentElement);
-  for (const f of d.files) {
+  for (const f of groups.audio) {
     const canvas = root.querySelector('[data-wave="' + f.id + '"]');
     if (!canvas) continue;
     const w = new Waveform(canvas, {
       barWidth: 2,
       barGap: 1,
       idleColor: cs.getPropertyValue("--wave-idle").trim(),
-      playedColor: cs.getPropertyValue("--accent").trim(),
+      playedColor: cs.getPropertyValue("--wave-played").trim() || "#a78bfa",
       onSeek: (ratio, done) => {
         if (!done) return;
         if (current === f.id && audio.duration) audio.currentTime = ratio * audio.duration;
@@ -139,7 +197,72 @@ function render(d) {
   root.addEventListener("click", onClick);
 }
 
+// ------------------------------------------------------ visionneuse
+
+let viewer = null;
+
+function openViewer(id) {
+  const images = data.files.filter((f) => groupOf(f) === "image");
+  let i = Math.max(0, images.findIndex((f) => f.id === id));
+  closeViewer();
+  viewer = document.createElement("div");
+  viewer.className = "lightbox";
+  viewer.innerHTML =
+    '<div class="lb-bar"><span class="lb-name"></span>' +
+      '<button class="btn btn-ghost btn-icon" data-lb-dl aria-label="Télécharger">' + icon("download") + "</button>" +
+      '<button class="btn btn-ghost btn-icon" data-lb-close aria-label="Fermer">' + icon("x") + "</button></div>" +
+    '<div class="lb-stage"><img alt=""></div>' +
+    (images.length > 1
+      ? '<button class="lb-nav lb-prev" data-lb-prev aria-label="Précédente">' + icon("back", 22) + "</button>" +
+        '<button class="lb-nav lb-next" data-lb-next aria-label="Suivante">' + icon("chevron", 22) + "</button>"
+      : "");
+  document.body.appendChild(viewer);
+  document.body.style.overflow = "hidden";
+
+  const show = () => {
+    const f = images[i];
+    viewer.querySelector("img").src = f.url;
+    viewer.querySelector(".lb-name").textContent = f.name + (images.length > 1 ? "  ·  " + (i + 1) + " / " + images.length : "");
+  };
+  const step = (d) => { i = (i + d + images.length) % images.length; show(); };
+
+  viewer.addEventListener("click", (e) => {
+    if (e.target.closest("[data-lb-close]") || e.target.classList.contains("lb-stage")) closeViewer();
+    else if (e.target.closest("[data-lb-prev]")) step(-1);
+    else if (e.target.closest("[data-lb-next]")) step(1);
+    else if (e.target.closest("[data-lb-dl]")) { registerDownload(); triggerDownload(images[i].download_url, images[i].name); }
+  });
+  viewer.onkey = (e) => {
+    if (e.key === "Escape") closeViewer();
+    if (e.key === "ArrowLeft") step(-1);
+    if (e.key === "ArrowRight") step(1);
+  };
+  document.addEventListener("keydown", viewer.onkey);
+
+  // balayage au doigt pour passer d'une image à l'autre
+  let x0 = null;
+  viewer.addEventListener("touchstart", (e) => { x0 = e.touches[0].clientX; }, { passive: true });
+  viewer.addEventListener("touchend", (e) => {
+    if (x0 == null || images.length < 2) return;
+    const dx = e.changedTouches[0].clientX - x0;
+    if (Math.abs(dx) > 50) step(dx < 0 ? 1 : -1);
+    x0 = null;
+  });
+  show();
+}
+
+function closeViewer() {
+  if (!viewer) return;
+  document.removeEventListener("keydown", viewer.onkey);
+  viewer.remove();
+  viewer = null;
+  document.body.style.overflow = "";
+}
+
 async function onClick(e) {
+  const thumb = e.target.closest("[data-open]");
+  if (thumb) { openViewer(thumb.dataset.open); return; }
+
   const play = e.target.closest("[data-play]");
   if (play) {
     const f = data.files.find((x) => x.id === play.dataset.play);

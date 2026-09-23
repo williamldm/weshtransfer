@@ -1,10 +1,11 @@
 // Feuille "Ajouter des sons" : choix du morceau, du type, détails optionnels.
 // L'upload démarre dès validation ; on peut naviguer pendant qu'il tourne.
 
-import { enqueue, checkFile, guessKind, guessBpm, titleFromName } from "../upload.js?v=8";
-import { listProjects, createProject } from "../api.js?v=8";
-import { icon } from "../icons.js?v=8";
-import { esc, h, openSheet, toast, errorText, formatBytes, KINDS } from "../ui.js?v=8";
+import { enqueue, checkFile, guessKind, guessBpm, titleFromName } from "../upload.js?v=12";
+import { listProjects, createProject } from "../api.js?v=12";
+import { icon } from "../icons.js?v=12";
+import { CATEGORY, categoryOf, isAudio } from "../files.js?v=12";
+import { esc, h, openSheet, toast, errorText, formatBytes, KINDS } from "../ui.js?v=12";
 
 // opts : { projectId, newTitle, tag, onQueued(jobs, projectId) }
 export async function openUploadSheet(ctx, fileList, opts) {
@@ -26,7 +27,7 @@ export async function openUploadSheet(ctx, fileList, opts) {
     '<form class="upload-form" novalidate>' +
       '<ul class="file-pick">' + checked.map((c) =>
         '<li class="' + (c.error ? "is-bad" : "") + '">' +
-          icon(c.error ? "alert" : "music", 18) +
+          icon(c.error ? "alert" : CATEGORY[categoryOf(c.file.name, c.file.type)].icon, 18) +
           '<span class="n">' + esc(c.file.name) + "</span>" +
           '<span class="s">' + (c.error ? esc(c.error) : formatBytes(c.file.size)) + "</span>" +
         "</li>").join("") +
@@ -39,7 +40,7 @@ export async function openUploadSheet(ctx, fileList, opts) {
         '<input class="input" name="title" maxlength="80" value="' + esc(suggested) + '">' +
       "</div>" +
 
-      '<div class="field"><span class="label">Type</span><div class="chips" role="radiogroup">' +
+      '<div class="field"' + (ok.some((f) => isAudio(f.name, f.type)) ? "" : " hidden") + '><span class="label">Type</span><div class="chips" role="radiogroup">' +
         KINDS.map(([k, label]) =>
           '<label class="chip kind-chip kind-' + k + '"><input type="radio" name="kind" value="' + k + '"' +
           (k === kind ? " checked" : "") + "><span>" + label + "</span></label>").join("") +

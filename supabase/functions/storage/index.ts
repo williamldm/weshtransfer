@@ -25,8 +25,11 @@ const PART_SIZE = 16 * 1024 * 1024;   // compromis 4G : une partie ratée coûte
 const GET_TTL = 6 * 3600;
 const PUT_TTL = 2 * 3600;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const EXT = ["mp3", "wav", "aif", "aiff", "m4a", "flac", "ogg", "zip"];
-const KEY = /^spaces\/([0-9a-f-]{36})\/([0-9a-f-]{36})\/([0-9a-f-]{36})\.([a-z0-9]{2,5})$/;
+// Tout est accepté sauf ce qui s'exécute (même liste que js/files.js).
+const BLOCKED = ["exe", "msi", "bat", "cmd", "com", "scr", "pif", "cpl", "dll", "sys", "msc",
+  "vbs", "vbe", "js", "jse", "wsf", "wsh", "hta", "ps1", "psm1", "reg", "lnk",
+  "jar", "apk", "app", "dmg", "pkg", "sh", "command"];
+const KEY = /^spaces\/([0-9a-f-]{36})\/([0-9a-f-]{36})\/([0-9a-f-]{36})\.([a-z0-9]{1,10})$/;
 
 type FileRow = { id: string; storage_path: string; backend: string; original_name: string };
 
@@ -66,9 +69,10 @@ Deno.serve(async (req) => {
         const fileId = String(body.file_id ?? "");
         const name = String(body.file_name ?? "");
         const size = Number(body.size ?? 0);
-        const ext = (/\.([a-z0-9]+)$/i.exec(name)?.[1] ?? "").toLowerCase();
+        // sans extension exploitable : .bin (le nom d'origine reste en base)
+        const ext = (/\.([a-z0-9]{1,10})$/i.exec(name)?.[1] ?? "bin").toLowerCase();
         if (!UUID.test(projectId) || !UUID.test(fileId)) return json({ error: "REQUETE_INVALIDE" }, 400);
-        if (!EXT.includes(ext)) return json({ error: "FORMAT_REFUSE" }, 400);
+        if (BLOCKED.includes(ext)) return json({ error: "FORMAT_REFUSE" }, 400);
         if (!(size > 0)) return json({ error: "FICHIER_VIDE" }, 400);
 
         const { data: project } = await db.from("projects")

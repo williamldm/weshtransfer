@@ -6,10 +6,10 @@ const DEFAULTS = {
   barWidth: 3,
   barGap: 1,
   minBarHeight: 2,
-  idleColor: "#3a4150",
-  playedColor: "#ff9142",
+  idleColor: "#3b3152",
+  playedColor: "#a78bfa",
   cursorColor: "#ffffff",
-  markerColor: "#ff9142"
+  markerColor: "#c4b5fd"
 };
 
 export class Waveform {

@@ -86,8 +86,24 @@ export function formatDate(iso: string): string {
 
 const KIND_LABEL: Record<string, string> = {
   instru: "Instru", voix: "Voix", freestyle: "Freestyle",
-  mix: "Mix", stems: "Stems", autre: "Fichier",
+  mix: "Mix", stems: "Stems",
 };
+
+// Même classement que js/files.js, réduit à ce dont l'email a besoin.
+const CATS: [string, string[]][] = [
+  ["Audio", ["mp3", "wav", "aif", "aiff", "m4a", "flac", "ogg", "opus", "aac"]],
+  ["Image", ["jpg", "jpeg", "png", "gif", "webp", "avif", "heic", "psd", "tif", "tiff"]],
+  ["Vidéo", ["mp4", "mov", "m4v", "webm", "mkv", "avi"]],
+  ["Document", ["pdf", "doc", "docx", "txt", "rtf", "pages", "xls", "xlsx", "csv"]],
+  ["Archive", ["zip", "rar", "7z", "tar", "gz"]],
+  ["Projet", ["als", "flp", "logicx", "ptx", "cpr", "rpp", "song", "band", "mid", "midi"]],
+];
+
+function typeLabel(name: string, kind: string): string {
+  const ext = (/\.([a-z0-9]+)$/i.exec(name)?.[1] ?? "").toLowerCase();
+  const cat = CATS.find(([, list]) => list.includes(ext))?.[0] ?? "Fichier";
+  return cat === "Audio" && KIND_LABEL[kind] ? KIND_LABEL[kind] : cat;
+}
 
 // ------------------------------------------------------------- gabarits
 
@@ -116,7 +132,7 @@ export function transferMail(input: TransferMailInput): { subject: string; html:
   const rows = shown.map((f) => `
       <tr>
         <td style="padding:10px 0;border-bottom:1px solid #ececef;font-size:14px;color:#16181d;word-break:break-all;">${esc(f.name)}</td>
-        <td style="padding:10px 0 10px 12px;border-bottom:1px solid #ececef;font-size:12px;color:#6c7484;white-space:nowrap;text-align:right;">${esc(KIND_LABEL[f.kind] ?? "Fichier")} · ${esc(formatBytes(f.size))}</td>
+        <td style="padding:10px 0 10px 12px;border-bottom:1px solid #ececef;font-size:12px;color:#6c7484;white-space:nowrap;text-align:right;">${esc(typeLabel(f.name, f.kind))} · ${esc(formatBytes(f.size))}</td>
       </tr>`).join("");
 
   const more = hidden > 0
@@ -124,33 +140,33 @@ export function transferMail(input: TransferMailInput): { subject: string; html:
     : "";
 
   const message = input.message
-    ? `<div style="margin:0 0 24px;padding:14px 16px;border-left:3px solid #ff9142;background:#fff7f0;font-size:15px;line-height:1.5;color:#16181d;white-space:pre-wrap;">${esc(input.message)}</div>`
+    ? `<div style="margin:0 0 24px;padding:14px 16px;border-left:3px solid #7c3aed;background:#f5f0ff;font-size:15px;line-height:1.5;color:#16181d;white-space:pre-wrap;">${esc(input.message)}</div>`
     : "";
 
   const html = `<!doctype html>
 <html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(subject)}</title></head>
-<body style="margin:0;padding:0;background:#f2f2f4;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+<body style="margin:0;padding:0;background:#f4f1fa;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
 <div style="display:none;max-height:0;overflow:hidden;opacity:0;">${esc(preheader)}</div>
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f2f2f4;padding:24px 12px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f1fa;padding:24px 12px;">
 <tr><td align="center">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#ffffff;border-radius:14px;overflow:hidden;">
-    <tr><td style="background:#0b0c0f;padding:18px 24px;">
-      <span style="font-size:15px;font-weight:700;color:#ffffff;letter-spacing:.02em;">Séminaire</span>
-      <span style="font-size:13px;color:#a2a9b8;"> · ${esc(input.spaceName)}</span>
+    <tr><td style="background:#0b0911;background-image:linear-gradient(135deg,#1b1030 0%,#0b0911 70%);padding:20px 24px;">
+      <span style="font-size:15px;font-weight:700;color:#ffffff;letter-spacing:.02em;"><span style="color:#a78bfa;">&#9679;</span> Séminaire</span>
+      <span style="font-size:13px;color:#aba2bf;"> · ${esc(input.spaceName)}</span>
     </td></tr>
     <tr><td style="padding:28px 24px 8px;">
       <p style="margin:0 0 6px;font-size:14px;color:#6c7484;"><strong style="color:#16181d;">${esc(input.sender)}</strong> t'a envoyé ${countLabel}</p>
       <h1 style="margin:0 0 20px;font-size:24px;line-height:1.25;color:#0b0c0f;">${esc(input.title)}</h1>
       ${message}
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 24px;">${rows}${more}</table>
-      <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 16px;"><tr><td style="border-radius:10px;background:#ff9142;">
-        <a href="${esc(input.link)}" style="display:inline-block;padding:15px 26px;font-size:16px;font-weight:700;color:#1a0d04;text-decoration:none;">Écouter et télécharger</a>
+      <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 16px;"><tr><td style="border-radius:12px;background:#7c3aed;">
+        <a href="${esc(input.link)}" style="display:inline-block;padding:15px 28px;font-size:16px;font-weight:700;color:#ffffff;text-decoration:none;">Ouvrir l'envoi</a>
       </td></tr></table>
       <p style="margin:0 0 24px;font-size:13px;color:#6c7484;">${esc(formatBytes(total))} au total · disponible jusqu'au ${esc(until)}</p>
     </td></tr>
     <tr><td style="padding:16px 24px 22px;border-top:1px solid #ececef;font-size:12px;line-height:1.5;color:#8b92a1;">
       ${input.canReply ? `Répondre à cet email écrit directement à ${esc(input.sender)}.<br>` : ""}
-      Si le bouton ne marche pas : <a href="${esc(input.link)}" style="color:#b85f22;word-break:break-all;">${esc(input.link)}</a>
+      Si le bouton ne marche pas : <a href="${esc(input.link)}" style="color:#6d28d9;word-break:break-all;">${esc(input.link)}</a>
     </td></tr>
   </table>
 </td></tr>
@@ -161,10 +177,10 @@ export function transferMail(input: TransferMailInput): { subject: string; html:
     `${input.sender} t'a envoyé ${countLabel} : ${input.title}`,
     "",
     input.message ? `${input.message}\n` : "",
-    ...shown.map((f) => `- ${f.name} (${KIND_LABEL[f.kind] ?? "Fichier"}, ${formatBytes(f.size)})`),
+    ...shown.map((f) => `- ${f.name} (${typeLabel(f.name, f.kind)}, ${formatBytes(f.size)})`),
     hidden > 0 ? `+ ${hidden} autre(s)` : "",
     "",
-    `Écouter et télécharger : ${input.link}`,
+    `Ouvrir l'envoi : ${input.link}`,
     `Disponible jusqu'au ${until}.`,
   ].filter((line, i, all) => line !== "" || all[i - 1] !== "").join("\n");
 
@@ -181,7 +197,7 @@ export function downloadNoticeMail(input: {
     ? `${input.who} a téléchargé "${input.title}"`
     : `"${input.title}" a été téléchargé`;
   const html = `<!doctype html><html lang="fr"><head><meta charset="utf-8"></head>
-<body style="margin:0;padding:24px 12px;background:#f2f2f4;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+<body style="margin:0;padding:24px 12px;background:#f4f1fa;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#fff;border-radius:14px;">
 <tr><td style="padding:24px;font-size:15px;line-height:1.5;color:#16181d;">
