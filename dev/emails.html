@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Aperçu des emails</title>
+<style>
+  body { margin: 0; background: #222; color: #ddd; font: 13px/1.5 system-ui, sans-serif; }
+  nav { position: sticky; top: 0; z-index: 2; display: flex; flex-wrap: wrap; gap: 6px; padding: 10px; background: #000; border-bottom: 1px solid #333; }
+  nav button { padding: 5px 12px; border: 0; border-radius: 99px; background: #333; color: #ccc; font: inherit; cursor: pointer; }
+  nav button.on { background: #A48BFF; color: #000; }
+  .meta { padding: 12px 16px 0; }
+  .meta b { color: #fff; }
+  .frames { display: flex; flex-wrap: wrap; gap: 16px; padding: 16px; align-items: flex-start; }
+  iframe { border: 1px solid #444; background: #fff; }
+  pre { margin: 0 16px 24px; padding: 12px; max-width: 640px; white-space: pre-wrap; background: #111; border: 1px solid #333; }
+</style>
+</head>
+<body>
+<!-- Les gabarits réels (supabase/functions/_shared/mail-templates.js) avec
+     des données fictives, en largeur ordinateur et téléphone. Images et
+     polices servies par le serveur local. -->
+<nav id="nav"></nav>
+<div class="meta" id="meta"></div>
+<div class="frames">
+  <iframe id="wide" width="680" height="1300" title="Ordinateur"></iframe>
+  <iframe id="narrow" width="375" height="1300" title="Téléphone"></iframe>
+</div>
+<pre id="text"></pre>
+
+<script type="module">
+import { transferMail, verifyCodeMail, downloadNoticeMail } from "../supabase/functions/_shared/mail-templates.js";
+
+const site = location.origin;
+const inAWeek = new Date(Date.now() + 7 * 86400e3).toISOString();
+const files = [
+  { name: "Nuit blanche (mix v3).wav", kind: "mix", size: 58_300_000 },
+  { name: "Nuit blanche - stems.zip", kind: "stems", size: 412_000_000 },
+  { name: "pochette_finale.png", kind: "", size: 3_400_000 },
+  { name: "clip_teaser_vertical.mp4", kind: "", size: 96_000_000 },
+];
+
+const cases = {
+  "Envoi": () => transferMail({
+    site, to: "ingé@studio.fr", sender: "Lil Brume", title: "Nuit blanche, mix du jour 2",
+    message: "Voilà le mix d'hier soir.\nDis-moi pour la voix du refrain, je la trouve un peu en retrait.",
+    files, link: site + "/t.html?k=0123456789abcdef0123456789abcdef", expiresAt: inAWeek, canReply: true,
+  }),
+  "Envoi (1 fichier, sans message)": () => transferMail({
+    site, sender: "Kasbah", title: "Freestyle du couloir",
+    message: null, files: files.slice(0, 1), link: site + "/t.html?k=x", expiresAt: inAWeek, canReply: false,
+  }),
+  "Envoi (12 fichiers)": () => transferMail({
+    site, sender: "Lil Brume", title: "Toutes les prises",
+    message: "Tout est là.", files: Array.from({ length: 12 }, (_, i) => ({ name: "prise_" + (i + 1) + ".wav", kind: "voix", size: 30_000_000 + i * 1e6 })),
+    link: site + "/t.html?k=x", expiresAt: inAWeek, canReply: true,
+  }),
+  "Code": () => verifyCodeMail({ site, email: "lil.brume@gmail.com", code: "048213", minutes: 15 }),
+  "Téléchargé (destinataire)": () => downloadNoticeMail({ site, who: "ingé@studio.fr", title: "Nuit blanche, mix du jour 2" }),
+  "Téléchargé (lien partagé)": () => downloadNoticeMail({ site, who: null, title: "Nuit blanche, mix du jour 2" }),
+};
+
+// ?raw=Nom : l'email seul, en pleine page (captures d'écran)
+const raw = new URLSearchParams(location.search).get("raw");
+if (raw && cases[raw]) {
+  document.open();
+  document.write(cases[raw]().html);
+  document.close();
+  throw new Error("mode raw");
+}
+
+const nav = document.getElementById("nav");
+function show(name) {
+  const m = cases[name]();
+  for (const b of nav.children) b.classList.toggle("on", b.textContent === name);
+  document.getElementById("meta").innerHTML = "<b>Objet :</b> " + m.subject.replace(/</g, "&lt;") +
+    " &nbsp; <b>Poids HTML :</b> " + (new Blob([m.html]).size / 1024).toFixed(1) + " Ko (Gmail coupe au-delà de 102 Ko)";
+  document.getElementById("wide").srcdoc = m.html;
+  document.getElementById("narrow").srcdoc = m.html;
+  document.getElementById("text").textContent = m.text;
+  history.replaceState(null, "", "#" + encodeURIComponent(name));
+}
+for (const name of Object.keys(cases)) {
+  const b = document.createElement("button");
+  b.textContent = name;
+  b.onclick = () => show(name);
+  nav.appendChild(b);
+}
+show(decodeURIComponent(location.hash.slice(1)) in cases ? decodeURIComponent(location.hash.slice(1)) : "Envoi");
+</script>
+</body>
+</html>

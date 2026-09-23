@@ -9,7 +9,7 @@
 
 import { admin } from "../_shared/supabase.ts";
 import { json, preflight, readJson } from "../_shared/http.ts";
-import { downloadNoticeMail, mailConfig, sendEmails } from "../_shared/email.ts";
+import { downloadNoticeMail, isVerified, mailConfig, sendEmails } from "../_shared/email.ts";
 import { b2Config, presignGet } from "../_shared/b2.ts";
 
 const URL_TTL = 6 * 3600;
@@ -78,17 +78,15 @@ Deno.serve(async (req) => {
     // L'expediteur est prevenu une fois par destinataire (ou une fois pour le
     // lien partage), jamais a chaque clic.
     if (first && cfg && transfer.notify_sender && transfer.reply_to) {
-      const mail = downloadNoticeMail({
-        who: recipient?.email ?? null,
-        title: transfer.title,
-        spaceName: transfer.space?.name ?? "",
-      });
-      await sendEmails(cfg, [{
-        to: transfer.reply_to,
-        subject: mail.subject,
-        html: mail.html,
-        text: mail.text,
-      }]);
+      // uniquement vers une adresse que l'expediteur a prouvee : sinon ce
+      // serait un moyen d'ecrire a n'importe qui
+      const { data: owner } = await db.from("transfers")
+        .select("sender:participants(user_id)").eq("id", transfer.id).maybeSingle();
+      const uid = (owner as { sender?: { user_id?: string } } | null)?.sender?.user_id;
+      if (uid && await isVerified(db, uid, transfer.reply_to)) {
+        const mail = downloadNoticeMail({ site: cfg.site, who: recipient?.email ?? null, title: transfer.title });
+        await sendEmails(cfg, [{ to: transfer.reply_to, subject: mail.subject, html: mail.html, text: mail.text }]);
+      }
     }
     return json({ ok: true });
   }

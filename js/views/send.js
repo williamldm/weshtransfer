@@ -4,18 +4,19 @@
 
 import {
   getProject, getFilesByIds, listSpaceFiles, createTransfer, sendTransfer, emailEnabled,
-  getTransfer, transferUrl, createProject, signFiles, cachedUrl
-} from "../api.js?v=27";
-import { openUploadSheet } from "./upload-sheet.js?v=27";
-import { mountUploads } from "./uploads.js?v=27";
-import { onUploads, enqueue, checkFile } from "../upload.js?v=27";
-import { categoryOf, canPreview } from "../files.js?v=27";
-import { takePending } from "../pending.js?v=27";
-import { icon } from "../icons.js?v=27";
+  getTransfer, transferUrl, createProject, signFiles, cachedUrl,
+  emailVerified, knownVerified, requestEmailCode, confirmEmailCode
+} from "../api.js?v=28";
+import { openUploadSheet } from "./upload-sheet.js?v=28";
+import { mountUploads } from "./uploads.js?v=28";
+import { onUploads, enqueue, checkFile } from "../upload.js?v=28";
+import { categoryOf, canPreview } from "../files.js?v=28";
+import { takePending } from "../pending.js?v=28";
+import { icon } from "../icons.js?v=28";
 import {
   esc, h, formatBytes, formatDuration, plural, toast, errorText, openSheet, copyText, shareLink,
   canShare, formatDate, daysLeft, fileBadge, fileTile
-} from "../ui.js?v=27";
+} from "../ui.js?v=28";
 
 // Dans un espace "envoi", ce composeur EST l'accueil.
 export const title = (ctx) => (ctx && ctx.space.mode === "envoi" ? ctx.space.name : "Envoyer");
@@ -125,7 +126,7 @@ export async function mount(root, ctx, params) {
           '<textarea class="input" name="message" rows="3" maxlength="2000" placeholder="Dis-leur ce qu\'ils vont écouter"></textarea></label>' +
         '<label class="field"><span class="label">Ton email</span>' +
           '<input class="input" type="email" name="reply" inputmode="email" autocomplete="email" autocapitalize="off" value="' + esc(state.replyTo) + '" placeholder="pour les réponses">' +
-          '<span class="hint">Les réponses t\'arrivent directement, et tu sais quand c\'est téléchargé.</span></label>' +
+          '<span class="hint" data-reply-hint></span></label>' +
         '<div class="field"><span class="label">Disponible pendant</span><div class="chips" data-days>' +
           DURATIONS.map((d) => '<button type="button" class="chip' + (d === state.days ? " is-on" : "") + '" data-d="' + d + '"' +
             (d > maxDays ? " disabled" : "") + ">" + plural(d, "jour", "jours") + "</button>").join("") +
@@ -154,6 +155,21 @@ export async function mount(root, ctx, params) {
   const emailEl = root.querySelector("[data-email]");
   const submitEl = root.querySelector("[data-submit]");
   const pendingEl = root.querySelector("[data-pending]");
+  const replyHint = root.querySelector("[data-reply-hint]");
+
+  // Sous "Ton email" : vérifiée ou pas, et pourquoi on la demande.
+  function drawReplyHint() {
+    const v = replyInput.value.trim().toLowerCase();
+    if (emailOn && v && knownVerified(v)) {
+      replyHint.innerHTML = '<span class="verified">' + icon("check", 14) + " Adresse vérifiée sur cet appareil</span>";
+    } else if (emailOn) {
+      replyHint.textContent = (state.emails.length ? "Obligatoire pour envoyer par email. " : "") +
+        "La première fois, on t'envoie un code pour vérifier que c'est bien toi. Ensuite, les réponses t'arrivent directement et tu sais quand c'est téléchargé.";
+    } else {
+      replyHint.textContent = "Les réponses t'arrivent directement, et tu sais quand c'est téléchargé.";
+    }
+  }
+  replyInput.addEventListener("input", drawReplyHint);
 
   // Si la durée par défaut dépasse la vie de l'espace, on prend la plus longue possible.
   if (state.days > maxDays) {
@@ -209,6 +225,7 @@ export async function mount(root, ctx, params) {
     const label = n && emailOn ? "Envoyer à " + plural(n, "personne", "personnes") : "Créer le lien";
     submitEl.innerHTML = icon(n && emailOn ? "send" : "link", 22) + "<span>" + label + "</span>";
     submitEl.disabled = state.sending || !state.files.length;
+    if (replyHint) drawReplyHint();
   }
 
   // ------------------------------------------- saisie des emails en pastilles
@@ -396,12 +413,32 @@ export async function mount(root, ctx, params) {
     const title = titleInput.value.trim();
     if (!title) { titleInput.focus(); return toast("Donne un titre à l'envoi", "err"); }
 
-    const replyTo = replyInput.value.trim().toLowerCase();
+    let replyTo = replyInput.value.trim().toLowerCase();
+    const byMail = state.emails.length > 0 && emailOn;
     if (replyTo && !EMAIL_RE.test(replyTo)) { replyInput.focus(); return toast("Ton email n'est pas valide", "err"); }
+    if (byMail && !replyTo) {
+      replyInput.focus();
+      return toast("Donne ton email : tes destinataires doivent savoir qui leur écrit", "err");
+    }
     try { localStorage.setItem(REPLY_KEY, replyTo); } catch (err) { /* privé */ }
 
     state.sending = true;
     drawSubmit();
+
+    // Rien ne part "de ta part" sans que l'adresse soit vérifiée (une fois
+    // par appareil). Pour un simple lien, on peut passer : pas d'avis de
+    // téléchargement dans ce cas.
+    if (emailOn && replyTo) {
+      submitEl.innerHTML = '<span class="spinner"></span><span>Vérification de ton email...</span>';
+      const outcome = await ensureVerified(replyTo, { optional: !byMail });
+      if (outcome === "cancel") {
+        state.sending = false;
+        drawSubmit();
+        return;
+      }
+      if (outcome === "skip") replyTo = "";
+      drawReplyHint();
+    }
     submitEl.innerHTML = '<span class="spinner"></span><span>' + (state.emails.length && emailOn ? "Envoi..." : "Création du lien...") + "</span>";
 
     try {
@@ -448,6 +485,129 @@ export async function mount(root, ctx, params) {
   }
 
   return () => { offUploads(); offJobs(); };
+}
+
+// --------------------------------------------- vérification de l'expéditeur
+
+// "ok" : adresse vérifiée ; "skip" : on continue sans (lien seul) ;
+// "cancel" : on revient au formulaire. `api` est remplaçable pour le banc
+// d'essai (dev/views.html), qui n'a pas de serveur.
+const realApi = { knownVerified, emailVerified, requestEmailCode, confirmEmailCode };
+
+export async function ensureVerified(email, opts, api) {
+  api = api || realApi;
+  if (api.knownVerified(email)) return "ok";
+  try {
+    if (await api.emailVerified(email)) return "ok";
+    const r = await api.requestEmailCode(email);
+    if (r && r.verified) return "ok";
+  } catch (err) {
+    toast(errorText(err), "err");
+    return "cancel";
+  }
+
+  return new Promise((resolve) => {
+    let done = false;
+    const finish = (value) => {
+      if (done) return;
+      done = true;
+      if (timer) clearInterval(timer);
+      resolve(value);
+      sheet.close();
+    };
+
+    const body = h(
+      '<div class="verify">' +
+        '<p class="muted">On vient d\'envoyer un code à 6 chiffres à <strong>' + esc(email) + "</strong>. " +
+          "C'est la seule fois sur cet appareil.</p>" +
+        '<input class="input code-input mono" type="text" inputmode="numeric" autocomplete="one-time-code" ' +
+          'maxlength="6" pattern="[0-9]*" placeholder="000000" aria-label="Code reçu par email" data-code>' +
+        '<p class="hint verify-msg" data-msg>Pas reçu ? Regarde dans les spams, il peut mettre une minute.</p>' +
+        '<button class="btn btn-primary btn-block" type="button" data-ok>Valider</button>' +
+        '<div class="row-2 verify-more">' +
+          '<button class="btn btn-ghost btn-sm" type="button" data-resend></button>' +
+          '<button class="btn btn-ghost btn-sm" type="button" data-change>Changer d\'adresse</button>' +
+        "</div>" +
+        (opts && opts.optional
+          ? '<button class="btn btn-ghost btn-block btn-sm" type="button" data-skip>Continuer sans vérifier</button>' +
+            '<p class="hint center">Tu auras ton lien, mais pas d\'avis quand c\'est téléchargé.</p>'
+          : "") +
+      "</div>"
+    );
+    const sheet = openSheet({ title: "Vérifie ton email", body, onClose: () => finish("cancel") });
+
+    const input = body.querySelector("[data-code]");
+    const msg = body.querySelector("[data-msg]");
+    const ok = body.querySelector("[data-ok]");
+    const resend = body.querySelector("[data-resend]");
+
+    let wait = 30;
+    let timer = null;
+    const tick = () => {
+      resend.disabled = wait > 0;
+      resend.textContent = wait > 0 ? "Renvoyer (" + wait + " s)" : "Renvoyer le code";
+      if (wait-- <= 0) { clearInterval(timer); timer = null; }
+    };
+    const startTimer = () => { wait = 30; tick(); if (!timer) timer = setInterval(tick, 1000); };
+    startTimer();
+
+    let checking = false;
+    async function check() {
+      const code = input.value.replace(/\D/g, "");
+      if (code.length !== 6 || checking) return;
+      checking = true;
+      ok.disabled = true;
+      ok.innerHTML = '<span class="spinner"></span><span>Vérification...</span>';
+      try {
+        if (await api.confirmEmailCode(email, code)) {
+          if (timer) clearInterval(timer);
+          toast("Email vérifié", "ok");
+          return finish("ok");
+        }
+      } catch (err) {
+        msg.textContent = errorText(err);
+        msg.classList.add("is-bad");
+        input.select();
+      }
+      checking = false;
+      ok.disabled = false;
+      ok.textContent = "Valider";
+    }
+
+    input.addEventListener("input", () => {
+      input.value = input.value.replace(/\D/g, "").slice(0, 6);
+      msg.classList.remove("is-bad");
+      if (input.value.length === 6) check();
+    });
+    input.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); check(); } });
+    ok.onclick = check;
+
+    resend.onclick = async () => {
+      resend.disabled = true;
+      try {
+        await api.requestEmailCode(email);
+        msg.textContent = "Nouveau code envoyé. L'ancien ne marche plus.";
+        msg.classList.remove("is-bad");
+        input.value = "";
+        input.focus();
+        startTimer();
+      } catch (err) {
+        msg.textContent = errorText(err);
+        msg.classList.add("is-bad");
+        resend.disabled = false;
+      }
+    };
+    body.querySelector("[data-change]").onclick = () => {
+      if (timer) clearInterval(timer);
+      finish("cancel");
+      const field = document.querySelector("[name=reply]");
+      if (field) { field.focus(); field.select(); }
+    };
+    const skip = body.querySelector("[data-skip]");
+    if (skip) skip.onclick = () => { if (timer) clearInterval(timer); finish("skip"); };
+
+    setTimeout(() => input.focus(), 250);
+  });
 }
 
 // ---------------------------------------------------------------- succès

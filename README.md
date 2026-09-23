@@ -76,14 +76,37 @@ Mise en place (interface web B2) :
 3. **Auth** : Authentication > Sign In / Providers > Anonymous sign-ins : ON.
 4. **Edge Functions** (toutes en `--no-verify-jwt`, elles vérifient elles-mêmes) :
 
-       supabase functions deploy storage send-transfer transfer-open purge-spaces --no-verify-jwt --use-api
+       supabase functions deploy storage send-transfer transfer-open verify-email purge-spaces --no-verify-jwt --use-api
 
-5. **Emails** (facultatif, sinon mode lien) : compte Brevo, domaine
-   `weshtransfer.fr` authentifié (Brevo > Expéditeurs, domaines et IP
-   dédiées > Domaines : enregistrements DKIM, DMARC et code Brevo à ajouter
-   dans la zone DNS chez o2switch), expéditeur `envoi@weshtransfer.fr`.
+5. **Emails** (facultatif, sinon mode lien). Deux voies, essayées dans cet
+   ordre, chaque message refusé par la première repartant par la seconde :
 
-       supabase secrets set BREVO_API_KEY=xkeysib-... MAIL_FROM="WeshTransfer <envoi@weshtransfer.fr>" SITE_URL=https://weshtransfer.fr
+   - **SMTP o2switch** (gratuit, n'entame pas le quota Brevo) : créer la
+     boîte `envoi@weshtransfer.fr` dans cPanel > Comptes de messagerie.
+     Port 465 obligatoire (les Edge Functions bloquent 25 et 587).
+
+         supabase secrets set SMTP_HOST=mail.weshtransfer.fr SMTP_USER=envoi@weshtransfer.fr SMTP_PASS=...
+
+   - **Brevo** (300 emails par jour en gratuit) : domaine authentifié chez
+     Brevo (enregistrements DNS dans la zone o2switch).
+
+         supabase secrets set BREVO_API_KEY=xkeysib-...
+
+   Communs : `MAIL_FROM="WeshTransfer <envoi@weshtransfer.fr>"` et
+   `SITE_URL=https://weshtransfer.fr`. La zone DNS doit garder un SPF qui
+   couvre les deux voies (serveur o2switch et `include:spf.brevo.com`).
+
+   Gabarits : `supabase/functions/_shared/mail-templates.js`, en JS pur pour
+   être partagés avec `dev/emails.html`, qui les affiche avec des données
+   fictives. Images des emails : `img/mail/` (PNG et JPEG : le SVG ne passe
+   pas dans Gmail).
+
+   **Vérification de l'expéditeur** : avant qu'un email parte "de la part
+   de" quelqu'un (Reply-To, avis de téléchargement), l'adresse est vérifiée
+   par un code à 6 chiffres (Edge Function `verify-email`, tables
+   `sender_emails` et `email_codes`, fermées au navigateur). Une fois par
+   appareil et par adresse. Limites : 5 codes par heure et par appareil,
+   8 par jour et par adresse, 5 essais par code, 15 minutes de validité.
 
 6. **Purge quotidienne** : un même secret, jamais versionné, à deux endroits :
 
@@ -104,6 +127,7 @@ Mise en place (interface web B2) :
 - `dev/views.html` : tous les écrans avec des données fictives, sans Supabase.
 - `dev/transfer.html` : la page destinataire avec un serveur simulé.
 - `dev/waveform-test.html` : décodage audio et rendu de la waveform.
+- `dev/emails.html` : les emails avec des données fictives, ordinateur et téléphone.
 - `python3 tools/check.py` : contrôles avant mise en ligne (versions `?v=`
   cohérentes, aucune clé secrète dans le front, pas de guillemets
   typographiques dans le code).

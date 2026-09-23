@@ -1,28 +1,36 @@
-// Emails transactionnels via Brevo (https://www.brevo.com), API HTTP.
+// Envoi des emails transactionnels.
 //
-// Trois secrets a definir (supabase secrets set ...) :
-//   BREVO_API_KEY   cle API Brevo (xkeysib-...), SMTP & API > Cles API
-//   MAIL_FROM       expediteur sur un domaine authentifie chez Brevo,
-//                   ex. "WeshTransfer <envoi@weshtransfer.fr>"
-//   SITE_URL        adresse publique du site, ex. https://weshtransfer.fr
-// Tant que l'un manque, l'envoi par email est desactive et l'appli bascule
-// sur le partage de lien : rien ne casse.
+// Deux voies, dans cet ordre :
+//   1. SMTP o2switch (boîte envoi@weshtransfer.fr) : gratuit, n'entame pas
+//      le quota Brevo. Secrets SMTP_HOST, SMTP_USER, SMTP_PASS (voir smtp.ts).
+//   2. Brevo (API HTTP) : en secours si le SMTP est absent ou refuse un
+//      message. Secret BREVO_API_KEY. Plan gratuit : 300 emails par jour.
+// Communs : MAIL_FROM ("WeshTransfer <envoi@weshtransfer.fr>") et SITE_URL
+// (https://weshtransfer.fr). Sans aucune des deux voies, l'envoi par email
+// est désactivé et l'appli bascule sur le partage de lien : rien ne casse.
 
-export type MailConfig = { key: string; from: { name?: string; email: string }; site: string };
+import { smtpConfig, smtpSendAll, type SmtpConfig } from "./smtp.ts";
+export {
+  esc, formatBytes, formatDate, typeLabel, transferMail, verifyCodeMail, downloadNoticeMail,
+} from "./mail-templates.js";
+
+export type Sender = { name?: string; email: string };
+export type MailConfig = { from: Sender; site: string; brevo: string | null; smtp: SmtpConfig | null };
 
 // "Nom <adresse>" ou "adresse" seule
-function parseFrom(raw: string): { name?: string; email: string } | null {
+function parseFrom(raw: string): Sender | null {
   const m = raw.trim().match(/^(?:"?([^"<]*?)"?\s*<([^>\s]+@[^>\s]+)>|([^<>\s]+@[^<>\s]+))$/);
   if (!m) return null;
   return m[3] ? { email: m[3] } : { name: m[1] || undefined, email: m[2] };
 }
 
 export function mailConfig(): MailConfig | null {
-  const key = Deno.env.get("BREVO_API_KEY");
   const from = parseFrom(Deno.env.get("MAIL_FROM") ?? "");
   const site = Deno.env.get("SITE_URL");
-  if (!key || !from || !site) return null;
-  return { key, from, site: site.replace(/\/+$/, "") };
+  const brevo = Deno.env.get("BREVO_API_KEY") || null;
+  const smtp = smtpConfig();
+  if (!from || !site || (!brevo && !smtp)) return null;
+  return { from, site: site.replace(/\/+$/, ""), brevo, smtp };
 }
 
 export function transferLink(site: string, token: string): string {
@@ -37,20 +45,46 @@ export type OutgoingEmail = {
   reply_to?: string;
 };
 
-export type SendResult = { ok: true; id: string | null } | { ok: false; error: string };
+export type SendResult =
+  | { ok: true; id: string | null; via: "smtp" | "brevo" }
+  | { ok: false; error: string };
 
-// Un appel par destinataire (chacun a son lien personnel), en parallele :
-// un echec n'empeche pas les autres de partir.
-export function sendEmails(cfg: MailConfig, emails: OutgoingEmail[]): Promise<SendResult[]> {
-  return Promise.all(emails.map((e) => sendOne(cfg, e)));
+// Un message par destinataire (chacun a son lien personnel). SMTP d'abord,
+// sur une seule connexion ; chaque message refusé retente par Brevo.
+export async function sendEmails(cfg: MailConfig, emails: OutgoingEmail[]): Promise<SendResult[]> {
+  const results: (SendResult | null)[] = emails.map(() => null);
+  let smtpError = "";
+
+  if (cfg.smtp && emails.length) {
+    try {
+      const out = await smtpSendAll(cfg.smtp, emails.map((e) => ({
+        from: cfg.from, to: e.to, replyTo: e.reply_to, subject: e.subject, html: e.html, text: e.text,
+      })));
+      out.forEach((r, i) => {
+        if (r.ok) results[i] = { ok: true, id: r.id, via: "smtp" };
+        else smtpError = r.error;
+      });
+    } catch (err) {
+      smtpError = (err as Error).message;
+    }
+    if (smtpError) console.warn("SMTP en échec, bascule Brevo :", smtpError);
+  }
+
+  await Promise.all(emails.map(async (e, i) => {
+    if (results[i]) return;
+    results[i] = cfg.brevo
+      ? await sendBrevo(cfg, e)
+      : { ok: false, error: smtpError || "Aucune voie d'envoi configurée" };
+  }));
+  return results as SendResult[];
 }
 
-async function sendOne(cfg: MailConfig, e: OutgoingEmail): Promise<SendResult> {
+async function sendBrevo(cfg: MailConfig, e: OutgoingEmail): Promise<SendResult> {
   let res: Response;
   try {
     res = await fetch("https://api.brevo.com/v3/smtp/email", {
       method: "POST",
-      headers: { "api-key": cfg.key, "Content-Type": "application/json", Accept: "application/json" },
+      headers: { "api-key": cfg.brevo!, "Content-Type": "application/json", Accept: "application/json" },
       body: JSON.stringify({
         sender: cfg.from,
         to: [{ email: e.to }],
@@ -66,152 +100,14 @@ async function sendOne(cfg: MailConfig, e: OutgoingEmail): Promise<SendResult> {
   }
   const body = await res.json().catch(() => ({})) as { messageId?: string; message?: string; code?: string };
   if (!res.ok) return { ok: false, error: body.message ?? body.code ?? `Brevo HTTP ${res.status}` };
-  return { ok: true, id: body.messageId ?? null };
+  return { ok: true, id: body.messageId ?? null, via: "brevo" };
 }
 
-// ------------------------------------------------------------ formatage
-
-export function esc(value: unknown): string {
-  return String(value ?? "").replace(/[&<>"']/g, (c) => ({
-    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
-  })[c]!);
-}
-
-export function formatBytes(bytes: number | null | undefined): string {
-  if (!bytes || bytes < 0) return "";
-  const units = ["o", "Ko", "Mo", "Go"];
-  let v = bytes;
-  let i = 0;
-  while (v >= 1024 && i < units.length - 1) { v /= 1024; i++; }
-  return `${v >= 10 || i === 0 ? Math.round(v) : v.toFixed(1)} ${units[i]}`;
-}
-
-export function formatDate(iso: string): string {
-  return new Intl.DateTimeFormat("fr-FR", {
-    weekday: "long", day: "numeric", month: "long", timeZone: "Europe/Paris",
-  }).format(new Date(iso));
-}
-
-const KIND_LABEL: Record<string, string> = {
-  instru: "Instru", voix: "Voix", freestyle: "Freestyle",
-  mix: "Mix", stems: "Stems",
-};
-
-// Même classement que js/files.js, réduit à ce dont l'email a besoin.
-const CATS: [string, string[]][] = [
-  ["Audio", ["mp3", "wav", "aif", "aiff", "m4a", "flac", "ogg", "opus", "aac"]],
-  ["Image", ["jpg", "jpeg", "png", "gif", "webp", "avif", "heic", "psd", "tif", "tiff"]],
-  ["Vidéo", ["mp4", "mov", "m4v", "webm", "mkv", "avi"]],
-  ["Document", ["pdf", "doc", "docx", "txt", "rtf", "pages", "xls", "xlsx", "csv"]],
-  ["Archive", ["zip", "rar", "7z", "tar", "gz"]],
-  ["Projet", ["als", "flp", "logicx", "ptx", "cpr", "rpp", "song", "band", "mid", "midi"]],
-];
-
-function typeLabel(name: string, kind: string): string {
-  const ext = (/\.([a-z0-9]+)$/i.exec(name)?.[1] ?? "").toLowerCase();
-  const cat = CATS.find(([, list]) => list.includes(ext))?.[0] ?? "Fichier";
-  return cat === "Audio" && KIND_LABEL[kind] ? KIND_LABEL[kind] : cat;
-}
-
-// ------------------------------------------------------------- gabarits
-
-export type TransferMailInput = {
-  sender: string;
-  spaceName: string;
-  title: string;
-  message: string | null;
-  files: { name: string; kind: string; size: number | null }[];
-  link: string;
-  expiresAt: string;
-  canReply: boolean;
-};
-
-export function transferMail(input: TransferMailInput): { subject: string; html: string; text: string } {
-  const count = input.files.length;
-  const total = input.files.reduce((sum, f) => sum + (f.size ?? 0), 0);
-  const countLabel = count > 1 ? `${count} fichiers` : "1 fichier";
-  const until = formatDate(input.expiresAt);
-  const shown = input.files.slice(0, 12);
-  const hidden = count - shown.length;
-
-  const subject = `${input.sender} t'a envoyé "${input.title}"`;
-  const preheader = `${countLabel} · ${formatBytes(total)} · disponible jusqu'au ${until}`;
-
-  const rows = shown.map((f) => `
-      <tr>
-        <td style="padding:10px 0;border-bottom:1px solid #ececef;font-size:14px;color:#16181d;word-break:break-all;">${esc(f.name)}</td>
-        <td style="padding:10px 0 10px 12px;border-bottom:1px solid #ececef;font-size:12px;color:#6c7484;white-space:nowrap;text-align:right;">${esc(typeLabel(f.name, f.kind))} · ${esc(formatBytes(f.size))}</td>
-      </tr>`).join("");
-
-  const more = hidden > 0
-    ? `<tr><td colspan="2" style="padding:10px 0;font-size:13px;color:#6c7484;">+ ${hidden} autre${hidden > 1 ? "s" : ""}</td></tr>`
-    : "";
-
-  const message = input.message
-    ? `<div style="margin:0 0 24px;padding:14px 16px;border-left:3px solid #7c3aed;background:#f5f0ff;font-size:15px;line-height:1.5;color:#16181d;white-space:pre-wrap;">${esc(input.message)}</div>`
-    : "";
-
-  const html = `<!doctype html>
-<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(subject)}</title></head>
-<body style="margin:0;padding:0;background:#f4f1fa;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
-<div style="display:none;max-height:0;overflow:hidden;opacity:0;">${esc(preheader)}</div>
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f1fa;padding:24px 12px;">
-<tr><td align="center">
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#ffffff;border-radius:14px;overflow:hidden;">
-    <tr><td style="background:#0D0A12;background-image:radial-gradient(60% 120% at 50% 0%,#1E1430 0%,#0D0A12 70%);padding:20px 24px;">
-      <span style="font-family:Outfit,Helvetica,Arial,sans-serif;font-size:22px;font-weight:800;letter-spacing:-0.04em;color:#EEE9F5;"><span style="color:#A48BFF;">Wesh</span>Transfer</span>
-      <span style="font-family:IBM Plex Mono,Menlo,monospace;font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:#8E84A3;"> · ${esc(input.spaceName)}</span>
-    </td></tr>
-    <tr><td style="padding:28px 24px 8px;">
-      <p style="margin:0 0 6px;font-size:14px;color:#6c7484;"><strong style="color:#16181d;">${esc(input.sender)}</strong> t'a envoyé ${countLabel}</p>
-      <h1 style="margin:0 0 20px;font-size:24px;line-height:1.25;color:#0b0c0f;">${esc(input.title)}</h1>
-      ${message}
-      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 24px;">${rows}${more}</table>
-      <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 16px;"><tr><td style="border-radius:12px;background:#7c3aed;">
-        <a href="${esc(input.link)}" style="display:inline-block;padding:15px 28px;font-size:16px;font-weight:700;color:#ffffff;text-decoration:none;">Ouvrir l'envoi</a>
-      </td></tr></table>
-      <p style="margin:0 0 24px;font-size:13px;color:#6c7484;">${esc(formatBytes(total))} au total · disponible jusqu'au ${esc(until)}</p>
-    </td></tr>
-    <tr><td style="padding:16px 24px 22px;border-top:1px solid #ececef;font-size:12px;line-height:1.5;color:#8b92a1;">
-      ${input.canReply ? `Répondre à cet email écrit directement à ${esc(input.sender)}.<br>` : ""}
-      Si le bouton ne marche pas : <a href="${esc(input.link)}" style="color:#6d28d9;word-break:break-all;">${esc(input.link)}</a>
-    </td></tr>
-  </table>
-</td></tr>
-</table>
-</body></html>`;
-
-  const text = [
-    `${input.sender} t'a envoyé ${countLabel} : ${input.title}`,
-    "",
-    input.message ? `${input.message}\n` : "",
-    ...shown.map((f) => `- ${f.name} (${typeLabel(f.name, f.kind)}, ${formatBytes(f.size)})`),
-    hidden > 0 ? `+ ${hidden} autre(s)` : "",
-    "",
-    `Ouvrir l'envoi : ${input.link}`,
-    `Disponible jusqu'au ${until}.`,
-  ].filter((line, i, all) => line !== "" || all[i - 1] !== "").join("\n");
-
-  return { subject, html, text };
-}
-
-export function downloadNoticeMail(input: {
-  who: string | null;
-  title: string;
-  spaceName: string;
-}): { subject: string; html: string; text: string } {
-  const who = input.who ?? "Quelqu'un (via le lien partagé)";
-  const subject = input.who
-    ? `${input.who} a téléchargé "${input.title}"`
-    : `"${input.title}" a été téléchargé`;
-  const html = `<!doctype html><html lang="fr"><head><meta charset="utf-8"></head>
-<body style="margin:0;padding:24px 12px;background:#f4f1fa;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#fff;border-radius:14px;">
-<tr><td style="padding:24px;font-size:15px;line-height:1.5;color:#16181d;">
-<p style="margin:0 0 8px;font-size:13px;color:#6c7484;">WeshTransfer · ${esc(input.spaceName)}</p>
-<p style="margin:0;"><strong>${esc(who)}</strong> a téléchargé ton envoi <strong>${esc(input.title)}</strong>.</p>
-</td></tr></table></td></tr></table></body></html>`;
-  const text = `${who} a téléchargé ton envoi "${input.title}".`;
-  return { subject, html, text };
+// Adresse vérifiée par CET utilisateur (table sender_emails) ?
+// deno-lint-ignore no-explicit-any
+export async function isVerified(db: any, userId: string, email: string | null): Promise<boolean> {
+  if (!email) return false;
+  const { data } = await db.from("sender_emails").select("email")
+    .eq("user_id", userId).eq("email", email.trim().toLowerCase()).maybeSingle();
+  return !!data;
 }

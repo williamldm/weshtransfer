@@ -1,15 +1,15 @@
 // Écoute d'une version : grande waveform, transport, commentaires
 // horodatés façon SoundCloud ("à 1:23, la voix sature").
 
-import { getFile, listComments, listCommentsOf, addComment, deleteComment, setCommentResolved, setFileApproved, signFiles, cachedUrl, cachedDownload, deleteFile, updateFile } from "../api.js?v=27";
-import { Waveform, formatTime } from "../waveform.js?v=27";
-import { play, toggle, isCurrent, onPlayer, seekRatio, seekSeconds, skip, state as playerState, trackFromFile } from "../player.js?v=27";
-import { icon } from "../icons.js?v=27";
-import { isAudio, canPreview, categoryOf } from "../files.js?v=27";
+import { getFile, listComments, listCommentsOf, addComment, deleteComment, setCommentResolved, setFileApproved, signFiles, cachedUrl, cachedDownload, deleteFile, updateFile } from "../api.js?v=28";
+import { Waveform, formatTime } from "../waveform.js?v=28";
+import { play, toggle, isCurrent, onPlayer, seekRatio, seekSeconds, skip, state as playerState, trackFromFile } from "../player.js?v=28";
+import { icon } from "../icons.js?v=28";
+import { isAudio, canPreview, categoryOf } from "../files.js?v=28";
 import {
   esc, h, fileBadge, fileTile, timeAgo, formatBytes, avatar, toast, errorText, triggerDownload, plural,
   confirmSheet, actionSheet, KINDS, openSheet
-} from "../ui.js?v=27";
+} from "../ui.js?v=28";
 
 export const title = () => "Écoute";
 

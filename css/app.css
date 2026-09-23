@@ -1,5 +1,5 @@
-@import url("fonts.css?v=27");
-@import url("tokens.css?v=27");
+@import url("fonts.css?v=28");
+@import url("tokens.css?v=28");
 
 /* ================================================================= base */
 *, *::before, *::after { box-sizing: border-box; }
@@ -787,3 +787,14 @@ body.public .scene { position: fixed; inset: 0; z-index: -1; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition: none !important; animation: none !important; }
 }
+
+/* ------------------------------------------ vérification de l'expéditeur */
+.verify { display: grid; gap: var(--sp-3); }
+.verify .muted { margin: 0; line-height: 1.5; }
+.code-input { height: 64px; font-size: 30px; letter-spacing: .45em; text-align: center; padding-left: .45em; }
+.code-input::placeholder { color: var(--line-strong); }
+.verify-msg { margin: 0; }
+.verify-msg.is-bad { color: var(--danger, #F07A7A); }
+.verify-more { gap: var(--sp-2); }
+.verify-more .btn { width: 100%; }
+.hint .verified { display: inline-flex; align-items: center; gap: 6px; color: var(--ok); }

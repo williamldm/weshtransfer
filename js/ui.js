@@ -1,7 +1,7 @@
 // Briques d'interface partagées : DOM, messages, formatage, feuilles.
 
-import { icon } from "./icons.js?v=27";
-import { CATEGORY, categoryOf, extOf } from "./files.js?v=27";
+import { icon } from "./icons.js?v=28";
+import { CATEGORY, categoryOf, extOf } from "./files.js?v=28";
 
 // ------------------------------------------------------------------ DOM
 
@@ -55,6 +55,14 @@ const ERRORS = {
   TROP_DE_DESTINATAIRES: "20 destinataires maximum par envoi.",
   QUOTA_EMAILS: "Limite de 200 emails par jour atteinte pour cet espace.",
   PAS_TON_ENVOI: "Seul l'expéditeur peut faire ça.",
+  EMAIL_EXPEDITEUR_REQUIS: "Donne ton email pour envoyer par email.",
+  EMAIL_NON_VERIFIE: "Ton email n'est pas encore vérifié.",
+  EMAIL_INDISPONIBLE: "L'envoi d'emails est coupé pour le moment.",
+  TROP_DE_CODES: "Trop de codes demandés. Réessaie dans une heure.",
+  ENVOI_CODE_ECHEC: "Le code n'a pas pu partir. Vérifie l'adresse et réessaie.",
+  CODE_FAUX: "Ce n'est pas le bon code.",
+  CODE_EXPIRE: "Ce code a expiré. Demande-en un nouveau.",
+  TROP_D_ESSAIS: "Trop d'essais. Demande un nouveau code.",
   ENVOI_EXPIRE: "Cet envoi a expiré.",
   CHEMIN_INVALIDE: "Chemin de fichier refusé.",
   RESEAU: "Pas de réseau. Vérifie ta connexion.",

@@ -1,7 +1,7 @@
 // Accès aux données. Toutes les requêtes de l'appli passent par ici : les
 // vues ne connaissent ni PostgREST ni le Storage.
 
-import { sb, q, invoke, requireClient } from "./db.js?v=27";
+import { sb, q, invoke, requireClient } from "./db.js?v=28";
 
 // Toute requête passe par ici : sans config, message clair plutôt
 // qu'un "Cannot read properties of null".
@@ -222,6 +222,41 @@ export function createTransfer(params) {
 
 export function sendTransfer(transferId, retry) {
   return invoke("send-transfer", { transfer_id: transferId, retry: !!retry });
+}
+
+// Vérification de l'email de l'expéditeur (code à 6 chiffres), une fois
+// par appareil et par adresse. Le serveur fait foi ; la liste locale évite
+// juste un aller-retour.
+const VERIFIED_KEY = "seminaire.verifiedEmails";
+
+function verifiedLocal() {
+  try { return JSON.parse(localStorage.getItem(VERIFIED_KEY) || "[]"); } catch (err) { return []; }
+}
+
+function rememberVerified(email) {
+  const list = verifiedLocal().filter((e) => e !== email);
+  list.unshift(email);
+  try { localStorage.setItem(VERIFIED_KEY, JSON.stringify(list.slice(0, 10))); } catch (err) { /* privé */ }
+}
+
+export async function emailVerified(email) {
+  const r = await invoke("verify-email", { action: "status", email });
+  if (r && r.verified) rememberVerified(email);
+  return !!(r && r.verified);
+}
+
+export function knownVerified(email) {
+  return verifiedLocal().includes(email);
+}
+
+export function requestEmailCode(email) {
+  return invoke("verify-email", { action: "request", email });
+}
+
+export async function confirmEmailCode(email, code) {
+  const r = await invoke("verify-email", { action: "confirm", email, code });
+  if (r && r.verified) rememberVerified(email);
+  return !!(r && r.verified);
 }
 
 let emailCheck = null;

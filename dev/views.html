@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Banc d'essai des vues</title>
-<link rel="stylesheet" href="../css/app.css?v=27">
+<link rel="stylesheet" href="../css/app.css?v=28">
 <style>
   .dev-nav { position: sticky; top: 0; z-index: 99; display: flex; gap: 6px; overflow-x: auto; padding: 8px; background: #000; border-bottom: 1px solid #333; }
   .dev-nav a { flex: none; padding: 4px 10px; border-radius: 99px; background: #222; color: #ccc; font-size: 12px; }
@@ -22,16 +22,16 @@
 <div class="toast-wrap" id="toasts"></div>
 
 <script type="module">
-import { renderProjects } from "../js/views/home.js?v=27";
-import { renderVersion } from "../js/views/project.js?v=27";
-import { renderFileShell, renderComments } from "../js/views/file.js?v=27";
-import { renderTransfers } from "../js/views/transfers.js?v=27";
-import { renderJob } from "../js/views/uploads.js?v=27";
-import * as send from "../js/views/send.js?v=27";
-import { openPeopleSheet } from "../js/views/people.js?v=27";
-import { openUploadSheet } from "../js/views/upload-sheet.js?v=27";
-import { Waveform } from "../js/waveform.js?v=27";
-import { icon } from "../js/icons.js?v=27";
+import { renderProjects } from "../js/views/home.js?v=28";
+import { renderVersion } from "../js/views/project.js?v=28";
+import { renderFileShell, renderComments } from "../js/views/file.js?v=28";
+import { renderTransfers } from "../js/views/transfers.js?v=28";
+import { renderJob } from "../js/views/uploads.js?v=28";
+import * as send from "../js/views/send.js?v=28";
+import { openPeopleSheet } from "../js/views/people.js?v=28";
+import { openUploadSheet } from "../js/views/upload-sheet.js?v=28";
+import { Waveform } from "../js/waveform.js?v=28";
+import { icon } from "../js/icons.js?v=28";
 
 const view = document.getElementById("view");
 const ago = (min) => new Date(Date.now() - min * 60000).toISOString();
@@ -169,6 +169,18 @@ const screens = {
     w.setPeaks(file.peaks);
     w.setProgress(77 / 214);
     w.setMarkers(comments.filter((c) => c.at_ms != null).map((c) => ({ atMs: c.at_ms })), 214000);
+  },
+  async verify() {
+    // feuille de vérification de l'expéditeur, avec une fausse API :
+    // le bon code est 123456, les autres sont refusés
+    await send.mount(view, ctx, { query: new URLSearchParams() });
+    const fake = {
+      knownVerified: () => false,
+      emailVerified: async () => false,
+      requestEmailCode: async () => ({ sent: true }),
+      confirmEmailCode: async (e, code) => { await new Promise((r) => setTimeout(r, 400)); if (code !== "123456") throw new Error("CODE_FAUX"); return true; },
+    };
+    send.ensureVerified("lil.brume@gmail.com", { optional: true }, fake).then((r) => console.log("vérification :", r));
   },
   async send() {
     await send.mount(view, ctx, { query: new URLSearchParams() });

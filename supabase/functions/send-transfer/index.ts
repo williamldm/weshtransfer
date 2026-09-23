@@ -4,11 +4,15 @@
 // POST { transfer_id, retry }   -> renvoie aussi a ceux en echec
 // POST { check: true }          -> { email_enabled } (l'UI s'adapte)
 //
+// L'email de l'expediteur (reply_to) doit avoir ete verifie par code
+// (Edge Function verify-email) : rien ne part "de la part de" quelqu'un
+// qui n'a pas prouve que l'adresse est a lui.
+//
 // Deployee avec --no-verify-jwt : l'appelant est identifie ici via son JWT.
 
 import { admin, callerId } from "../_shared/supabase.ts";
 import { json, preflight, readJson } from "../_shared/http.ts";
-import { mailConfig, sendEmails, transferLink, transferMail, type OutgoingEmail } from "../_shared/email.ts";
+import { isVerified, mailConfig, sendEmails, transferLink, transferMail, type OutgoingEmail } from "../_shared/email.ts";
 
 type TransferRow = {
   id: string;
@@ -51,6 +55,9 @@ Deno.serve(async (req) => {
 
   if (!cfg) return json({ email_enabled: false, results: [] });
 
+  if (!transfer.reply_to) return json({ error: "EMAIL_EXPEDITEUR_REQUIS" }, 400);
+  if (!await isVerified(db, uid, transfer.reply_to)) return json({ error: "EMAIL_NON_VERIFIE" }, 403);
+
   if (body.retry) {
     await db.from("transfer_recipients")
       .update({ status: "pending", error: null })
@@ -82,8 +89,9 @@ Deno.serve(async (req) => {
 
   const emails: OutgoingEmail[] = recipients.map((r) => {
     const mail = transferMail({
+      site: cfg.site,
+      to: r.email,
       sender,
-      spaceName: transfer.space?.name ?? "",
       title: transfer.title,
       message: transfer.message,
       files,
