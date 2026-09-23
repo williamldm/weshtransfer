@@ -1,7 +1,7 @@
 // Session anonyme + appartenance à un espace. Aucun compte : l'appareil
 // reçoit un utilisateur anonyme Supabase, puis rejoint un espace via son code.
 
-import { sb, q, requireClient } from "./db.js?v=16";
+import { sb, q, requireClient } from "./db.js?v=17";
 
 const SPACE_KEY = "seminaire.space";      // espace actif
 const KNOWN_KEY = "seminaire.spaces";     // tous les espaces rejoints sur cet appareil

@@ -1,5 +1,5 @@
 // Identité WeshTransfer : monogramme (le W aux trois cheminées fumantes)
-// et logotype "Wesh" italique + "Transfer", en Bodoni Moda.
+// et logotype "Wesh" en violet + "Transfer", en Outfit grasse.
 // Tracé repris tel quel du canevas de l'identité.
 
 const MARK_PATHS =

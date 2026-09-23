@@ -1,5 +1,5 @@
-@import url("fonts.css?v=16");
-@import url("tokens.css?v=16");
+@import url("fonts.css?v=17");
+@import url("tokens.css?v=17");
 
 /* =============================================================== base */
 *, *::before, *::after { box-sizing: border-box; }
@@ -26,24 +26,23 @@ a { color: var(--accent-bright); text-decoration: none; }
 h1, h2, h3 { margin: 0; font-weight: 650; line-height: 1.2; letter-spacing: -0.01em; }
 
 /* ---- typographie de l'identité
-   Grands titres en Bodoni Moda ; l'italique violet sert d'accent, comme
-   "Wesh" dans le logotype. En dessous de ~22 px, on reste en sans-serif :
-   le Bodoni très contrasté se lit mal en petit sur un téléphone. */
+   Grands titres en Outfit bien grasse et serrée ; l'accent se fait par la
+   couleur violette, sans italique. */
 .hub-hero h1, .send-hero h1, .tp-hero h1, .page-head h1, .space-top h1,
-.done h1, .tp-state h1, .hub-spec-title, .hub-spec strong, .hub-card strong {
+.done h1, .tp-state h1, .hub-card strong {
   font-family: var(--display);
-  font-weight: 400;
-  letter-spacing: -0.01em;
+  font-weight: 800;
+  letter-spacing: -0.035em;
 }
 .hub-hero h1 em, .send-hero h1 em, .tp-hero h1 em, .grad-text {
-  font-style: italic;
+  font-style: normal;
   color: var(--accent-bright);
   background: none;
   -webkit-background-clip: initial;
   background-clip: initial;
 }
-.wordmark { font-family: var(--display); font-weight: 400; letter-spacing: -0.01em; white-space: nowrap; }
-.wordmark em { font-style: italic; color: var(--accent-bright); }
+.wordmark { font-family: var(--display); font-weight: 800; letter-spacing: -0.045em; white-space: nowrap; }
+.wordmark em { font-style: normal; color: var(--accent-bright); }
 .monogram { display: block; flex: none; }
 .brand-link { display: flex; align-items: center; padding: 0 var(--sp-2) 0 var(--sp-3); }
 .label-mono, .eyebrow, .label, .hub-tag {
@@ -1039,7 +1038,7 @@ body.hub {
   color: var(--accent-hi);
   font-size: 11px;
 }
-.hub-hero h1 { font-size: clamp(36px, 9vw, 68px); line-height: 1.02; }
+.hub-hero h1 { font-size: clamp(36px, 9vw, 70px); line-height: 1; }
 .hub-hero p { max-width: 560px; margin: var(--sp-4) auto 0; color: var(--text-dim); font-size: var(--fs-lg); }
 .hub-cta { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--sp-3); margin-top: var(--sp-6); }
 .hub-cta .btn { flex: 1 1 220px; max-width: 280px; }
@@ -1068,14 +1067,6 @@ body.hub {
 .hub-card:hover { border-color: rgba(167, 139, 250, .5); transform: translateY(-2px); }
 .hub-card strong { margin-top: var(--sp-2); color: var(--text); font-size: var(--fs-lg); }
 .hub-card span:not(.ft) { font-size: var(--fs-sm); line-height: 1.5; }
-
-.hub-spec { margin-bottom: var(--sp-7); padding: var(--sp-6) var(--sp-5); border: 1px solid var(--line); border-radius: 22px; background: var(--bg); }
-.hub-spec-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: var(--sp-2); margin-bottom: var(--sp-5); padding-bottom: var(--sp-4); border-bottom: 1px solid var(--line-strong); }
-.hub-spec-title { font-size: clamp(30px, 7vw, 44px); font-style: italic; color: var(--accent-bright); }
-.label-mono { color: var(--text-faint); font-size: 11px; }
-.hub-spec-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--sp-5) var(--sp-6); }
-.hub-spec-grid > div { display: flex; flex-direction: column; gap: var(--sp-2); }
-.hub-spec strong { color: var(--text); font-size: 24px; line-height: 1.2; }
 
 .hub-faq { max-width: 680px; margin: 0 auto var(--sp-6); }
 .hub-faq details { border-bottom: 1px solid var(--line); }

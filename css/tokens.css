@@ -45,9 +45,9 @@
 
   /* ---- typographie */
   --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  /* identité : Bodoni Moda pour le logotype et les titres,
+  /* identité : Outfit (grasse, géométrique) pour le logotype et les titres,
      IBM Plex Mono pour les mentions et les libellés */
-  --display: "Bodoni Moda", Didot, "Bodoni 72", Georgia, serif;
+  --display: "Outfit", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
 
   --fs-xs:  12px;

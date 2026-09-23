@@ -2,7 +2,7 @@
 // déjà filtrés par la RLS ; on les relaie sur le bus de l'appli, et la
 // présence dit qui a l'appli ouverte en ce moment.
 
-import { sb } from "./db.js?v=16";
+import { sb } from "./db.js?v=17";
 
 const TABLES = ["projects", "files", "comments", "participants", "transfers", "transfer_recipients"];
 

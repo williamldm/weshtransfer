@@ -151,7 +151,7 @@ export function transferMail(input: TransferMailInput): { subject: string; html:
 <tr><td align="center">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#ffffff;border-radius:14px;overflow:hidden;">
     <tr><td style="background:#0D0A12;background-image:radial-gradient(60% 120% at 50% 0%,#1E1430 0%,#0D0A12 70%);padding:20px 24px;">
-      <span style="font-family:Bodoni Moda,Didot,Georgia,serif;font-size:22px;color:#EEE9F5;"><em style="color:#A48BFF;">Wesh</em>Transfer</span>
+      <span style="font-family:Outfit,Helvetica,Arial,sans-serif;font-size:22px;font-weight:800;letter-spacing:-0.04em;color:#EEE9F5;"><span style="color:#A48BFF;">Wesh</span>Transfer</span>
       <span style="font-family:IBM Plex Mono,Menlo,monospace;font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:#8E84A3;"> · ${esc(input.spaceName)}</span>
     </td></tr>
     <tr><td style="padding:28px 24px 8px;">
