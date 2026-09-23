@@ -1,0 +1,24 @@
+# Netlify : prépare le dossier public (_deploy) puis le publie.
+# Les migrations SQL, les outils et les bancs d'essai ne sont jamais en ligne.
+[build]
+  command = "python3 tools/build.py"
+  publish = "_deploy"
+
+# Les pages et scripts changent à chaque version (?v=N) : le HTML ne doit
+# jamais rester en cache, sinon il pointerait vers d'anciens scripts.
+[[headers]]
+  for = "/*.html"
+  [headers.values]
+    Cache-Control = "no-cache"
+
+[[headers]]
+  for = "/"
+  [headers.values]
+    Cache-Control = "no-cache"
+
+# La page destinataire ne doit pas fuiter le lien privé vers d'autres sites.
+[[headers]]
+  for = "/t.html"
+  [headers.values]
+    Referrer-Policy = "no-referrer"
+    X-Robots-Tag = "noindex, nofollow"
