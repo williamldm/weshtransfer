@@ -1,5 +1,5 @@
-@import url("fonts.css?v=33");
-@import url("tokens.css?v=33");
+@import url("fonts.css?v=34");
+@import url("tokens.css?v=34");
 
 /* ================================================================= base */
 *, *::before, *::after { box-sizing: border-box; }
@@ -590,7 +590,7 @@ body.has-player .toast-wrap { bottom: calc(var(--player-h) + var(--safe-bottom) 
 /* =================================================== la centrale (hub) */
 /* Identité : la mise en page de WeTransfer, détournée. Le "fond d'écran"
    est notre centrale au charbon, la carte d'envoi est posée dessus. */
-.scene { background: #0E0B14 url("../img/scene.svg") center bottom / cover no-repeat; }
+.scene { background: #0E0B14 var(--scene, url("../img/scene.svg")) center bottom / cover no-repeat; }
 
 /* fond transparent : sinon il se peint par-dessus la scène (z-index -1) ;
    le noir est porté par html */
@@ -875,6 +875,55 @@ body.public .scene { position: fixed; inset: 0; z-index: -1; }
 
 /* fonds d'écran : on passe au suivant */
 .scene { transition: background-image .4s ease; }
+
+/* ============================================ l'appli, sur le même décor */
+/* Même mise en scène que l'accueil et la page destinataire : le décor
+   derrière, le contenu sur une carte. */
+body.app { background: transparent; }
+body.app .scene { position: fixed; inset: 0; z-index: -1; }
+body.app .app-header { border-bottom-color: rgba(255, 255, 255, .05); background: rgba(15, 13, 19, .82); }
+body.app .app-main {
+  margin: var(--sp-6) auto calc(var(--sp-7) + var(--safe-bottom));
+  padding: var(--sp-6) var(--sp-5);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-lg);
+  background: rgba(22, 20, 27, .97);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, .55);
+}
+body.app.has-player { padding-bottom: var(--player-h); }
+body.app.has-player .app-main { padding-bottom: var(--sp-6); }
+@media (max-width: 859px) {
+  /* téléphone : le décor en bandeau sous l'en-tête, la carte par-dessus */
+  /* bandeau court : ce qui dépasse entre l'en-tête et la carte, ce sont les
+     installations du décor, pas le ciel */
+  body.app .scene { position: absolute; inset: 0 0 auto 0; height: 190px; }
+  body.app .app-main { margin: 88px var(--sp-2) calc(var(--sp-5) + var(--safe-bottom)); padding: var(--sp-5) var(--sp-4); }
+}
+
+/* ================================================ passages de page */
+/* D'une page à l'autre (accueil -> appli -> ...) : le décor ne bouge pas,
+   la carte se transforme en la suivante, le logo glisse à sa place.
+   Navigateurs sans View Transitions : navigation ordinaire. */
+@view-transition { navigation: auto; }
+.scene { view-transition-name: scene; }
+.deck, body.app .app-main, .tp > #tp { view-transition-name: card; }
+.hub-top .logo, body.app .brand-link, .tp-brand { view-transition-name: brand; }
+body.app .app-header { view-transition-name: topbar; }
+.player { view-transition-name: player; }
+
+::view-transition-group(*) { animation-duration: .42s; animation-timing-function: cubic-bezier(.2, .8, .2, 1); }
+::view-transition-group(card) { animation-duration: .5s; }
+::view-transition-image-pair(card) { overflow: hidden; border-radius: var(--r-lg); }
+::view-transition-old(card) { animation: vt-out .22s ease both; }
+::view-transition-new(card) { animation: vt-in .38s .08s ease both; }
+::view-transition-old(root) { animation: vt-out .25s ease both; }
+::view-transition-new(root) { animation: vt-in .3s ease both; }
+@keyframes vt-out { to { opacity: 0; } }
+@keyframes vt-in { from { opacity: 0; transform: translateY(8px); } }
+@media (prefers-reduced-motion: reduce) {
+  @view-transition { navigation: none; }
+  ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; }
+}
 .wp-next { display: inline-block; margin-top: 6px; padding: 0; border: none; background: none; color: var(--accent-bright); font: inherit; letter-spacing: inherit; text-transform: inherit; cursor: pointer; }
 .wp-next:hover { text-decoration: underline; }
 .wallpaper-note [data-wp-text] { display: block; }

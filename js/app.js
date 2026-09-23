@@ -1,21 +1,21 @@
 // Coquille de l'appli : démarrage, routeur à hash, en-tête, bus
 // d'événements, temps réel. Chaque vue est un module avec mount().
 
-import { restore, getSpace, leaveSpace } from "./session.js?v=33";
-import { connectSpace } from "./realtime.js?v=33";
-import { bindPlayerBar } from "./player.js?v=33";
-import { activeCount, onUploads } from "./upload.js?v=33";
-import { openPeopleSheet } from "./views/people.js?v=33";
-import { openUploadSheet } from "./views/upload-sheet.js?v=33";
-import { icon } from "./icons.js?v=33";
-import { monogram } from "./brand.js?v=33";
-import { toast, errorText, esc } from "./ui.js?v=33";
+import { restore, getSpace, leaveSpace } from "./session.js?v=34";
+import { connectSpace } from "./realtime.js?v=34";
+import { bindPlayerBar } from "./player.js?v=34";
+import { activeCount, onUploads } from "./upload.js?v=34";
+import { openPeopleSheet } from "./views/people.js?v=34";
+import { openUploadSheet } from "./views/upload-sheet.js?v=34";
+import { icon } from "./icons.js?v=34";
+import { monogram } from "./brand.js?v=34";
+import { toast, errorText, esc } from "./ui.js?v=34";
 
-import * as home from "./views/home.js?v=33";
-import * as project from "./views/project.js?v=33";
-import * as file from "./views/file.js?v=33";
-import * as send from "./views/send.js?v=33";
-import * as transfers from "./views/transfers.js?v=33";
+import * as home from "./views/home.js?v=34";
+import * as project from "./views/project.js?v=34";
+import * as file from "./views/file.js?v=34";
+import * as send from "./views/send.js?v=34";
+import * as transfers from "./views/transfers.js?v=34";
 
 // L'accueil dépend du mode de l'espace : morceaux (séminaire) ou
 // directement le composeur d'envoi (espace dédié aux envois).
@@ -112,6 +112,16 @@ export function navigate(hash) {
   else location.hash = hash;
 }
 
+// Changement de vue en fondu (View Transitions) : l'ancienne vue reste
+// affichée le temps que la nouvelle se prépare, 300 ms au plus, puis on
+// passe de l'une à l'autre. Sans l'API, ou si l'utilisateur demande moins
+// d'animations : changement direct.
+function routeSmoothly() {
+  const calm = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if (!document.startViewTransition || calm || document.hidden) { route(); return; }
+  document.startViewTransition(() => Promise.race([route(), new Promise((r) => setTimeout(r, 300))]));
+}
+
 function parse() {
   const raw = (location.hash || "#/projects").slice(1);
   const [path, qs] = raw.split("?");
@@ -196,7 +206,10 @@ async function boot() {
     const config = /CONFIG_MANQUANTE|CLE_SECRETE/.test(err.message);
     viewEl.innerHTML = '<div class="empty-state">' + icon("alert", 36) +
       "<p>" + esc(errorText(err)) + "</p>" +
-      (config ? "" : '<button class="btn btn-primary" onclick="location.reload()">Réessayer</button>') + "</div>";
+      (config ? "" : '<button class="btn btn-primary" data-reload>Réessayer</button>') + "</div>";
+    // pas de onclick="" en ligne : la CSP du site l'interdit
+    const retry = viewEl.querySelector("[data-reload]");
+    if (retry) retry.onclick = () => location.reload();
     return;
   }
 
@@ -251,7 +264,7 @@ async function boot() {
   bindPlayerBar(navigate);
   bindDrop();
   connectSpace(space, bus);
-  window.addEventListener("hashchange", route);
+  window.addEventListener("hashchange", routeSmoothly);
   window.addEventListener("offline", () => toast("Hors ligne : les uploads reprendront au retour du réseau", "err"));
   window.addEventListener("online", () => toast("De retour en ligne", "ok"));
 

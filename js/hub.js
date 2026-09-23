@@ -3,11 +3,11 @@
 // les espaces déjà ouverts sur cet appareil (ouvrir, oublier, supprimer).
 // session.js / api.js ne sont chargés qu'au moment d'agir.
 
-import { icon } from "./icons.js?v=33";
-import { esc, h, errorText, formatBytes, plural, actionSheet, confirmSheet, toast } from "./ui.js?v=33";
-import { isBlocked } from "./files.js?v=33";
-import { putPending, MAX_BYTES } from "./pending.js?v=33";
-import { mountWallpaper } from "./wallpapers.js?v=33";
+import { icon } from "./icons.js?v=34";
+import { esc, h, errorText, formatBytes, plural, actionSheet, confirmSheet, toast } from "./ui.js?v=34";
+import { isBlocked } from "./files.js?v=34";
+import { putPending, MAX_BYTES } from "./pending.js?v=34";
+import { mountWallpaperNote } from "./wallpapers.js?v=34";
 
 const PSEUDO_KEY = "seminaire.pseudo";
 const MODE_LABEL = { envoi: "Envois", seminaire: "Salon", revue: "Retours" };
@@ -173,7 +173,7 @@ function spaceMenu(k) {
     {
       label: "Oublier sur cet appareil", icon: "logout",
       run: async () => {
-        const session = await import("./session.js?v=33");
+        const session = await import("./session.js?v=34");
         session.forgetSpace(k.id);
         toast("\"" + k.name + "\" n'apparaît plus ici. Rien n'a été supprimé.", "ok");
         drawSpacesLink();
@@ -188,9 +188,9 @@ function spaceMenu(k) {
           { ok: "Tout supprimer", danger: true, title: "Supprimer l'espace" });
         if (!ok) return;
         try {
-          const session = await import("./session.js?v=33");
+          const session = await import("./session.js?v=34");
           await session.ensureAuth();
-          const api = await import("./api.js?v=33");
+          const api = await import("./api.js?v=34");
           await api.deleteSpace(k.id);
           session.forgetSpace(k.id);
           toast("\"" + k.name + "\" a été supprimé.", "ok");
@@ -236,7 +236,7 @@ deck.addEventListener("submit", async (e) => {
     }
     if (mine) { goTo(mine); return; }
 
-    const session = await import("./session.js?v=33");
+    const session = await import("./session.js?v=34");
     if (kind === "join") await session.joinSpace(val("code"), pseudo);
     else if (kind === "salon") await session.createSpace(val("name"), "seminaire", pseudo);
     else if (kind === "revue") await session.createSpace(val("project"), "revue", pseudo);
@@ -274,5 +274,6 @@ const invited = (new URLSearchParams(location.search).get("c") || "").toUpperCas
 if (invited) show("join", invited.slice(0, 8));
 else show("send");
 
-// Un décor différent à chaque visite, et le bouton "Fond suivant".
-mountWallpaper(document.querySelector(".scene"), document.querySelector("[data-wallpaper]"));
+// Légende du décor et bouton "Fond suivant" (le décor lui-même est posé
+// par wallpaper-boot.js, avant le premier affichage).
+mountWallpaperNote(document.querySelector("[data-wallpaper]"));

@@ -1,6 +1,6 @@
-// Fonds d'écran de l'accueil et de la page destinataire : un décor
-// différent à chaque visite (dans l'ordre, pour tous les voir), et un
-// bouton pour passer au suivant. Les scènes sont générées par
+// Fonds d'écran : le même décor sur toutes les pages pendant une visite
+// (accueil, appli, page destinataire), le suivant à la visite d'après, et
+// un bouton "Fond suivant" sur l'accueil. Les scènes sont générées par
 // tools/scenes.py, sauf la centrale (img/scene.svg), l'originale.
 
 export const WALLPAPERS = [
@@ -12,36 +12,55 @@ export const WALLPAPERS = [
   { file: "img/scenes/autoroute.svg", title: "Périphérique, 23 h", joke: "Tous en SUV, clim à fond, seul à bord." }
 ];
 
-const KEY = "seminaire.wallpaper";
+const KEY = "seminaire.wallpaper";       // dernier décor vu (d'une visite à l'autre)
+const VISIT = "seminaire.wallpaperVisit"; // déjà choisi pour cette visite (onglet)
 
-function stored() {
-  try { return Number(localStorage.getItem(KEY)); } catch (err) { return NaN; }
+function read(store, key) {
+  try { return store.getItem(key); } catch (err) { return null; }
+}
+function write(store, key, value) {
+  try { store.setItem(key, value); } catch (err) { /* navigation privée */ }
 }
 
-function remember(i) {
-  try { localStorage.setItem(KEY, String(i)); } catch (err) { /* navigation privée */ }
+// Le décor de cette visite : on avance d'un cran une seule fois par visite,
+// puis toutes les pages gardent le même.
+export function currentWallpaper() {
+  const n = WALLPAPERS.length;
+  const last = Number(read(localStorage, KEY));
+  const known = read(localStorage, KEY) !== null && Number.isInteger(last) && last >= 0 && last < n;
+  if (read(sessionStorage, VISIT)) return known ? last : 2;
+  const i = known ? (last + 1) % n : 2;
+  write(localStorage, KEY, String(i));
+  write(sessionStorage, VISIT, "1");
+  return i;
 }
 
-// scene : l'élément .scene ; note : le texte "Fond d'écran n°..." (facultatif)
-export function mountWallpaper(scene, note) {
-  if (!scene) return;
-  const last = stored();
-  let i = Number.isInteger(last) && last >= 0 ? (last + 1) % WALLPAPERS.length : 2;
+// Posé en variable CSS sur <html> (adresse absolue : une url() relative
+// dans une variable se résoudrait par rapport à la feuille de style).
+export function applyWallpaper(i) {
+  const w = WALLPAPERS[i] || WALLPAPERS[2];
+  document.documentElement.style.setProperty("--scene", 'url("' + new URL(w.file, document.baseURI).href + '")');
+  return w;
+}
 
+// Accueil : légende "Fond d'écran n° x sur 6" et bouton "Fond suivant".
+export function mountWallpaperNote(note) {
+  if (!note) return;
+  let i = currentWallpaper();
   const show = () => {
-    const w = WALLPAPERS[i];
-    scene.style.backgroundImage = 'url("' + w.file + '")';
-    remember(i);
-    if (note) {
-      note.querySelector("[data-wp-text]").innerHTML =
-        "Fond d'écran n° " + (i + 1) + " sur " + WALLPAPERS.length + " · " + w.title + ".<br>" + w.joke;
-    }
-    // le suivant, déjà en cache pour un changement instantané
-    const next = new Image();
+    const w = applyWallpaper(i);
+    note.querySelector("[data-wp-text]").innerHTML =
+      "Fond d'écran n° " + (i + 1) + " sur " + WALLPAPERS.length + " · " + w.title + ".<br>" + w.joke;
+    const next = new Image();   // le suivant déjà en cache : changement instantané
     next.src = WALLPAPERS[(i + 1) % WALLPAPERS.length].file;
   };
-
   show();
-  const btn = note && note.querySelector("[data-wp-next]");
-  if (btn) btn.onclick = () => { i = (i + 1) % WALLPAPERS.length; show(); };
+  const btn = note.querySelector("[data-wp-next]");
+  if (btn) {
+    btn.onclick = () => {
+      i = (i + 1) % WALLPAPERS.length;
+      write(localStorage, KEY, String(i));
+      show();
+    };
+  }
 }
