@@ -1,5 +1,5 @@
 ---
 deployment:
   tasks:
-    - export DEPLOYPATH=/home2/lowi3581/weshtransfer.fr/
+    - export DEPLOYPATH=/home2/lowi3581/weshtransfer.fr
     - /bin/cp -R * $DEPLOYPATH
