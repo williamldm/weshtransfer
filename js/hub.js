@@ -2,8 +2,8 @@
 // Chaque action ouvre une petite feuille ; session.js n'est chargé qu'au
 // moment d'agir, la page reste légère.
 
-import { icon } from "./icons.js?v=15";
-import { esc, h, openSheet, errorText } from "./ui.js?v=15";
+import { icon } from "./icons.js?v=16";
+import { esc, h, openSheet, errorText } from "./ui.js?v=16";
 
 const PSEUDO_KEY = "seminaire.pseudo";
 
@@ -30,7 +30,7 @@ if (known.length) {
   resume.hidden = false;
   resume.innerHTML = known.slice(0, 4).map((k) =>
     '<button type="button" class="resume" data-id="' + esc(k.id) + '">' +
-      "<span>" + (k.mode === "envoi" ? "Envois" : "Salon") + "</span><strong>" + esc(k.name) +
+      "<span>" + ({ envoi: "Envois", revue: "Retours" }[k.mode] || "Salon") + "</span><strong>" + esc(k.name) +
       '</strong><span class="mono">' + esc(k.code) + "</span></button>").join("");
   resume.addEventListener("click", (e) => {
     const b = e.target.closest("[data-id]");
@@ -54,6 +54,12 @@ const FORMS = {
     fields: ["name", "pseudo"],
     button: "Créer le salon"
   },
+  revue: {
+    title: "Faire valider un mix",
+    intro: "Tu déposes tes mix, l'artiste les écoute et commente à la seconde près. Tu coches au fur et à mesure. Personne n'a besoin de compte.",
+    fields: ["project", "pseudo"],
+    button: "Ouvrir l'espace de retours"
+  },
   join: {
     title: "Rejoindre un espace",
     intro: "Le code qu'on t'a donné, et ton blaze.",
@@ -65,6 +71,7 @@ const FORMS = {
 const FIELD = {
   code: (v) => '<label class="field"><span class="label">Code</span><input class="input input-code" name="code" maxlength="8" autocapitalize="characters" autocomplete="off" autocorrect="off" spellcheck="false" placeholder="ABC123" value="' + esc(v || "") + '"></label>',
   name: () => '<label class="field"><span class="label">Nom du salon</span><input class="input" name="name" maxlength="60" placeholder="Ex : Villa septembre, Studio B"></label>',
+  project: () => '<label class="field"><span class="label">Artiste ou projet</span><input class="input" name="project" maxlength="60" placeholder="Ex : Kenza, EP Nuit blanche"></label>',
   pseudo: () => '<label class="field"><span class="label">Ton blaze</span><input class="input" name="pseudo" maxlength="24" autocomplete="nickname" placeholder="Comment on te reconnaît" value="' + esc(savedPseudo()) + '"></label>'
 };
 
@@ -104,14 +111,16 @@ function open(kind, prefillCode) {
     if (pseudo.length < 2) return fail("Ton blaze doit faire au moins 2 caractères.");
     if (kind === "join" && val("code").length < 5) return fail("Le code fait au moins 5 caractères.");
     if (kind === "salon" && !val("name")) return fail("Donne un nom à ton salon.");
+    if (kind === "revue" && !val("project")) return fail("Pour quel artiste ou quel projet ?");
 
     btn.disabled = true;
     btn.textContent = "Un instant...";
     try {
       try { localStorage.setItem(PSEUDO_KEY, pseudo); } catch (e2) { /* privé */ }
-      const session = await import("./session.js?v=15");
+      const session = await import("./session.js?v=16");
       if (kind === "join") await session.joinSpace(val("code"), pseudo);
       else if (kind === "salon") await session.createSpace(val("name"), "seminaire", pseudo);
+      else if (kind === "revue") await session.createSpace(val("project"), "revue", pseudo);
       else await session.createSpace("Envois de " + pseudo, "envoi", pseudo);
       location.href = "app.html#/projects";
     } catch (e2) {

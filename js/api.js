@@ -1,7 +1,7 @@
 // Accès aux données. Toutes les requêtes de l'appli passent par ici : les
 // vues ne connaissent ni PostgREST ni le Storage.
 
-import { sb, q, invoke, requireClient } from "./db.js?v=15";
+import { sb, q, invoke, requireClient } from "./db.js?v=16";
 
 // Toute requête passe par ici : sans config, message clair plutôt
 // qu'un "Cannot read properties of null".
@@ -11,7 +11,7 @@ const db = () => requireClient();
 
 export function listProjects(spaceId) {
   return q(db().from("projects")
-    .select("id, title, bpm, musical_key, last_activity_at, created_at, creator:participants(pseudo), files(id, kind, status)")
+    .select("id, title, bpm, musical_key, last_activity_at, created_at, creator:participants(pseudo), files(id, kind, status, version_no, approved_at, original_name, mime_type)")
     .eq("space_id", spaceId)
     .eq("archived", false)
     .order("last_activity_at", { ascending: false }));
@@ -23,7 +23,8 @@ export function getProject(id) {
       creator:participants(pseudo),
       files(id, version_no, label, kind, status, storage_path, original_name, mime_type,
             size_bytes, duration_sec, bpm, musical_key, peaks, created_at, uploaded_by,
-            uploader:participants(id, pseudo), comments(count))`)
+            approved_at, approved_by,
+            uploader:participants(id, pseudo), comments(id, resolved_at))`)
     .eq("id", id)
     .order("version_no", { referencedTable: "files", ascending: false })
     .maybeSingle());
@@ -50,18 +51,45 @@ export function getFile(id) {
   return q(db().from("files")
     .select(`id, space_id, project_id, version_no, label, kind, status, storage_path,
       original_name, mime_type, size_bytes, duration_sec, bpm, musical_key, peaks,
-      created_at, uploaded_by,
+      created_at, uploaded_by, approved_at, approved_by,
       uploader:participants(id, pseudo),
-      project:projects(id, title, files(id, version_no, label, kind, status))`)
+      project:projects(id, title, files(id, version_no, label, kind, status, storage_path,
+        original_name, mime_type, duration_sec, approved_at))`)
     .eq("id", id)
     .maybeSingle());
 }
 
 export function listComments(fileId) {
   return q(db().from("comments")
-    .select("id, body, at_ms, created_at, author_id, author:participants(id, pseudo)")
+    .select("id, file_id, body, at_ms, created_at, resolved_at, resolved_by, author_id, author:participants(id, pseudo)")
     .eq("file_id", fileId)
     .order("created_at", { ascending: true }));
+}
+
+// Retours de toutes les versions d'un morceau (pour suivre sur la v3 ce
+// qui a été demandé sur la v2).
+export function listCommentsOf(fileIds) {
+  if (!fileIds.length) return Promise.resolve([]);
+  return q(db().from("comments")
+    .select("id, file_id, body, at_ms, created_at, resolved_at, resolved_by, author_id, author:participants(id, pseudo)")
+    .in("file_id", fileIds)
+    .order("at_ms", { ascending: true, nullsFirst: false }));
+}
+
+// Retours encore ouverts dans tout l'espace, pour l'accueil.
+export function listOpenComments(spaceId) {
+  return q(db().from("comments")
+    .select("id, file_id")
+    .eq("space_id", spaceId)
+    .is("resolved_at", null));
+}
+
+export function setCommentResolved(id, resolved) {
+  return q(db().rpc("set_comment_resolved", { p_comment: id, p_resolved: !!resolved }));
+}
+
+export function setFileApproved(id, approved) {
+  return q(db().rpc("set_file_approved", { p_file: id, p_approved: !!approved }));
 }
 
 export function addComment(fileId, body, atMs) {

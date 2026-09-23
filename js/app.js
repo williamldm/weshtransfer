@@ -1,21 +1,21 @@
 // Coquille de l'appli : démarrage, routeur à hash, en-tête, bus
 // d'événements, temps réel. Chaque vue est un module avec mount().
 
-import { restore, getSpace, leaveSpace } from "./session.js?v=15";
-import { connectSpace } from "./realtime.js?v=15";
-import { bindPlayerBar } from "./player.js?v=15";
-import { activeCount, onUploads } from "./upload.js?v=15";
-import { openPeopleSheet } from "./views/people.js?v=15";
-import { openUploadSheet } from "./views/upload-sheet.js?v=15";
-import { icon } from "./icons.js?v=15";
-import { monogram } from "./brand.js?v=15";
-import { toast, errorText, esc } from "./ui.js?v=15";
+import { restore, getSpace, leaveSpace } from "./session.js?v=16";
+import { connectSpace } from "./realtime.js?v=16";
+import { bindPlayerBar } from "./player.js?v=16";
+import { activeCount, onUploads } from "./upload.js?v=16";
+import { openPeopleSheet } from "./views/people.js?v=16";
+import { openUploadSheet } from "./views/upload-sheet.js?v=16";
+import { icon } from "./icons.js?v=16";
+import { monogram } from "./brand.js?v=16";
+import { toast, errorText, esc } from "./ui.js?v=16";
 
-import * as home from "./views/home.js?v=15";
-import * as project from "./views/project.js?v=15";
-import * as file from "./views/file.js?v=15";
-import * as send from "./views/send.js?v=15";
-import * as transfers from "./views/transfers.js?v=15";
+import * as home from "./views/home.js?v=16";
+import * as project from "./views/project.js?v=16";
+import * as file from "./views/file.js?v=16";
+import * as send from "./views/send.js?v=16";
+import * as transfers from "./views/transfers.js?v=16";
 
 // L'accueil dépend du mode de l'espace : morceaux (séminaire) ou
 // directement le composeur d'envoi (espace dédié aux envois).

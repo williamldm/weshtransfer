@@ -1,18 +1,18 @@
 // Un morceau : ses versions de la plus récente à la plus ancienne, chacune
 // avec sa mini-waveform jouable d'un tap.
 
-import { getProject, signFiles, cachedUrl, cachedDownload, updateProject, deleteProject, deleteFile } from "../api.js?v=15";
-import { mountUploads } from "./uploads.js?v=15";
-import { openUploadSheet } from "./upload-sheet.js?v=15";
-import { Waveform } from "../waveform.js?v=15";
-import { play, toggle, isCurrent, onPlayer, seekRatio, state as playerState, trackFromFile } from "../player.js?v=15";
-import { saveZip, canStreamToDisk, MEMORY_LIMIT } from "../zip.js?v=15";
-import { icon } from "../icons.js?v=15";
-import { isAudio, canPreview } from "../files.js?v=15";
+import { getProject, signFiles, cachedUrl, cachedDownload, updateProject, deleteProject, deleteFile } from "../api.js?v=16";
+import { mountUploads } from "./uploads.js?v=16";
+import { openUploadSheet } from "./upload-sheet.js?v=16";
+import { Waveform } from "../waveform.js?v=16";
+import { play, toggle, isCurrent, onPlayer, seekRatio, state as playerState, trackFromFile } from "../player.js?v=16";
+import { saveZip, canStreamToDisk, MEMORY_LIMIT } from "../zip.js?v=16";
+import { icon } from "../icons.js?v=16";
+import { isAudio, canPreview } from "../files.js?v=16";
 import {
   esc, fileBadge, fileTile, timeAgo, formatBytes, formatDuration, plural, promptSheet,
   confirmSheet, actionSheet, toast, errorText, triggerDownload
-} from "../ui.js?v=15";
+} from "../ui.js?v=16";
 
 export const title = () => "Morceau";
 
@@ -25,8 +25,10 @@ function waveColors() {
   };
 }
 
-export function renderVersion(f, me) {
-  const n = f.comments && f.comments[0] ? f.comments[0].count : 0;
+export function renderVersion(f, me, review) {
+  const comments = Array.isArray(f.comments) ? f.comments : [];
+  const n = comments.length;
+  const open = comments.filter((c) => !c.resolved_at).length;
   const bits = [
     f.uploader ? f.uploader.pseudo : "?",
     timeAgo(f.created_at),
@@ -43,7 +45,11 @@ export function renderVersion(f, me) {
         '<div class="version-title"><span class="vno">v' + f.version_no + "</span>" +
           (f.label ? '<span class="vlabel">' + esc(f.label) + "</span>" : "") + fileBadge(f.original_name, f.mime_type, f.kind) + "</div>" +
         '<div class="version-meta">' + esc(bits.join(" · ")) +
-          (n ? ' · <span class="ccount">' + icon("comment", 13) + n + "</span>" : "") + "</div>" +
+          (review
+            ? (open ? ' · <span class="ccount is-todo">' + icon("comment", 13) + plural(open, "à corriger", "à corriger") + "</span>"
+                : n ? ' · <span class="ccount">' + icon("check", 13) + "tout corrigé</span>" : "")
+            : (n ? ' · <span class="ccount">' + icon("comment", 13) + n + "</span>" : "")) + "</div>" +
+          (f.approved_at ? '<div class="approved">' + icon("check", 14) + " Validée" + (f.approved_by ? " par " + esc(f.approved_by) : "") + "</div>" : "") +
       "</a>" +
       '<button class="btn btn-ghost btn-icon" data-more aria-label="Actions">' + icon("more") + "</button>" +
     "</div>" +
@@ -92,7 +98,7 @@ export async function mount(root, ctx, params) {
       '<div data-uploads hidden></div>' +
       '<div class="versions" data-versions>' +
         (files.length
-          ? files.map((f) => renderVersion(f, ctx.space.participantId)).join("")
+          ? files.map((f) => renderVersion(f, ctx.space.participantId, ctx.space.mode === "revue")).join("")
           : '<div class="empty-state">' + icon("upload", 32) + "<p>Pas encore de version. Ajoute le premier son.</p></div>") +
       "</div>";
 

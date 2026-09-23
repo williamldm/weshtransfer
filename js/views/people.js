@@ -1,9 +1,9 @@
 // Feuille "Participants" : qui est là, inviter, réglages du host.
 
-import { listParticipants, updateSpace } from "../api.js?v=15";
-import { icon } from "../icons.js?v=15";
-import { esc, h, openSheet, avatar, shareLink, copyText, toast, errorText, formatDate, confirmSheet, canShare } from "../ui.js?v=15";
-import { leaveSpace, knownSpaces, switchTo } from "../session.js?v=15";
+import { listParticipants, updateSpace } from "../api.js?v=16";
+import { icon } from "../icons.js?v=16";
+import { esc, h, openSheet, avatar, shareLink, copyText, toast, errorText, formatDate, confirmSheet, canShare } from "../ui.js?v=16";
+import { leaveSpace, knownSpaces, switchTo } from "../session.js?v=16";
 
 export function inviteUrl(code) {
   return new URL("index.html?c=" + encodeURIComponent(code), location.href).href;
@@ -56,10 +56,10 @@ export async function openPeopleSheet(ctx) {
   // Passer d'un espace à l'autre sans ressaisir de code
   const others = knownSpaces().filter((k) => k.id !== s.id);
   body.querySelector("[data-spaces]").innerHTML =
-    '<div class="space-item is-current">' + icon(s.mode === "envoi" ? "send" : "music", 18) +
+    '<div class="space-item is-current">' + icon({ envoi: "send", revue: "check" }[s.mode] || "music", 18) +
       "<span>" + esc(s.name) + '</span><span class="tag">ici</span></div>' +
     others.map((k) =>
-      '<button class="space-item" data-switch="' + esc(k.id) + '">' + icon(k.mode === "envoi" ? "send" : "music", 18) +
+      '<button class="space-item" data-switch="' + esc(k.id) + '">' + icon({ envoi: "send", revue: "check" }[k.mode] || "music", 18) +
         "<span>" + esc(k.name) + "</span>" + icon("chevron", 18) + "</button>").join("") +
     '<a class="space-item" href="index.html">' + icon("plus", 18) + "<span>Rejoindre un autre espace</span></a>";
   body.querySelector("[data-spaces]").addEventListener("click", (e) => {

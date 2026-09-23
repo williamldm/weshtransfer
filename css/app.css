@@ -1,5 +1,5 @@
-@import url("fonts.css?v=15");
-@import url("tokens.css?v=15");
+@import url("fonts.css?v=16");
+@import url("tokens.css?v=16");
 
 /* =============================================================== base */
 *, *::before, *::after { box-sizing: border-box; }
@@ -1046,7 +1046,10 @@ body.hub {
 .hub-hero .resume-list { max-width: 420px; margin: var(--sp-5) auto 0; }
 
 .hub-cards { display: grid; grid-template-columns: 1fr; gap: var(--sp-3); margin-bottom: var(--sp-7); }
-@media (min-width: 760px) { .hub-cards { grid-template-columns: repeat(3, 1fr); } }
+@media (min-width: 640px) { .hub-cards { grid-template-columns: repeat(2, 1fr); } }
+@media (min-width: 980px) { .hub-cards { grid-template-columns: repeat(4, 1fr); } }
+.hub-alt { margin-top: var(--sp-4); padding: var(--sp-2); border: none; background: none; color: var(--accent-bright); font: inherit; font-size: var(--fs-sm); font-weight: 600; cursor: pointer; }
+.hub-alt:hover { color: var(--accent-hi); }
 .hub-card {
   display: flex;
   flex-direction: column;
@@ -1147,6 +1150,65 @@ body.hub {
   .step { padding: var(--sp-5) var(--sp-6); }
   .send-go { padding: 0 var(--sp-6) var(--sp-6); }
 }
+
+/* ============================================== retours de mix */
+.review-hint {
+  display: flex;
+  gap: var(--sp-3);
+  margin-bottom: var(--sp-4);
+  padding: var(--sp-3) var(--sp-4);
+  border-radius: var(--r-md);
+  background: var(--accent-soft);
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+}
+.review-hint .ic { color: var(--accent-bright); margin-top: 2px; }
+
+.status { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: var(--r-pill); background: var(--surface-3); color: var(--text-dim); font-size: var(--fs-xs); font-weight: 700; }
+.status.is-ok { background: rgba(74, 222, 128, .14); color: var(--ok); }
+.status.is-todo { background: rgba(251, 191, 36, .14); color: var(--warn); }
+.ccount.is-todo { color: var(--warn); }
+.approved { display: flex; align-items: center; gap: 4px; margin-top: 4px; color: var(--ok); font-size: var(--fs-xs); font-weight: 700; }
+
+.approve { margin-bottom: var(--sp-3); }
+.approve.is-on {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-3) var(--sp-3) var(--sp-4);
+  border: 1px solid rgba(74, 222, 128, .35);
+  border-radius: var(--r-md);
+  background: rgba(74, 222, 128, .08);
+}
+.approve-text { display: flex; flex: 1; align-items: center; gap: var(--sp-2); color: var(--text-dim); font-size: var(--fs-sm); }
+.approve-text .ic { color: var(--ok); }
+.approve-text strong { color: var(--text); }
+
+.c-check {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 2px solid var(--line-strong);
+  border-radius: 10px;
+  background: transparent;
+  color: transparent;
+  cursor: pointer;
+  transition: background .15s, border-color .15s, color .15s;
+}
+.c-check:hover { border-color: var(--accent-bright); color: var(--text-faint); }
+.comment.is-done .c-check { border-color: var(--ok); background: var(--ok); color: #06240f; }
+.comment.is-done .c-text { color: var(--text-faint); text-decoration: line-through; text-decoration-color: rgba(142, 132, 163, .6); }
+.c-done { display: flex; align-items: center; gap: 4px; margin-top: 4px; color: var(--ok); font-size: var(--fs-xs); }
+.vtag { padding: 1px 7px; border-radius: 6px; background: var(--surface-3); color: var(--text-dim); font-family: var(--mono); font-size: var(--fs-xs); }
+
+.carry { margin-top: var(--sp-5); padding: var(--sp-4); border: 1px dashed var(--line-strong); border-radius: var(--r-lg); }
+.carry-head { display: flex; gap: var(--sp-2); margin-bottom: var(--sp-2); color: var(--text-dim); font-size: var(--fs-sm); }
+.carry-head .ic { flex: none; margin-top: 2px; color: var(--warn); }
+.comments .section-head { flex-wrap: wrap; }
+.version-switch .chip .ic { color: var(--ok); }
 
 /* ======================================= catégories de fichiers */
 .cat {
