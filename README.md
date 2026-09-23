@@ -34,18 +34,23 @@ de limite de 50 Mo par fichier. Tant que B2 n'est pas configuré, l'appli
 bascule d'elle-même sur le Storage Supabase ; chaque fichier retient où il
 est stocké (`files.backend`).
 
-Mise en place (interface web B2) :
+En service depuis le 2026-09-23 : bucket `weshtransfer` (privé, région
+`eu-central-003`), clé d'application restreinte à ce bucket.
 
-1. **Bucket** : Create a Bucket, fichiers **privés**, Object Lock désactivé.
-2. **CORS** (Bucket Settings > CORS Rules) : partager avec une seule
-   origine HTTPS, `https://weshtransfer.fr`, pour l'API **compatible S3**. Ça autorise le navigateur à envoyer
-   et lire via URL signée ; les fichiers restent privés.
-3. **Lifecycle** : garder uniquement la dernière version (filet de
-   sécurité : l'appli supprime déjà toutes les versions elle-même).
-4. **Clé d'application** restreinte à ce bucket, accès lecture + écriture.
-5. Secrets :
+Réglages du bucket (posés par l'API `b2_update_bucket`) :
 
-       supabase secrets set B2_KEY_ID=... B2_APP_KEY=... B2_BUCKET=... B2_ENDPOINT=https://s3.<region>.backblazeb2.com
+1. **Privé**, Object Lock désactivé.
+2. **CORS** (API compatible S3) : `s3_get`, `s3_head`, `s3_put`, en-têtes
+   `content-type` et `range`, depuis `https://weshtransfer.fr`, la copie
+   Netlify et `http://127.0.0.1:5599` / `http://localhost:5599` (dev).
+   Toute autre origine est refusée.
+3. **Cycle de vie** : anciennes versions effacées un jour après avoir été
+   masquées, uploads multipart abandonnés annulés au bout de deux jours
+   (filets de sécurité : l'appli supprime déjà toutes les versions et
+   annule ses uploads elle-même).
+4. Secrets :
+
+       supabase secrets set B2_KEY_ID=... B2_APP_KEY=... B2_BUCKET=weshtransfer B2_ENDPOINT=https://s3.eu-central-003.backblazeb2.com
 
 ## Fonctionnement
 
