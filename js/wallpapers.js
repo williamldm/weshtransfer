@@ -43,24 +43,89 @@ export function applyWallpaper(i) {
   return w;
 }
 
+// ------------------------------------------------------------- défilement
+// Toutes les 20 s, le décor suivant arrive en fondu par-dessus l'actuel
+// (préchargé avant, pour ne jamais montrer d'image à moitié chargée). Le
+// décor courant est mémorisé : la page suivante reprend où on en était.
+// En pause quand l'onglet est caché.
+
+const ROTATE_MS = 20000;
+const FADE_MS = 1400;
+let rotation = null;
+
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+const frame = () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+function preload(src) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = img.onerror = () => resolve();
+    img.src = src;
+  });
+}
+
+export function startRotation(scene) {
+  if (rotation || !scene) return rotation;
+  let i = currentWallpaper();
+  let timer = 0;
+  let busy = false;
+  const listeners = new Set();
+  const fade = document.createElement("div");
+  fade.className = "scene-fade";
+  fade.setAttribute("aria-hidden", "true");
+  scene.appendChild(fade);
+
+  async function go(next) {
+    if (busy) return;
+    busy = true;
+    const url = new URL(WALLPAPERS[next].file, document.baseURI).href;
+    await preload(url);
+    fade.style.backgroundImage = 'url("' + url + '")';
+    await frame();
+    fade.classList.add("is-on");
+    await wait(FADE_MS);
+    // le décor du dessous devient le nouveau, puis le voile disparaît d'un coup
+    applyWallpaper(next);
+    write(localStorage, KEY, String(next));
+    await frame();
+    fade.classList.add("is-instant");
+    fade.classList.remove("is-on");
+    await frame();
+    fade.classList.remove("is-instant");
+    i = next;
+    busy = false;
+    for (const fn of listeners) fn(i);
+  }
+
+  const schedule = () => {
+    clearTimeout(timer);
+    timer = setTimeout(async () => {
+      if (!document.hidden) await go((i + 1) % WALLPAPERS.length);
+      schedule();
+    }, ROTATE_MS);
+  };
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) schedule(); });
+  schedule();
+
+  rotation = {
+    get index() { return i; },
+    next: async () => { await go((i + 1) % WALLPAPERS.length); schedule(); },
+    onChange: (fn) => { listeners.add(fn); return () => listeners.delete(fn); }
+  };
+  return rotation;
+}
+
 // Accueil : légende "Fond d'écran n° x sur 6" et bouton "Fond suivant".
 export function mountWallpaperNote(note) {
   if (!note) return;
-  let i = currentWallpaper();
-  const show = () => {
-    const w = applyWallpaper(i);
+  const r = rotation || startRotation(document.querySelector(".scene"));
+  const show = (i) => {
+    const w = WALLPAPERS[i];
     note.querySelector("[data-wp-text]").innerHTML =
       "Fond d'écran n° " + (i + 1) + " sur " + WALLPAPERS.length + " · " + w.title + ".<br>" + w.joke;
-    const next = new Image();   // le suivant déjà en cache : changement instantané
-    next.src = WALLPAPERS[(i + 1) % WALLPAPERS.length].file;
   };
-  show();
+  show(r ? r.index : currentWallpaper());
+  if (!r) return;
+  r.onChange(show);
   const btn = note.querySelector("[data-wp-next]");
-  if (btn) {
-    btn.onclick = () => {
-      i = (i + 1) % WALLPAPERS.length;
-      write(localStorage, KEY, String(i));
-      show();
-    };
-  }
+  if (btn) btn.onclick = () => r.next();
 }

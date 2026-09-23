@@ -1,5 +1,5 @@
-@import url("fonts.css?v=36");
-@import url("tokens.css?v=36");
+@import url("fonts.css?v=37");
+@import url("tokens.css?v=37");
 
 /* ================================================================= base */
 *, *::before, *::after { box-sizing: border-box; }
@@ -865,7 +865,10 @@ body.public .scene { position: fixed; inset: 0; z-index: -1; }
 .version-note { margin: 6px 0 0; color: var(--text-dim); font-size: var(--fs-sm); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 
 /* fonds d'écran : on passe au suivant */
-.scene { transition: background-image .4s ease; }
+/* le décor suivant arrive en fondu par-dessus (js/wallpapers.js) */
+.scene-fade { position: absolute; inset: 0; background: transparent center bottom / cover no-repeat; opacity: 0; transition: opacity 1.4s ease; pointer-events: none; }
+.scene-fade.is-on { opacity: 1; }
+.scene-fade.is-instant { transition: none; }
 
 /* ============================================ l'appli, sur le même décor */
 /* Même mise en scène que l'accueil et la page destinataire : le décor
