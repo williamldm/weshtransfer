@@ -2,8 +2,8 @@
 // Chaque action ouvre une petite feuille ; session.js n'est chargé qu'au
 // moment d'agir, la page reste légère.
 
-import { icon } from "./icons.js?v=17";
-import { esc, h, openSheet, errorText } from "./ui.js?v=17";
+import { icon } from "./icons.js?v=21";
+import { esc, h, openSheet, errorText } from "./ui.js?v=21";
 
 const PSEUDO_KEY = "seminaire.pseudo";
 
@@ -27,7 +27,7 @@ for (const el of document.querySelectorAll("[data-icon]")) el.innerHTML = icon(e
 const known = knownSpaces();
 const resume = document.getElementById("resume");
 if (known.length) {
-  resume.hidden = false;
+  document.getElementById("resume-wrap").hidden = false;
   resume.innerHTML = known.slice(0, 4).map((k) =>
     '<button type="button" class="resume" data-id="' + esc(k.id) + '">' +
       "<span>" + ({ envoi: "Envois", revue: "Retours" }[k.mode] || "Salon") + "</span><strong>" + esc(k.name) +
@@ -117,7 +117,7 @@ function open(kind, prefillCode) {
     btn.textContent = "Un instant...";
     try {
       try { localStorage.setItem(PSEUDO_KEY, pseudo); } catch (e2) { /* privé */ }
-      const session = await import("./session.js?v=17");
+      const session = await import("./session.js?v=21");
       if (kind === "join") await session.joinSpace(val("code"), pseudo);
       else if (kind === "salon") await session.createSpace(val("name"), "seminaire", pseudo);
       else if (kind === "revue") await session.createSpace(val("project"), "revue", pseudo);

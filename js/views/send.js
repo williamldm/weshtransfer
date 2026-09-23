@@ -5,16 +5,16 @@
 import {
   getProject, getFilesByIds, listSpaceFiles, createTransfer, sendTransfer, emailEnabled,
   getTransfer, transferUrl, createProject, signFiles, cachedUrl
-} from "../api.js?v=17";
-import { openUploadSheet } from "./upload-sheet.js?v=17";
-import { mountUploads } from "./uploads.js?v=17";
-import { onUploads, enqueue, checkFile } from "../upload.js?v=17";
-import { categoryOf, canPreview } from "../files.js?v=17";
-import { icon } from "../icons.js?v=17";
+} from "../api.js?v=21";
+import { openUploadSheet } from "./upload-sheet.js?v=21";
+import { mountUploads } from "./uploads.js?v=21";
+import { onUploads, enqueue, checkFile } from "../upload.js?v=21";
+import { categoryOf, canPreview } from "../files.js?v=21";
+import { icon } from "../icons.js?v=21";
 import {
   esc, h, formatBytes, formatDuration, plural, toast, errorText, openSheet, copyText, shareLink,
   canShare, formatDate, daysLeft, fileBadge, fileTile
-} from "../ui.js?v=17";
+} from "../ui.js?v=21";
 
 // Dans un espace "envoi", ce composeur EST l'accueil.
 export const title = (ctx) => (ctx && ctx.space.mode === "envoi" ? ctx.space.name : "Envoyer");
@@ -68,7 +68,7 @@ export async function mount(root, ctx, params) {
 
   // ------------------------------------------------------ rendu
   const stepHead = (n, title, aside) =>
-    '<div class="step-head"><span class="step-n">' + n + "</span><h2>" + title + "</h2>" + (aside || "") + "</div>";
+    '<div class="step-head"><span class="step-n">' + String(n).padStart(2, "0") + "</span><h2>" + title + "</h2>" + (aside || "") + "</div>";
 
   root.innerHTML =
     (envoiMode

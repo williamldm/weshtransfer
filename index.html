@@ -9,7 +9,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>WeshTransfer · le transfert le moins écoresponsable du marché</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='#1a1226'/%3E%3Csvg x='12' y='5' width='40' height='54' viewBox='0 -46 140 204'%3E%3Cpath d='M20 6 C 11 -2, 30 -9, 21 -19' stroke='#8B6CF0' stroke-width='3' fill='none' stroke-linecap='round' opacity='0.45'/%3E%3Cpath d='M70 6 C 58 0, 82 -6, 70 -13 L 70 -25' stroke='#EEE9F5' stroke-width='6.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpolygon points='70,-44 55,-19 85,-19' fill='#EEE9F5'/%3E%3Cpath d='M120 6 C 111 -2, 130 -9, 121 -19' stroke='#8B6CF0' stroke-width='3' fill='none' stroke-linecap='round' opacity='0.45'/%3E%3Cpolyline points='20,12 20,50 45,130 70,50 95,130 120,50 120,12' fill='none' stroke='#EEE9F5' stroke-width='12' stroke-linejoin='miter'/%3E%3Cline x1='70' y1='12' x2='70' y2='54' stroke='#EEE9F5' stroke-width='12'/%3E%3Crect x='11' y='8' width='18' height='5' fill='#EEE9F5'/%3E%3Crect x='61' y='8' width='18' height='5' fill='#EEE9F5'/%3E%3Crect x='111' y='8' width='18' height='5' fill='#EEE9F5'/%3E%3Crect x='14' y='22' width='12' height='4' fill='#8B6CF0'/%3E%3Crect x='64' y='22' width='12' height='4' fill='#8B6CF0'/%3E%3Crect x='114' y='22' width='12' height='4' fill='#8B6CF0'/%3E%3C/svg%3E%3C/svg%3E">
-<link rel="stylesheet" href="css/app.css?v=17">
+<link rel="stylesheet" href="css/app.css?v=21">
 </head>
 <body class="hub">
 
@@ -23,43 +23,39 @@
 
 <main class="hub-main">
   <section class="hub-hero">
-    <span class="hub-tag">N° 001 · Édition charbon</span>
+    <p class="label-mono">N° 001 · Édition charbon</p>
     <h1>Le transfert de fichiers <em>le moins écoresponsable</em> du marché.</h1>
-    <p>Tes sons, clips et stems voyagent en jet privé. On les écoute avant de les télécharger, on les commente à la seconde près. Sans compte, sans remords.</p>
-    <div class="hub-cta">
-      <button class="btn btn-primary btn-xl" data-open="send">Envoyer des fichiers</button>
-      <button class="btn btn-xl" data-open="salon">Créer un salon</button>
-    </div>
-    <button class="hub-alt" data-open="revue">Ingé son ? Fais valider tes mix, commentés à la seconde près →</button>
-    <div class="resume-list" id="resume" hidden></div>
+    <p class="hub-lead">Envoie tes sons, stems et clips. On les écoute avant de les télécharger, on les commente à la seconde près. Sans compte, sans remords.</p>
   </section>
 
-  <section class="hub-cards">
-    <button class="hub-card" data-open="send">
-      <span class="ft ft-audio" data-icon="send"></span>
-      <strong>Envoyer</strong>
-      <span>Dépose tes fichiers, mets des adresses. Ils reçoivent un lien pour écouter, voir et télécharger. Jusqu'à 3 Go par fichier.</span>
+  <nav class="hub-actions" aria-label="Que veux-tu faire ?">
+    <button class="hub-action is-main" data-open="send">
+      <span class="ha-text"><strong>Envoyer des fichiers</strong><span>Tu déposes, tu mets des adresses. Ils écoutent, regardent et téléchargent. Jusqu'à 3 Go par fichier.</span></span>
+      <span class="ha-arrow" data-icon="chevron"></span>
     </button>
-    <button class="hub-card" data-open="salon">
-      <span class="ft ft-video" data-icon="users"></span>
-      <strong>Créer un salon</strong>
-      <span>Un espace pour ton groupe, ta résidence, ton séminaire. Versions, commentaires horodatés, tout le monde en temps réel.</span>
+    <button class="hub-action" data-open="salon">
+      <span class="ha-text"><strong>Créer un salon</strong><span>Un espace pour ton groupe, ta résidence, ton séminaire. Versions et commentaires horodatés, en temps réel.</span></span>
+      <span class="ha-arrow" data-icon="chevron"></span>
     </button>
-    <button class="hub-card" data-open="revue">
-      <span class="ft ft-document" data-icon="check"></span>
-      <strong>Retours de mix</strong>
-      <span>Tu déposes ton mix, l'artiste commente à 1:23 « la voix est trop en arrière ». Tu coches, tu envoies la v2, il valide.</span>
+    <button class="hub-action" data-open="revue">
+      <span class="ha-text"><strong>Faire valider un mix</strong><span>Tu déposes ton mix, l'artiste commente à 1:23. Tu coches, tu envoies la v2, il valide.</span></span>
+      <span class="ha-arrow" data-icon="chevron"></span>
     </button>
-    <button class="hub-card" data-open="join">
-      <span class="ft ft-project" data-icon="link"></span>
-      <strong>Rejoindre</strong>
-      <span>On t'a donné un code à 6 caractères ? C'est ici. Tu choisis juste un blaze.</span>
+    <button class="hub-action" data-open="join">
+      <span class="ha-text"><strong>Rejoindre avec un code</strong><span>On t'a donné un code à 6 caractères. Tu choisis juste un blaze.</span></span>
+      <span class="ha-arrow" data-icon="chevron"></span>
     </button>
+  </nav>
+
+  <section class="hub-resume" id="resume-wrap" hidden>
+    <h2 class="label-mono">Sur cet appareil</h2>
+    <div class="resume-list" id="resume"></div>
   </section>
 
   <section class="hub-faq">
+    <h2 class="label-mono">Questions</h2>
     <details>
-      <summary>C'est vraiment le moins éco-responsable ?</summary>
+      <summary>C'est vraiment le moins écoresponsable ?</summary>
       <p>On fait de notre mieux. Mais en vrai, les fichiers sont supprimés automatiquement à expiration et on ne garde rien. Désolé.</p>
     </details>
     <details>
@@ -68,7 +64,7 @@
     </details>
     <details>
       <summary>Je peux envoyer quoi ?</summary>
-      <p>Tout : sons, stems, clips, visuels, PDF, projets Ableton ou FL Studio. Sauf les programmes (.exe, .dmg...), on n'est pas là pour ça.</p>
+      <p>Tout : sons, stems, clips, visuels, PDF, projets Ableton ou FL Studio. Sauf les programmes (.exe, .dmg…), on n'est pas là pour ça.</p>
     </details>
   </section>
 
@@ -80,6 +76,6 @@
 <div id="sheets"></div>
 <div class="toast-wrap" id="toasts" aria-live="polite"></div>
 
-<script type="module" src="js/hub.js?v=17"></script>
+<script type="module" src="js/hub.js?v=21"></script>
 </body>
 </html>

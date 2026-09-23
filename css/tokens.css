@@ -1,59 +1,56 @@
-/* WeshTransfer : jetons de design. Noir violacé, blanc lavande, violet charbon.
-   Mobile d'abord : tout se lit et se touche a bout de bras dans une villa
-   mal eclairee, telephone dans une main. */
+/* WeshTransfer : jetons de design.
+   Direction : un outil de studio sobre. Aplats, un seul violet réservé à
+   l'action et à la lecture, métadonnées en mono. Pas de dégradé, pas de
+   halo, pas d'ombre hors des fenêtres modales. */
 
 :root {
   color-scheme: dark;
 
-  /* ---- fonds : noir teinté de violet, du plus profond au plus proche */
-  --bg:          #0D0A12;
-  --surface:     #15101E;
-  --surface-2:   #1C1528;
-  --surface-3:   #261D37;
+  /* ---- fonds : noir neutre à peine teinté */
+  --bg:          #0F0D13;
+  --surface:     #16141B;
+  --surface-2:   #1D1A23;
+  --surface-3:   #27232F;
+  --field:       #121017;
 
   /* ---- traits */
-  --line:        #2C2340;
-  --line-strong: #3A2F4F;
+  --line:        #25222C;
+  --line-strong: #353140;
 
-  /* ---- texte (blanc légèrement lavande) */
-  --text:        #EEE9F5;
-  --text-dim:    #B9AFCB;
-  --text-faint:  #8E84A3;
+  /* ---- texte (contrastes sur --bg : 16:1, 8:1, 4.6:1) */
+  --text:        #ECEAF0;
+  --text-dim:    #A9A4B4;
+  --text-faint:  #7D7889;
 
-  /* ---- accent violet
-     --accent : fonds de boutons (texte blanc, contraste 5,7:1)
-     --accent-bright : texte, icônes et waveform sur fond noir */
-  --accent:        #6A45D9;
+  /* ---- violet : un seul, utilisé avec parcimonie
+     --accent : aplat des boutons principaux (texte blanc 4,7:1)
+     --accent-bright : texte, icônes et waveform sur fond sombre */
+  --accent:        #7B5CE6;
+  --accent-hover:  #8A6CF0;
   --accent-bright: #A48BFF;
   --accent-hi:     #C9BAFF;
-  --accent-dim:    #5A38C4;
-  --accent-soft:   rgba(139, 108, 240, 0.14);
-  --accent-glow:   rgba(139, 108, 240, 0.38);
-  --on-accent:     #ffffff;
-  --accent-grad:   linear-gradient(135deg, #5A38C4 0%, #6A45D9 50%, #8B6CF0 100%);
+  --accent-soft:   rgba(164, 139, 255, 0.10);
+  --on-accent:     #FFFFFF;
 
   /* ---- états */
-  --ok:          #4ade80;
-  --warn:        #fbbf24;
-  --danger:      #f87171;
-  --live:        #ef4444;
+  --ok:          #6FCF8E;
+  --warn:        #E2B55A;
+  --danger:      #EF7B7B;
 
   /* ---- waveform */
-  --wave-idle:   #3A2F4F;
+  --wave-idle:   #3A3644;
   --wave-played: var(--accent-bright);
-  --wave-cursor: #ffffff;
 
   /* ---- typographie */
   --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  /* identité : Outfit (grasse, géométrique) pour le logotype et les titres,
-     IBM Plex Mono pour les mentions et les libellés */
+  /* Outfit : logotype et titres. IBM Plex Mono : libellés et métadonnées */
   --display: "Outfit", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
 
   --fs-xs:  12px;
   --fs-sm:  13px;
-  --fs-md:  15px;   /* corps : 15px et pas 14, on lit a l'arrache */
-  --fs-lg:  18px;
+  --fs-md:  15px;
+  --fs-lg:  17px;
   --fs-xl:  22px;
   --fs-2xl: 28px;
 
@@ -66,43 +63,37 @@
   --sp-6: 32px;
   --sp-7: 48px;
 
-  /* ---- formes */
-  --r-sm: 8px;
-  --r-md: 12px;
-  --r-lg: 18px;
+  /* ---- formes : sobres */
+  --r-sm: 6px;
+  --r-md: 8px;
+  --r-lg: 12px;
   --r-pill: 999px;
 
-  /* ---- cible tactile minimale : jamais en dessous */
-  --touch: 48px;
+  /* ---- cible tactile minimale */
+  --touch: 44px;
 
-  --shadow: 0 8px 28px rgba(0, 0, 0, 0.55);
+  --shadow: 0 16px 48px rgba(0, 0, 0, 0.5);
 
-  /* ---- encoches et barre de geste iOS */
   --safe-top:    env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
 
-  /* ---- hauteur du lecteur persistant, pour degager le bas des listes */
-  --player-h: 76px;
+  --player-h: 72px;
 }
 
-/* Couleurs par type de fichier : reperage instantane dans une liste
-   de 40 versions, sans avoir a lire les etiquettes. */
+/* Types musicaux et catégories : un point de couleur, jamais un aplat. */
 :root {
-  --kind-instru:    #60a5fa;
-  --kind-voix:      #f472b6;
-  --kind-freestyle: #2dd4bf;
-  --kind-mix:       #4ade80;
-  --kind-stems:     #fbbf24;
-  --kind-autre:     #94a3b8;
-}
+  --kind-instru:    #7AA2E3;
+  --kind-voix:      #D98BB5;
+  --kind-freestyle: #5FB8A8;
+  --kind-mix:       #7FBF7A;
+  --kind-stems:     #D9B45F;
+  --kind-autre:     #8E8A98;
 
-/* Catégories de fichiers non audio : reconnaissables d'un coup d'oeil. */
-:root {
   --cat-audio:    var(--accent-bright);
-  --cat-image:    #f472b6;
-  --cat-video:    #38bdf8;
-  --cat-document: #fbbf24;
-  --cat-archive:  #94a3b8;
-  --cat-project:  #4ade80;
-  --cat-other:    #aba2bf;
+  --cat-image:    #D98BB5;
+  --cat-video:    #6FB3D9;
+  --cat-document: #D9B45F;
+  --cat-archive:  #8E8A98;
+  --cat-project:  #7FBF7A;
+  --cat-other:    #8E8A98;
 }

@@ -1,7 +1,7 @@
 // Briques d'interface partagées : DOM, messages, formatage, feuilles.
 
-import { icon } from "./icons.js?v=17";
-import { CATEGORY, categoryOf } from "./files.js?v=17";
+import { icon } from "./icons.js?v=21";
+import { CATEGORY, categoryOf, extOf } from "./files.js?v=21";
 
 // ------------------------------------------------------------------ DOM
 
@@ -151,16 +151,18 @@ export function kindBadge(kind) {
 // catégorie pour le reste (image, vidéo, projet...).
 export function fileBadge(name, mime, kind) {
   const cat = categoryOf(name, mime);
-  if (cat === "audio") return kindBadge(kind);
+  // un zip de stems reste "Stems" : le type musical prime sur le format
+  if (cat === "audio" || (cat === "archive" && kind === "stems")) return kindBadge(kind);
   return '<span class="cat cat-' + cat + '">' + CATEGORY[cat].label + "</span>";
 }
 
 // Tuile d'icône colorée par catégorie (ou vignette d'image si url fournie).
 export function fileTile(name, mime, thumbUrl) {
   const cat = categoryOf(name, mime);
+  const ext = (extOf(name) || "").slice(0, 4).toUpperCase();
   const inner = thumbUrl
     ? '<img src="' + esc(thumbUrl) + '" alt="" loading="lazy">'
-    : icon(CATEGORY[cat].icon, 20);
+    : ext ? '<span class="ft-ext">' + esc(ext) + "</span>" : icon(CATEGORY[cat].icon, 18);
   return '<span class="ft ft-' + cat + '">' + inner + "</span>";
 }
 

@@ -1,12 +1,12 @@
 // Accueil de l'espace : gros boutons d'action, uploads en cours, morceaux
 // triés par activité récente.
 
-import { listProjects, createProject, listOpenComments } from "../api.js?v=17";
-import { mountUploads } from "./uploads.js?v=17";
-import { openUploadSheet } from "./upload-sheet.js?v=17";
-import { openPeopleSheet } from "./people.js?v=17";
-import { icon } from "../icons.js?v=17";
-import { esc, h, kindBadge, timeAgo, plural, promptSheet, toast, errorText, daysLeft, formatDate } from "../ui.js?v=17";
+import { listProjects, createProject, listOpenComments } from "../api.js?v=21";
+import { mountUploads } from "./uploads.js?v=21";
+import { openUploadSheet } from "./upload-sheet.js?v=21";
+import { openPeopleSheet } from "./people.js?v=21";
+import { icon } from "../icons.js?v=21";
+import { esc, h, kindBadge, timeAgo, plural, promptSheet, toast, errorText, daysLeft, formatDate } from "../ui.js?v=21";
 
 export const title = (ctx) => ctx.space.name;
 
@@ -86,7 +86,7 @@ export async function mount(root, ctx) {
     '<div class="section-head"><h2>' + (review ? "Mix" : "Morceaux") + "</h2>" +
       '<button class="btn btn-ghost btn-sm" data-new>' + icon("plus", 16) + " Nouveau</button>" +
     "</div>" +
-    '<div data-list><div class="skeleton"></div><div class="skeleton"></div></div>' +
+    '<div class="rows" data-list><div class="skeleton"></div><div class="skeleton"></div></div>' +
 
     '<a class="link-row" href="#/transfers">' + icon("mail", 18) + "<span>Envois par email et liens</span>" + icon("chevron", 18) + "</a>";
 
