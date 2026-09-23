@@ -1,5 +1,10 @@
 ---
+# Déploiement cPanel (Git Version Control > Deploy HEAD Commit).
+# Ne copie que ce qui est public, .htaccess compris (un simple * sauterait
+# les fichiers cachés et mettrait dev/, tools/, supabase/ en ligne).
+# Même liste que tools/build.py : les garder alignées.
 deployment:
   tasks:
-    - export DEPLOYPATH=/home2/lowi3581/weshtransfer.fr
-    - /bin/cp -R * $DEPLOYPATH
+    - export DEPLOYPATH=/home2/lowi3581/weshtransfer.fr/
+    - /bin/cp index.html app.html t.html robots.txt .htaccess $DEPLOYPATH
+    - /bin/cp -R css js fonts img $DEPLOYPATH

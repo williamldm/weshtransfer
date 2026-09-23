@@ -10,6 +10,7 @@ if subprocess.run([sys.executable, str(root / "tools/check.py")]).returncode:
     sys.exit("Contrôles en échec : rien n'est préparé.")
 shutil.rmtree(out, ignore_errors=True)
 out.mkdir()
+# même liste que .cpanel.yml (déploiement o2switch) : les garder alignées
 for name in ["index.html", "app.html", "t.html", "robots.txt", ".htaccess"]:
     shutil.copy2(root / name, out / name)
 for d in ["css", "js", "fonts", "img"]:

@@ -112,14 +112,14 @@ Mise en place (interface web B2) :
 
 ## Mise en ligne
 
-Hébergement : o2switch (Apache), domaine `weshtransfer.fr`.
+Hébergement : o2switch (Apache), domaine `weshtransfer.fr`, déployé depuis
+GitHub : cPanel > Git Version Control > *Update from Remote* puis *Deploy HEAD
+Commit*. `.cpanel.yml` ne copie que les fichiers publics : les trois pages,
+`robots.txt`, `.htaccess`, `css/`, `js/`, `fonts/`, `img/`.
 
-    python3 tools/build.py
-
-prépare `_deploy/` : les trois pages, `css/`, `js/`, `fonts/`, `img/`,
-`robots.txt` et `.htaccess`. C'est **le contenu** de ce dossier qui va à la
-racine du site (`public_html` ou le dossier du domaine), `.htaccess` compris
-(fichier caché : l'afficher dans le gestionnaire de fichiers).
+À la main, `python3 tools/build.py` prépare la même sélection dans `_deploy/`
+(contrôles compris) ; c'est **le contenu** de ce dossier qui va à la racine du
+site, `.htaccess` compris (fichier caché).
 
 Le `.htaccess` force le HTTPS (l'appli en a besoin), renvoie `www` vers le
 domaine nu, et ne sert que les fichiers publics : si le dépôt entier se
