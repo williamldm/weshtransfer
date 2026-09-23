@@ -1,4 +1,4 @@
-/* Seminaire : jetons de design. Violet et noir, fort contraste.
+/* WeshTransfer : jetons de design. Noir violacé, blanc lavande, violet charbon.
    Mobile d'abord : tout se lit et se touche a bout de bras dans une villa
    mal eclairee, telephone dans une main. */
 
@@ -6,31 +6,31 @@
   color-scheme: dark;
 
   /* ---- fonds : noir teinté de violet, du plus profond au plus proche */
-  --bg:          #0b0911;
-  --surface:     #13101c;
-  --surface-2:   #1b1627;
-  --surface-3:   #251e35;
+  --bg:          #0D0A12;
+  --surface:     #15101E;
+  --surface-2:   #1C1528;
+  --surface-3:   #261D37;
 
   /* ---- traits */
-  --line:        #2a2339;
-  --line-strong: #3b3152;
+  --line:        #2C2340;
+  --line-strong: #3A2F4F;
 
   /* ---- texte (blanc légèrement lavande) */
-  --text:        #efeaf8;
-  --text-dim:    #aba2bf;
-  --text-faint:  #71698a;
+  --text:        #EEE9F5;
+  --text-dim:    #B9AFCB;
+  --text-faint:  #8E84A3;
 
   /* ---- accent violet
      --accent : fonds de boutons (texte blanc, contraste 5,7:1)
      --accent-bright : texte, icônes et waveform sur fond noir */
-  --accent:        #7c3aed;
-  --accent-bright: #a78bfa;
-  --accent-hi:     #c4b5fd;
-  --accent-dim:    #6d28d9;
-  --accent-soft:   rgba(139, 92, 246, 0.14);
-  --accent-glow:   rgba(124, 58, 237, 0.38);
+  --accent:        #6A45D9;
+  --accent-bright: #A48BFF;
+  --accent-hi:     #C9BAFF;
+  --accent-dim:    #5A38C4;
+  --accent-soft:   rgba(139, 108, 240, 0.14);
+  --accent-glow:   rgba(139, 108, 240, 0.38);
   --on-accent:     #ffffff;
-  --accent-grad:   linear-gradient(135deg, #6d28d9 0%, #8b5cf6 55%, #a855f7 100%);
+  --accent-grad:   linear-gradient(135deg, #5A38C4 0%, #6A45D9 50%, #8B6CF0 100%);
 
   /* ---- états */
   --ok:          #4ade80;
@@ -39,13 +39,16 @@
   --live:        #ef4444;
 
   /* ---- waveform */
-  --wave-idle:   #3b3152;
+  --wave-idle:   #3A2F4F;
   --wave-played: var(--accent-bright);
   --wave-cursor: #ffffff;
 
   /* ---- typographie */
   --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  /* identité : Bodoni Moda pour le logotype et les titres,
+     IBM Plex Mono pour les mentions et les libellés */
+  --display: "Bodoni Moda", Didot, "Bodoni 72", Georgia, serif;
+  --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
 
   --fs-xs:  12px;
   --fs-sm:  13px;

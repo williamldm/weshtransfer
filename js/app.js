@@ -1,20 +1,21 @@
 // Coquille de l'appli : démarrage, routeur à hash, en-tête, bus
 // d'événements, temps réel. Chaque vue est un module avec mount().
 
-import { restore, getSpace } from "./session.js?v=13";
-import { connectSpace } from "./realtime.js?v=13";
-import { bindPlayerBar } from "./player.js?v=13";
-import { activeCount, onUploads } from "./upload.js?v=13";
-import { openPeopleSheet } from "./views/people.js?v=13";
-import { openUploadSheet } from "./views/upload-sheet.js?v=13";
-import { icon } from "./icons.js?v=13";
-import { toast, errorText, esc } from "./ui.js?v=13";
+import { restore, getSpace, leaveSpace } from "./session.js?v=15";
+import { connectSpace } from "./realtime.js?v=15";
+import { bindPlayerBar } from "./player.js?v=15";
+import { activeCount, onUploads } from "./upload.js?v=15";
+import { openPeopleSheet } from "./views/people.js?v=15";
+import { openUploadSheet } from "./views/upload-sheet.js?v=15";
+import { icon } from "./icons.js?v=15";
+import { monogram } from "./brand.js?v=15";
+import { toast, errorText, esc } from "./ui.js?v=15";
 
-import * as home from "./views/home.js?v=13";
-import * as project from "./views/project.js?v=13";
-import * as file from "./views/file.js?v=13";
-import * as send from "./views/send.js?v=13";
-import * as transfers from "./views/transfers.js?v=13";
+import * as home from "./views/home.js?v=15";
+import * as project from "./views/project.js?v=15";
+import * as file from "./views/file.js?v=15";
+import * as send from "./views/send.js?v=15";
+import * as transfers from "./views/transfers.js?v=15";
 
 // L'accueil dépend du mode de l'espace : morceaux (séminaire) ou
 // directement le composeur d'envoi (espace dédié aux envois).
@@ -67,7 +68,7 @@ function setDrop(fn) {
 function drawHeader(isRoot) {
   header.innerHTML =
     (isRoot
-      ? '<a class="brand-dot" href="index.html" aria-label="Accueil WeshTransfer"></a>'
+      ? '<a class="brand-link" href="index.html" aria-label="Accueil WeshTransfer">' + monogram(28) + "</a>"
       : '<button class="btn btn-ghost btn-icon" data-back aria-label="Retour">' + icon("back") + "</button>") +
     '<div class="title" data-title></div>' +
     '<span class="up-pill" data-up hidden></span>' +
@@ -201,6 +202,9 @@ async function boot() {
 
   if (!space) {
     const saved = getSpace();
+    // espace disparu (purgé) ou session perdue : on l'oublie sur cet
+    // appareil ; s'il existe encore, le code pré-rempli permet d'y revenir
+    leaveSpace();
     location.replace("index.html" + (saved && saved.code ? "?c=" + encodeURIComponent(saved.code) : ""));
     return;
   }

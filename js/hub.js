@@ -2,8 +2,8 @@
 // Chaque action ouvre une petite feuille ; session.js n'est chargé qu'au
 // moment d'agir, la page reste légère.
 
-import { icon } from "./icons.js?v=13";
-import { esc, h, openSheet, errorText } from "./ui.js?v=13";
+import { icon } from "./icons.js?v=15";
+import { esc, h, openSheet, errorText } from "./ui.js?v=15";
 
 const PSEUDO_KEY = "seminaire.pseudo";
 
@@ -109,7 +109,7 @@ function open(kind, prefillCode) {
     btn.textContent = "Un instant...";
     try {
       try { localStorage.setItem(PSEUDO_KEY, pseudo); } catch (e2) { /* privé */ }
-      const session = await import("./session.js?v=13");
+      const session = await import("./session.js?v=15");
       if (kind === "join") await session.joinSpace(val("code"), pseudo);
       else if (kind === "salon") await session.createSpace(val("name"), "seminaire", pseudo);
       else await session.createSpace("Envois de " + pseudo, "envoi", pseudo);

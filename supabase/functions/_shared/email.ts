@@ -150,9 +150,9 @@ export function transferMail(input: TransferMailInput): { subject: string; html:
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f1fa;padding:24px 12px;">
 <tr><td align="center">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#ffffff;border-radius:14px;overflow:hidden;">
-    <tr><td style="background:#0b0911;background-image:linear-gradient(135deg,#1b1030 0%,#0b0911 70%);padding:20px 24px;">
-      <span style="font-size:15px;font-weight:700;color:#ffffff;letter-spacing:.02em;"><span style="color:#a78bfa;">&#9679;</span> WeshTransfer</span>
-      <span style="font-size:13px;color:#aba2bf;"> · ${esc(input.spaceName)}</span>
+    <tr><td style="background:#0D0A12;background-image:radial-gradient(60% 120% at 50% 0%,#1E1430 0%,#0D0A12 70%);padding:20px 24px;">
+      <span style="font-family:Bodoni Moda,Didot,Georgia,serif;font-size:22px;color:#EEE9F5;"><em style="color:#A48BFF;">Wesh</em>Transfer</span>
+      <span style="font-family:IBM Plex Mono,Menlo,monospace;font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:#8E84A3;"> · ${esc(input.spaceName)}</span>
     </td></tr>
     <tr><td style="padding:28px 24px 8px;">
       <p style="margin:0 0 6px;font-size:14px;color:#6c7484;"><strong style="color:#16181d;">${esc(input.sender)}</strong> t'a envoyé ${countLabel}</p>

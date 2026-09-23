@@ -5,16 +5,16 @@
 import {
   getProject, getFilesByIds, listSpaceFiles, createTransfer, sendTransfer, emailEnabled,
   getTransfer, transferUrl, createProject, signFiles, cachedUrl
-} from "../api.js?v=13";
-import { openUploadSheet } from "./upload-sheet.js?v=13";
-import { mountUploads } from "./uploads.js?v=13";
-import { onUploads, enqueue, checkFile } from "../upload.js?v=13";
-import { categoryOf, canPreview } from "../files.js?v=13";
-import { icon } from "../icons.js?v=13";
+} from "../api.js?v=15";
+import { openUploadSheet } from "./upload-sheet.js?v=15";
+import { mountUploads } from "./uploads.js?v=15";
+import { onUploads, enqueue, checkFile } from "../upload.js?v=15";
+import { categoryOf, canPreview } from "../files.js?v=15";
+import { icon } from "../icons.js?v=15";
 import {
   esc, h, formatBytes, formatDuration, plural, toast, errorText, openSheet, copyText, shareLink,
   canShare, formatDate, daysLeft, fileBadge, fileTile
-} from "../ui.js?v=13";
+} from "../ui.js?v=15";
 
 // Dans un espace "envoi", ce composeur EST l'accueil.
 export const title = (ctx) => (ctx && ctx.space.mode === "envoi" ? ctx.space.name : "Envoyer");
