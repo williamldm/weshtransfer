@@ -1,28 +1,40 @@
 // Accueil de l'espace : gros boutons d'action, uploads en cours, morceaux
 // triés par activité récente.
 
-import { listProjects, createProject, listOpenComments, deleteProject, deleteFile } from "../api.js?v=31";
-import { mountUploads } from "./uploads.js?v=31";
-import { openUploadSheet } from "./upload-sheet.js?v=31";
-import { openPeopleSheet } from "./people.js?v=31";
-import { icon } from "../icons.js?v=31";
-import { esc, h, kindBadge, timeAgo, plural, promptSheet, toast, errorText, daysLeft, formatDate, actionSheet, confirmSheet } from "../ui.js?v=31";
+import { listProjects, createProject, listReviewComments, deleteProject, deleteFile } from "../api.js?v=32";
+import { stateOf, isEngineerOf } from "./review.js?v=32";
+import { mountUploads } from "./uploads.js?v=32";
+import { openUploadSheet } from "./upload-sheet.js?v=32";
+import { openPeopleSheet } from "./people.js?v=32";
+import { icon } from "../icons.js?v=32";
+import { esc, h, kindBadge, timeAgo, plural, promptSheet, toast, errorText, daysLeft, formatDate, actionSheet, confirmSheet } from "../ui.js?v=32";
 
 export const title = (ctx) => ctx.space.name;
 
-// Espace de retours : où en est chaque mix (dernière version validée,
-// corrections encore ouvertes, ou en attente d'écoute).
-function reviewStatus(files, openByFile) {
+// Espace de retours : où en est chaque mix, vu par l'ingé ou par
+// l'artiste (ce que CHACUN a à faire).
+function reviewStatus(files, stats, engineer) {
   const latest = files.slice().sort((a, b) => b.version_no - a.version_no)[0];
   if (!latest) return "";
-  const open = files.reduce((sum, f) => sum + (openByFile.get(f.id) || 0), 0);
-  if (latest.approved_at) return '<span class="status is-ok">' + icon("check", 14) + " v" + latest.version_no + " validée</span>";
-  if (open) return '<span class="status is-todo">' + plural(open, "retour à corriger", "retours à corriger") + "</span>";
-  return '<span class="status">v' + latest.version_no + " en attente d'écoute</span>";
+  const v = "v" + latest.version_no;
+  let open = 0, verify = 0, any = 0;
+  for (const f of files) {
+    const s = stats.get(f.id);
+    if (s) { open += s.open; verify += s.verify; any += s.all; }
+  }
+  if (latest.approved_at) return '<span class="status is-ok">' + icon("check", 14) + " " + v + " validée</span>";
+  if (engineer) {
+    if (open) return '<span class="status is-todo">' + plural(open, "retour à corriger", "retours à corriger") + "</span>";
+    if (verify) return '<span class="status">' + v + " · " + plural(verify, "correction", "corrections") + " chez l'artiste</span>";
+    return '<span class="status">' + v + " · en attente de l'artiste</span>";
+  }
+  if (verify) return '<span class="status is-todo">' + icon("check", 14) + " " + plural(verify, "correction à vérifier", "corrections à vérifier") + "</span>";
+  if (open) return '<span class="status">' + plural(open, "retour", "retours") + " chez l'ingé</span>";
+  return '<span class="status is-todo">' + v + (any ? " à valider" : " à écouter") + "</span>";
 }
 
-export function renderProjects(projects, openByFile, canEdit) {
-  const review = !!openByFile;
+export function renderProjects(projects, stats, canEdit, space) {
+  const review = !!stats;
   if (!projects.length) {
     return '<div class="empty-state">' + icon(review ? "check" : "music", 36) +
       (review
@@ -37,7 +49,7 @@ export function renderProjects(projects, openByFile, canEdit) {
         '<div class="row"><span class="name">' + esc(p.title) + "</span>" +
         '<span class="count">v' + (files.reduce((m, f) => Math.max(m, f.version_no), 0) || 0) + "</span></div>" +
         '<div class="meta">' + esc(timeAgo(p.last_activity_at)) + "</div>" +
-        '<div class="kinds">' + reviewStatus(files, openByFile) + "</div>" +
+        '<div class="kinds">' + reviewStatus(files, stats, isEngineerOf(space, files)) + "</div>" +
       "</a>" + menu + "</div>";
     }
     const kinds = [...new Set(files.map((f) => f.kind))];
@@ -73,13 +85,19 @@ export async function mount(root, ctx) {
     (review && !s.isHost
       ? '<p class="review-hint">' + icon("comment", 18) + "<span>Écoute les mix, mets le son en pause là où quelque chose cloche, et écris ton retour : il sera accroché à la seconde près.</span></p>"
       : "") +
+    // En retours de mix, l'artiste n'a rien à déposer en priorité : il
+    // écoute. Ses actions passent au second plan (une référence à envoyer).
     '<div class="hero-actions">' +
-      '<label class="btn btn-primary btn-xl">' + icon("upload", 22) + "<span>" + (review ? "Déposer un mix" : "Ajouter des sons") + "</span>" +
-        '<input type="file" multiple hidden data-pick>' +
-      "</label>" +
-      (review
-        ? '<button class="btn btn-xl" data-invite>' + icon("share", 22) + "<span>Inviter l'artiste</span></button>"
-        : '<a class="btn btn-xl" href="#/send">' + icon("send", 22) + "<span>Envoyer par email</span></a>") +
+      (review && !s.isHost
+        ? '<label class="btn btn-xl">' + icon("upload", 22) + "<span>Envoyer une référence</span>" +
+            '<input type="file" multiple hidden data-pick></label>' +
+          '<button class="btn btn-xl" data-invite>' + icon("share", 22) + "<span>Inviter quelqu'un</span></button>"
+        : '<label class="btn btn-primary btn-xl">' + icon("upload", 22) + "<span>" + (review ? "Déposer un mix" : "Ajouter des sons") + "</span>" +
+            '<input type="file" multiple hidden data-pick>' +
+          "</label>" +
+          (review
+            ? '<button class="btn btn-xl" data-invite>' + icon("share", 22) + "<span>Inviter l'artiste</span></button>"
+            : '<a class="btn btn-xl" href="#/send">' + icon("send", 22) + "<span>Envoyer par email</span></a>")) +
     "</div>" +
 
     '<div data-uploads hidden></div>' +
@@ -136,11 +154,17 @@ export async function mount(root, ctx) {
     loading = true;
     try {
       if (review) {
-        const [projects, open] = await Promise.all([listProjects(s.id), listOpenComments(s.id)]);
-        const byFile = new Map();
-        for (const c of open) byFile.set(c.file_id, (byFile.get(c.file_id) || 0) + 1);
+        const [projects, all] = await Promise.all([listProjects(s.id), listReviewComments(s.id)]);
+        const stats = new Map();
+        for (const c of all) {
+          const st = stats.get(c.file_id) || { open: 0, verify: 0, all: 0 };
+          const k = stateOf(c);
+          if (k !== "done") st[k]++;
+          st.all++;
+          stats.set(c.file_id, st);
+        }
         lastProjects = projects;
-        list.innerHTML = renderProjects(projects, byFile, canEdit);
+        list.innerHTML = renderProjects(projects, stats, canEdit, s);
       } else {
         lastProjects = await listProjects(s.id);
         list.innerHTML = renderProjects(lastProjects, null, canEdit);

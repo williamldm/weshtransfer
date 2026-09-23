@@ -1,7 +1,7 @@
 // Accès aux données. Toutes les requêtes de l'appli passent par ici : les
 // vues ne connaissent ni PostgREST ni le Storage.
 
-import { sb, q, invoke, requireClient } from "./db.js?v=31";
+import { sb, q, invoke, requireClient } from "./db.js?v=32";
 
 // Toute requête passe par ici : sans config, message clair plutôt
 // qu'un "Cannot read properties of null".
@@ -11,7 +11,7 @@ const db = () => requireClient();
 
 export function listProjects(spaceId) {
   return q(db().from("projects")
-    .select("id, title, bpm, musical_key, last_activity_at, created_at, created_by, creator:participants(pseudo), files(id, kind, status, version_no, approved_at, original_name, mime_type)")
+    .select("id, title, bpm, musical_key, last_activity_at, created_at, created_by, creator:participants(pseudo), files(id, kind, status, version_no, approved_at, original_name, mime_type, uploaded_by)")
     .eq("space_id", spaceId)
     .eq("archived", false)
     .order("last_activity_at", { ascending: false }));
@@ -23,8 +23,8 @@ export function getProject(id) {
       creator:participants(pseudo),
       files(id, version_no, label, kind, status, storage_path, original_name, mime_type,
             size_bytes, duration_sec, bpm, musical_key, peaks, created_at, uploaded_by,
-            approved_at, approved_by,
-            uploader:participants(id, pseudo), comments(id, resolved_at))`)
+            approved_at, approved_by, changelog,
+            uploader:participants(id, pseudo), comments(id, parent_id, resolved_at, resolved_in, verified_at))`)
     .eq("id", id)
     .order("version_no", { referencedTable: "files", ascending: false })
     .maybeSingle());
@@ -51,17 +51,19 @@ export function getFile(id) {
   return q(db().from("files")
     .select(`id, space_id, project_id, version_no, label, kind, status, storage_path,
       original_name, mime_type, size_bytes, duration_sec, bpm, musical_key, peaks,
-      created_at, uploaded_by, approved_at, approved_by,
+      created_at, uploaded_by, approved_at, approved_by, changelog,
       uploader:participants(id, pseudo),
       project:projects(id, title, files(id, version_no, label, kind, status, storage_path,
-        original_name, mime_type, duration_sec, approved_at))`)
+        original_name, mime_type, duration_sec, approved_at, uploaded_by))`)
     .eq("id", id)
     .maybeSingle());
 }
 
+const COMMENT_COLS = "id, file_id, parent_id, body, at_ms, tag, created_at, resolved_at, resolved_by, resolved_in, resolution_note, verified_at, verified_by, author_id, author:participants(id, pseudo)";
+
 export function listComments(fileId) {
   return q(db().from("comments")
-    .select("id, file_id, body, at_ms, created_at, resolved_at, resolved_by, author_id, author:participants(id, pseudo)")
+    .select(COMMENT_COLS)
     .eq("file_id", fileId)
     .order("created_at", { ascending: true }));
 }
@@ -71,30 +73,43 @@ export function listComments(fileId) {
 export function listCommentsOf(fileIds) {
   if (!fileIds.length) return Promise.resolve([]);
   return q(db().from("comments")
-    .select("id, file_id, body, at_ms, created_at, resolved_at, resolved_by, author_id, author:participants(id, pseudo)")
+    .select(COMMENT_COLS)
     .in("file_id", fileIds)
     .order("at_ms", { ascending: true, nullsFirst: false }));
 }
 
-// Retours encore ouverts dans tout l'espace, pour l'accueil.
-export function listOpenComments(spaceId) {
+// Retours (hors réponses) de tout l'espace, pour les statuts de l'accueil.
+export function listReviewComments(spaceId) {
   return q(db().from("comments")
-    .select("id, file_id")
+    .select("id, file_id, resolved_at, verified_at")
     .eq("space_id", spaceId)
-    .is("resolved_at", null));
+    .is("parent_id", null));
 }
 
-export function setCommentResolved(id, resolved) {
-  return q(db().rpc("set_comment_resolved", { p_comment: id, p_resolved: !!resolved }));
+// L'ingé coche "corrigé" : dans quelle version (fileId), avec quelle note.
+export function setCommentResolved(id, resolved, fileId, note) {
+  return q(db().rpc("set_comment_resolved", {
+    p_comment: id, p_resolved: !!resolved, p_file: fileId || null, p_note: note || null
+  }));
+}
+
+// L'artiste confirme une correction, ou la rouvre en expliquant.
+export function setCommentVerified(id, ok, reason) {
+  return q(db().rpc("set_comment_verified", { p_comment: id, p_ok: !!ok, p_reason: reason || null }));
+}
+
+export function isEngineer(projectId) {
+  return q(db().rpc("is_engineer", { p_project: projectId }));
 }
 
 export function setFileApproved(id, approved) {
   return q(db().rpc("set_file_approved", { p_file: id, p_approved: !!approved }));
 }
 
-export function addComment(fileId, body, atMs) {
+export function addComment(fileId, body, atMs, extra) {
+  const e = extra || {};
   return q(db().from("comments")
-    .insert({ file_id: fileId, body: body.trim().slice(0, 1000), at_ms: atMs })
+    .insert({ file_id: fileId, body: body.trim().slice(0, 1000), at_ms: atMs, tag: e.tag || null, parent_id: e.parentId || null })
     .select("id")
     .single());
 }

@@ -1,9 +1,9 @@
 // Feuille "Participants" : qui est là, inviter, réglages du host.
 
-import { listParticipants, updateSpace, deleteSpace } from "../api.js?v=31";
-import { icon } from "../icons.js?v=31";
-import { esc, h, openSheet, avatar, shareLink, copyText, toast, errorText, formatDate, confirmSheet, canShare } from "../ui.js?v=31";
-import { leaveSpace, knownSpaces, switchTo, forgetSpace } from "../session.js?v=31";
+import { listParticipants, updateSpace, deleteSpace } from "../api.js?v=32";
+import { icon } from "../icons.js?v=32";
+import { esc, h, openSheet, avatar, shareLink, copyText, toast, errorText, formatDate, confirmSheet, canShare } from "../ui.js?v=32";
+import { leaveSpace, knownSpaces, switchTo, forgetSpace } from "../session.js?v=32";
 
 export function inviteUrl(code) {
   return new URL("index.html?c=" + encodeURIComponent(code), location.href).href;

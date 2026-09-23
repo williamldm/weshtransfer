@@ -1,15 +1,16 @@
 // Écoute d'une version : grande waveform, transport, commentaires
 // horodatés façon SoundCloud ("à 1:23, la voix sature").
 
-import { getFile, listComments, listCommentsOf, addComment, deleteComment, setCommentResolved, setFileApproved, signFiles, cachedUrl, cachedDownload, deleteFile, updateFile } from "../api.js?v=31";
-import { Waveform, formatTime } from "../waveform.js?v=31";
-import { play, toggle, isCurrent, onPlayer, seekRatio, seekSeconds, skip, state as playerState, trackFromFile } from "../player.js?v=31";
-import { icon } from "../icons.js?v=31";
-import { isAudio, canPreview, categoryOf } from "../files.js?v=31";
+import { getFile, listComments, addComment, deleteComment, signFiles, cachedUrl, cachedDownload, deleteFile, updateFile } from "../api.js?v=32";
+import { createReview } from "./review.js?v=32";
+import { Waveform, formatTime } from "../waveform.js?v=32";
+import { play, toggle, isCurrent, onPlayer, seekRatio, seekSeconds, skip, state as playerState, trackFromFile } from "../player.js?v=32";
+import { icon } from "../icons.js?v=32";
+import { isAudio, canPreview, categoryOf } from "../files.js?v=32";
 import {
   esc, h, fileBadge, fileTile, timeAgo, formatBytes, avatar, toast, errorText, triggerDownload, plural,
   confirmSheet, actionSheet, KINDS, openSheet
-} from "../ui.js?v=31";
+} from "../ui.js?v=32";
 
 export const title = () => "Écoute";
 
@@ -20,42 +21,27 @@ const byTime = (a, b) => {
   return a.at_ms - b.at_ms;
 };
 
-// opts.review : mode retours de mix (case "corrigé", état barré)
-// opts.version : étiquette de version à afficher (retours d'une autre version)
-export function renderComment(c, me, isHost, opts) {
-  const o = opts || {};
+// Commentaire d'un salon. Les retours de mix ont leur propre rendu
+// (review.js) : états, corrections, réponses.
+export function renderComment(c, me, isHost) {
   const mine = c.author_id === me;
-  const done = !!c.resolved_at;
-  return '<li class="comment' + (done ? " is-done" : "") + '" data-id="' + c.id + '">' +
-    (o.review
-      ? '<button class="c-check" data-resolve aria-pressed="' + done + '" aria-label="' + (done ? "Rouvrir" : "Marquer comme corrigé") + '">' + icon("check", 16) + "</button>"
-      : avatar(c.author ? c.author.pseudo : "?")) +
+  return '<li class="comment" data-id="' + c.id + '">' +
+    avatar(c.author ? c.author.pseudo : "?") +
     '<div class="c-body">' +
       '<div class="c-head">' +
-        (o.version ? '<span class="vtag">' + esc(o.version) + "</span>" : "") +
         "<strong>" + esc(c.author ? c.author.pseudo : "?") + "</strong>" +
         (c.at_ms != null ? '<button class="ts" data-at="' + c.at_ms + '">' + formatTime(c.at_ms / 1000) + "</button>" : "") +
         '<span class="muted">' + timeAgo(c.created_at) + "</span></div>" +
       '<p class="c-text">' + esc(c.body) + "</p>" +
-      (done ? '<p class="c-done">' + icon("check", 12) + " Corrigé" + (c.resolved_by ? " par " + esc(c.resolved_by) : "") + " " + timeAgo(c.resolved_at) + "</p>" : "") +
     "</div>" +
     (mine || isHost ? '<button class="btn btn-ghost btn-icon btn-sm" data-del aria-label="Supprimer">' + icon("trash", 16) + "</button>" : "") +
   "</li>";
 }
 
-export function renderComments(comments, me, isHost, opts) {
-  const o = opts || {};
-  const filter = o.review ? (o.filter || "open") : "all";
-  const shown = comments
-    .filter((c) => filter === "all" || (filter === "open" ? !c.resolved_at : !!c.resolved_at))
-    .sort(byTime);
-  if (!shown.length) {
-    const empty = !comments.length
-      ? (o.review ? "Pas encore de retour. Mets le son en pause là où quelque chose cloche, et écris." : "Pas encore de commentaire. Mets le son en pause au bon endroit et écris.")
-      : filter === "open" ? "Tout est corrigé sur cette version." : "Rien de corrigé pour l'instant.";
-    return '<li class="comment-empty">' + empty + "</li>";
-  }
-  return shown.map((c) => renderComment(c, me, isHost, o)).join("");
+export function renderComments(comments, me, isHost) {
+  const shown = comments.filter((c) => !c.parent_id).sort(byTime);
+  if (!shown.length) return '<li class="comment-empty">Pas encore de commentaire. Mets le son en pause au bon endroit et écris.</li>';
+  return shown.map((c) => renderComment(c, me, isHost)).join("");
 }
 
 export function renderFileShell(file, space) {
@@ -101,41 +87,28 @@ export function renderFileShell(file, space) {
             '<button class="btn btn-ghost btn-icon" data-fwd aria-label="Avancer de 10 secondes">' + icon("fwd10", 22) + "</button>" +
             '<span class="mono t-dur" data-dur>' + formatTime(Number(file.duration_sec) || 0) + "</span>" +
           "</div>" +
+          (review ? '<button class="btn btn-block rv-note-here" data-note-here>' + icon("comment", 18) + ' <span>Noter un retour à <b data-note-at>0:00</b></span></button>' : "") +
         "</section>") +
-
-    (review
-      ? '<div class="approve' + (file.approved_at ? " is-on" : "") + '">' +
-          (file.approved_at
-            ? '<div class="approve-text">' + icon("check", 18) + "<span><strong>Mix validé</strong>" +
-                (file.approved_by ? " par " + esc(file.approved_by) : "") + " · " + timeAgo(file.approved_at) + "</span></div>" +
-              '<button class="btn btn-ghost btn-sm" data-approve>Retirer</button>'
-            : '<button class="btn btn-primary btn-block" data-approve>' + icon("check", 18) + "<span>Valider ce mix</span></button>") +
-        "</div>"
-      : "") +
     '<div class="actions-row">' +
       '<button class="btn" data-dl>' + icon("download", 18) + "<span>Télécharger</span></button>" +
       '<a class="btn" href="#/send?f=' + file.id + '">' + icon("send", 18) + "<span>Envoyer</span></a>" +
       (mine || space.isHost ? '<button class="btn btn-ghost btn-icon" data-more aria-label="Plus">' + icon("more") + "</button>" : "") +
     "</div>" +
 
-    '<section class="comments">' +
-      (review
-        ? '<div class="section-head"><h2>Retours</h2><div class="chips" data-filters>' +
-            '<button type="button" class="chip is-on" data-filter="open">À corriger <span class="count" data-n-open>0</span></button>' +
-            '<button type="button" class="chip" data-filter="done">Corrigés <span class="count" data-n-done>0</span></button>' +
-          "</div></div>"
-        : '<div class="section-head"><h2>Commentaires <span class="count" data-ccount>0</span></h2></div>') +
-      '<form class="comment-form" data-form>' +
-        '<textarea class="input" name="body" rows="2" maxlength="1000" placeholder="' + (review ? "Ex : la voix est trop en arrière ici" : "Ex : la voix est trop en avant ici") + '"></textarea>' +
-        '<div class="row">' +
-          (!audio ? "" : '<button type="button" class="chip chip-time is-on" data-timechip>' + icon("clock", 14) + ' <span>à 0:00</span></button>') +
-          '<span class="spacer"></span>' +
-          '<button class="btn btn-primary btn-sm" type="submit">Publier</button>' +
-        "</div>" +
-      "</form>" +
-      '<ul class="comment-list" data-comments></ul>' +
-      (review ? '<section class="carry" data-carry hidden></section>' : "") +
-    "</section>"
+    (review
+      ? '<div data-review-root></div>'
+      : '<section class="comments">' +
+          '<div class="section-head"><h2>Commentaires <span class="count" data-ccount>0</span></h2></div>' +
+          '<form class="comment-form" data-form>' +
+            '<textarea class="input" name="body" rows="2" maxlength="1000" placeholder="Ex : la voix est trop en avant ici"></textarea>' +
+            '<div class="row">' +
+              (!audio ? "" : '<button type="button" class="chip chip-time is-on" data-timechip>' + icon("clock", 14) + ' <span>à 0:00</span></button>') +
+              '<span class="spacer"></span>' +
+              '<button class="btn btn-primary btn-sm" type="submit">Publier</button>' +
+            "</div>" +
+          "</form>" +
+          '<ul class="comment-list" data-comments></ul>' +
+        "</section>")
   );
 }
 
@@ -146,8 +119,8 @@ export async function mount(root, ctx, params) {
   let wave = null;
   let useTime = true;
   const review = ctx.space.mode === "revue";
-  let filter = "open";
-  let earlier = [];   // retours encore ouverts sur les versions précédentes
+  let rv = null;        // retours de mix (review.js)
+  let markers = [];
 
   root.innerHTML = '<div class="skeleton tall"></div>';
 
@@ -187,47 +160,44 @@ export async function mount(root, ctx, params) {
       if (isCurrent(file.id)) wave.setProgress(playerState().ratio);
     }
 
+    if (review) {
+      rv = createReview({
+        el: root.querySelector("[data-review-root]"),
+        ctx,
+        currentMs,
+        playAt,
+        setMarkers: (list) => { markers = list; applyMarkers(); }
+      });
+      rv.setFile(file);
+    }
+
     bind();
     syncTransport(playerState());
   }
 
-  function drawComments() {
-    const me = ctx.space.participantId;
-    root.querySelector("[data-comments]").innerHTML = renderComments(comments, me, ctx.space.isHost, { review, filter });
-    if (review) {
-      root.querySelector("[data-n-open]").textContent = comments.filter((c) => !c.resolved_at).length;
-      root.querySelector("[data-n-done]").textContent = comments.filter((c) => c.resolved_at).length;
-      for (const b of root.querySelectorAll("[data-filter]")) b.classList.toggle("is-on", b.dataset.filter === filter);
-      drawEarlier();
-    } else {
-      root.querySelector("[data-ccount]").textContent = comments.length;
-    }
-    if (wave) {
-      // en retours de mix, seuls les points encore à corriger sont marqués
-      const marked = comments.filter((c) => c.at_ms != null && (!review || !c.resolved_at));
-      wave.setMarkers(marked.map((c) => ({ atMs: c.at_ms })), durationSec() * 1000);
-    }
+  function applyMarkers() {
+    if (wave) wave.setMarkers(markers, durationSec() * 1000);
   }
 
-  // Ce qui a été demandé sur la v2 et pas encore coché, affiché sur la v3 :
-  // un tap sur l'horodatage lit CETTE version au même endroit pour vérifier.
-  function drawEarlier() {
-    const el = root.querySelector("[data-carry]");
-    if (!el) return;
-    const open = earlier.filter((c) => !c.resolved_at).sort((a, b) => (a.at_ms ?? 1e12) - (b.at_ms ?? 1e12));
-    el.hidden = !open.length;
-    if (!open.length) { el.innerHTML = ""; return; }
-    const versionOf = new Map(((file.project && file.project.files) || []).map((v) => [v.id, "v" + v.version_no]));
-    el.innerHTML =
-      '<div class="carry-head">' + icon("retry", 16) + "<span>" +
-        plural(open.length, "retour encore ouvert", "retours encore ouverts") + " sur les versions précédentes. " +
-        "Touche l'horodatage pour vérifier sur la v" + file.version_no + ".</span></div>" +
-      '<ul class="comment-list">' +
-        open.map((c) => renderComment(c, ctx.space.participantId, ctx.space.isHost, { review: true, version: versionOf.get(c.file_id) })).join("") +
-      "</ul>";
+  // Lire CETTE version à un instant donné (vérifier une correction)
+  function playAt(sec) {
+    if (isCurrent(file.id)) { seekSeconds(sec); if (!playerState().playing) toggle(); }
+    else play(track(), { at: sec });
+  }
+
+  function drawComments() {
+    if (review) return;
+    const me = ctx.space.participantId;
+    root.querySelector("[data-comments]").innerHTML = renderComments(comments, me, ctx.space.isHost);
+    root.querySelector("[data-ccount]").textContent = comments.filter((c) => !c.parent_id).length;
+    markers = comments.filter((c) => c.at_ms != null).map((c) => ({ atMs: c.at_ms }));
+    applyMarkers();
   }
 
   function syncTimeChip(ms) {
+    const at = root.querySelector("[data-note-at]");
+    if (at) at.textContent = formatTime((ms != null ? ms : currentMs()) / 1000);
+    if (rv) rv.syncTime(ms);
     const chip = root.querySelector("[data-timechip]");
     if (!chip) return;
     chip.querySelector("span").textContent = "à " + formatTime((ms != null ? ms : currentMs()) / 1000);
@@ -279,11 +249,19 @@ export async function mount(root, ctx, params) {
       ]);
     }
 
+    const noteHere = root.querySelector("[data-note-here]");
+    if (noteHere) {
+      noteHere.onclick = () => {
+        if (isCurrent(file.id) && playerState().playing) toggle();   // pause : on écrit sur ce moment
+        rv.focusComposer();
+      };
+    }
+
     const chip = root.querySelector("[data-timechip]");
     if (chip) chip.onclick = () => { useTime = !useTime; syncTimeChip(); };
 
     const form = root.querySelector("[data-form]");
-    form.addEventListener("submit", async (e) => {
+    if (form) form.addEventListener("submit", async (e) => {
       e.preventDefault();
       const ta = form.querySelector("textarea");
       const body = ta.value.trim();
@@ -301,7 +279,7 @@ export async function mount(root, ctx, params) {
     });
 
     // Entrée = publier (Maj+Entrée = retour à la ligne), pratique au clavier
-    form.querySelector("textarea").addEventListener("keydown", (e) => {
+    if (form) form.querySelector("textarea").addEventListener("keydown", (e) => {
       if (e.key === "Enter" && !e.shiftKey && !e.isComposing && window.matchMedia("(pointer: fine)").matches) {
         e.preventDefault();
         form.requestSubmit();
@@ -327,52 +305,16 @@ export async function mount(root, ctx, params) {
       });
     }
 
-    for (const b of root.querySelectorAll("[data-filter]")) {
-      b.onclick = () => { filter = b.dataset.filter; drawComments(); };
-    }
-
-    const approve = root.querySelector("[data-approve]");
-    if (approve) {
-      approve.onclick = async () => {
-        approve.disabled = true;
-        try {
-          await setFileApproved(file.id, !file.approved_at);
-          if (!file.approved_at) toast("Mix validé. L'ingé son le voit tout de suite.", "ok");
-          await load();
-        } catch (err) { toast(errorText(err), "err"); approve.disabled = false; }
-      };
-    }
-
-    root.querySelector(".comments").addEventListener("click", async (e) => {
-      const check = e.target.closest("[data-resolve]");
-      if (check) {
-        const cid = check.closest(".comment").dataset.id;
-        const c = comments.concat(earlier).find((x) => x.id === cid);
-        if (!c) return;
-        const done = !c.resolved_at;
-        c.resolved_at = done ? new Date().toISOString() : null;   // affichage immédiat
-        c.resolved_by = done ? ctx.space.pseudo : null;
-        drawComments();
-        try { await setCommentResolved(cid, done); }
-        catch (err) { toast(errorText(err), "err"); await reloadComments(); }
-      }
-    });
-
-    root.querySelector(".comments").addEventListener("click", async (e) => {
+    const commentsEl = root.querySelector(".comments");
+    if (commentsEl) commentsEl.addEventListener("click", async (e) => {
       const ts = e.target.closest("[data-at]");
-      if (ts) {
-        const sec = Number(ts.dataset.at) / 1000;
-        if (isCurrent(file.id)) { seekSeconds(sec); if (!playerState().playing) toggle(); }
-        else play(track(), { at: sec });
-        return;
-      }
+      if (ts) { playAt(Number(ts.dataset.at) / 1000); return; }
       const del = e.target.closest("[data-del]");
       if (del) {
         const li = del.closest(".comment");
         try {
           await deleteComment(li.dataset.id);
           comments = comments.filter((c) => c.id !== li.dataset.id);
-          earlier = earlier.filter((c) => c.id !== li.dataset.id);
           drawComments();
         } catch (err) { toast(errorText(err), "err"); }
       }
@@ -380,12 +322,8 @@ export async function mount(root, ctx, params) {
   }
 
   async function reloadComments() {
+    if (rv) return rv.reload();
     comments = await listComments(id);
-    if (review) {
-      const earlierIds = ((file.project && file.project.files) || [])
-        .filter((v) => v.version_no < file.version_no).map((v) => v.id);
-      earlier = earlierIds.length ? await listCommentsOf(earlierIds) : [];
-    }
     drawComments();
   }
 
@@ -414,12 +352,7 @@ export async function mount(root, ctx, params) {
 
   async function load() {
     try {
-      [file, comments] = await Promise.all([getFile(id), listComments(id)]);
-      if (file && review) {
-        const earlierIds = ((file.project && file.project.files) || [])
-          .filter((v) => v.version_no < file.version_no && v.status === "ready").map((v) => v.id);
-        earlier = earlierIds.length ? await listCommentsOf(earlierIds) : [];
-      }
+      [file, comments] = await Promise.all([getFile(id), review ? [] : listComments(id)]);
     } catch (err) {
       root.innerHTML = '<p class="empty">' + esc(errorText(err)) + "</p>";
       return;
@@ -435,6 +368,7 @@ export async function mount(root, ctx, params) {
     if (wave) { wave.destroy(); wave = null; }
     drawShell();
     drawComments();
+    if (rv) await rv.reload().catch((err) => toast(errorText(err), "err"));
     ctx.setTitle(file.project ? file.project.title : "Écoute");
     if (file.project) ctx.setBack("#/p/" + file.project.id);
   }
@@ -444,8 +378,9 @@ export async function mount(root, ctx, params) {
     if (wave) wave.setProgress(isCurrent(file.id) ? s.ratio : 0);
     syncTransport(s);
     if (type === "time" && useTime) syncTimeChip();
-    if (type === "time" && wave && isCurrent(file.id) && s.duration && wave.markers.length === 0 && comments.some((c) => c.at_ms != null)) {
-      drawComments();
+    // durée connue seulement à la lecture : on replace les marqueurs
+    if (type === "time" && wave && isCurrent(file.id) && s.duration && wave.markers.length === 0 && markers.length) {
+      applyMarkers();
     }
   });
 

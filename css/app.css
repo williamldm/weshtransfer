@@ -1,5 +1,5 @@
-@import url("fonts.css?v=31");
-@import url("tokens.css?v=31");
+@import url("fonts.css?v=32");
+@import url("tokens.css?v=32");
 
 /* ================================================================= base */
 *, *::before, *::after { box-sizing: border-box; }
@@ -818,3 +818,57 @@ body.public .scene { position: fixed; inset: 0; z-index: -1; }
 .waybill dt { color: var(--text-faint); text-transform: uppercase; letter-spacing: .06em; }
 .waybill dd { margin: 0; color: var(--text); text-align: right; overflow-wrap: anywhere; }
 .wb-foot { margin: var(--sp-2) 0 0; color: var(--text-faint); }
+
+/* ------------------------------------------------ retours de mix (v2) */
+.rv { margin-top: var(--sp-4); }
+.rv-note-here { margin-top: var(--sp-3); }
+.rv-note-here b { font-family: var(--mono); font-weight: 500; color: var(--accent-hi); }
+
+.rv-card { margin-bottom: var(--sp-4); padding: var(--sp-4); border: 1px solid var(--line-strong); border-radius: var(--r-md); background: var(--surface); }
+.rv-card-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--sp-2); margin-bottom: var(--sp-3); }
+.rv-card-head .eyebrow { margin: 0; }
+.rv-news { border-color: var(--accent-bright); }
+.rv-news .btn { margin-top: var(--sp-3); }
+.rv-changelog-text { margin: 0; white-space: pre-wrap; line-height: 1.55; }
+.rv-changelog { margin: 0; }
+.rv-summary { display: flex; flex-wrap: wrap; gap: var(--sp-2); font-size: var(--fs-xs); font-family: var(--mono); }
+.rv-summary .st { padding: 2px 8px; border: 1px solid var(--line-strong); border-radius: 99px; color: var(--text-dim); }
+.rv-summary .st-open { border-color: var(--warn); color: var(--warn); }
+.rv-summary .st-ok { border-color: var(--ok); color: var(--ok); }
+.sheet-intro { margin: 0 0 var(--sp-3); padding-left: var(--sp-3); border-left: 2px solid var(--line-strong); }
+
+.rv-compose { margin-bottom: var(--sp-4); }
+.rv-compose-head { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-2); margin-bottom: var(--sp-2); }
+.rv-tags { margin-top: var(--sp-2); }
+.rv-tags .chip { padding: 4px 10px; font-size: var(--fs-xs); }
+.rv-compose .row .hint { margin: 0; }
+.rv-head { align-items: center; }
+.rv-tools { display: flex; gap: 4px; }
+.rv-filters { margin-bottom: var(--sp-2); }
+
+.rv-item { border-left: 3px solid var(--line-strong); padding-left: var(--sp-3); }
+.rv-item.is-open { border-left-color: var(--warn); }
+.rv-item.is-verify { border-left-color: var(--accent-bright); }
+.rv-item.is-done { border-left-color: var(--ok); }
+.rv-item.is-done .c-text { color: var(--text-dim); }
+.rv-state { font-family: var(--mono); font-size: var(--fs-xs); letter-spacing: .04em; text-transform: uppercase; }
+.rv-item.is-open .rv-state { color: var(--warn); }
+.rv-item.is-verify .rv-state { color: var(--accent-bright); }
+.rv-item.is-done .rv-state { color: var(--ok); }
+.rv-tag { padding: 1px 7px; border-radius: 99px; background: var(--surface-3); color: var(--text-dim); font-size: var(--fs-xs); }
+.c-by { margin: 2px 0 0; font-size: var(--fs-xs); }
+.rv-fix { display: flex; gap: var(--sp-2); margin-top: var(--sp-2); padding: var(--sp-2) var(--sp-3); border-radius: var(--r-sm); background: var(--surface-2); color: var(--text-dim); font-size: var(--fs-sm); }
+.rv-fix > .ic { flex: none; margin-top: 3px; color: var(--accent-bright); }
+.rv-fix strong { color: var(--text); font-weight: 600; }
+.rv-note { margin: 4px 0 0; color: var(--text); white-space: pre-wrap; }
+.rv-ok { margin: 4px 0 0; color: var(--ok); }
+.rv-replies { margin: var(--sp-2) 0 0; padding: 0 0 0 var(--sp-3); list-style: none; border-left: 1px solid var(--line-strong); font-size: var(--fs-sm); }
+.rv-replies li { padding: 3px 0; overflow-wrap: anywhere; }
+.rv-replies .muted { font-size: var(--fs-xs); }
+.rv-del-reply { padding: 0 2px; border: none; background: none; color: var(--text-faint); cursor: pointer; vertical-align: middle; }
+.rv-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: var(--sp-2); }
+.rv-reply { display: flex; gap: 6px; margin-top: var(--sp-2); }
+.rv-reply[hidden] { display: none; }
+.rv-reply .input { flex: 1; min-height: 36px; }
+.ccount.is-ok { color: var(--ok); }
+.version-note { margin: 6px 0 0; color: var(--text-dim); font-size: var(--fs-sm); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
