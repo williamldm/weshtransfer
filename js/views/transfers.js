@@ -1,12 +1,12 @@
 // Historique des envois de l'espace : qui a reçu quoi, qui a ouvert,
 // qui a téléchargé. Mis à jour en direct.
 
-import { listTransfers, revokeTransfer, deleteTransfer, sendTransfer, transferUrl, emailEnabled } from "../api.js?v=21";
-import { icon } from "../icons.js?v=21";
+import { listTransfers, revokeTransfer, deleteTransfer, sendTransfer, transferUrl, emailEnabled, deleteFile, listTransferRefs } from "../api.js?v=24";
+import { icon } from "../icons.js?v=24";
 import {
   esc, formatBytes, plural, timeAgo, formatDate, daysLeft, toast, errorText, copyText, shareLink,
   canShare, confirmSheet, actionSheet
-} from "../ui.js?v=21";
+} from "../ui.js?v=24";
 
 export const title = () => "Envois";
 
@@ -56,7 +56,7 @@ export function renderTransfers(list, me, isHost, emailOn) {
           (mine && failed && emailOn ? '<button class="btn btn-sm" data-retry>' + icon("retry", 16) + " Renvoyer</button>" : "") +
           (mine || isHost ? '<button class="btn btn-ghost btn-icon btn-sm" data-more aria-label="Plus">' + icon("more", 18) + "</button>" : "") +
         "</div>") +
-      (expired && (mine || isHost) ? '<div class="tr-actions"><button class="btn btn-ghost btn-sm" data-delete>' + icon("trash", 16) + " Retirer de la liste</button></div>" : "") +
+      (expired && (mine || isHost) ? '<div class="tr-actions"><button class="btn btn-ghost btn-sm" data-delete>' + icon("trash", 16) + " Supprimer</button></div>" : "") +
     "</article>";
   }).join("");
 }
@@ -101,11 +101,15 @@ export async function mount(root, ctx) {
         load();
       } catch (err) { toast(errorText(err), "err"); }
     } else if (e.target.closest("[data-delete]")) {
-      try { await deleteTransfer(t.id); load(); } catch (err) { toast(errorText(err), "err"); }
+      removeTransfer(t);
     } else if (e.target.closest("[data-more]")) {
       actionSheet(t.title, [
         {
-          label: "Désactiver le lien maintenant", icon: "lock", danger: true,
+          label: ctx.space.mode === "envoi" ? "Supprimer l'envoi et ses fichiers" : "Supprimer l'envoi", icon: "trash", danger: true,
+          run: () => removeTransfer(t)
+        },
+        {
+          label: "Désactiver le lien maintenant", icon: "lock",
           run: async () => {
             const ok = await confirmSheet("Plus personne ne pourra ouvrir cet envoi, y compris les destinataires email.", { ok: "Désactiver", danger: true });
             if (!ok) return;
@@ -116,6 +120,28 @@ export async function mount(root, ctx) {
       ]);
     }
   });
+
+  // Dans un espace d'envoi, les fichiers n'existent que pour l'envoi : on
+  // les efface avec lui, sauf s'ils servent encore à un autre envoi.
+  async function removeTransfer(t) {
+    const withFiles = ctx.space.mode === "envoi";
+    const ok = await confirmSheet(
+      withFiles
+        ? "Le lien ne marchera plus, et les fichiers de cet envoi seront effacés."
+        : "Le lien ne marchera plus. Les fichiers restent dans l'espace.",
+      { ok: "Supprimer", danger: true, title: "Supprimer cet envoi" });
+    if (!ok) return;
+    try {
+      const fileIds = (t.transfer_files || []).map((x) => x.file && x.file.id).filter(Boolean);
+      await deleteTransfer(t.id);
+      if (withFiles && fileIds.length) {
+        const stillUsed = new Set((await listTransferRefs(fileIds)).map((r) => r.file_id));
+        for (const id of fileIds) if (!stillUsed.has(id)) await deleteFile({ id }).catch(() => {});
+      }
+      toast("Envoi supprimé", "ok");
+      load();
+    } catch (err) { toast(errorText(err), "err"); }
+  }
 
   let timer = 0;
   const off = ctx.bus.on("db", (e) => {

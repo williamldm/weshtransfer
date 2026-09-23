@@ -13,6 +13,7 @@
 // POST { action: "upload-abort", key, upload_id }
 // POST { action: "sign", file_ids: [...] }
 // POST { action: "delete", file_id }
+// POST { action: "delete-space", space_id }   (host uniquement)
 
 import { admin, asUser, callerId } from "../_shared/supabase.ts";
 import { json, preflight, readJson } from "../_shared/http.ts";
@@ -20,6 +21,7 @@ import {
   abortMultipart, b2Config, completeMultipart, createMultipart, deletePrefix,
   listParts, presignGet, presignPart,
 } from "../_shared/b2.ts";
+import { wipeSpace } from "../_shared/wipe.ts";
 
 const PART_SIZE = 16 * 1024 * 1024;   // compromis 4G : une partie ratée coûte peu à renvoyer
 const GET_TTL = 6 * 3600;
@@ -181,6 +183,18 @@ Deno.serve(async (req) => {
         await service.storage.from("seminar").remove([row.storage_path]);
       }
       return json({ ok: true });
+    }
+
+    // ---------------------------------------- suppression d'un espace
+    if (action === "delete-space") {
+      const spaceId = String(body.space_id ?? "");
+      if (!UUID.test(spaceId)) return json({ error: "REQUETE_INVALIDE" }, 400);
+      // seul le host : vérifié avec la session de l'appelant
+      const { data: me } = await db.from("participants")
+        .select("id, is_host").eq("space_id", spaceId).eq("user_id", uid).maybeSingle();
+      if (!me || !me.is_host) return json({ error: "SEUL_LE_HOST" }, 403);
+      const files = await wipeSpace(service, spaceId);
+      return json({ ok: true, files });
     }
 
     return json({ error: "ACTION_INCONNUE" }, 400);

@@ -1,7 +1,7 @@
 // Session anonyme + appartenance à un espace. Aucun compte : l'appareil
 // reçoit un utilisateur anonyme Supabase, puis rejoint un espace via son code.
 
-import { sb, q, requireClient } from "./db.js?v=21";
+import { sb, q, requireClient } from "./db.js?v=24";
 
 const SPACE_KEY = "seminaire.space";      // espace actif
 const KNOWN_KEY = "seminaire.spaces";     // tous les espaces rejoints sur cet appareil
@@ -26,7 +26,7 @@ export function knownSpaces() {
 
 function remember(space) {
   const list = knownSpaces().filter((s) => s.id !== space.id);
-  list.unshift({ id: space.id, name: space.name, code: space.code, mode: space.mode });
+  list.unshift({ id: space.id, name: space.name, code: space.code, mode: space.mode, isHost: !!space.isHost });
   write(KNOWN_KEY, list.slice(0, 10));
 }
 
@@ -39,6 +39,15 @@ export function switchTo(id) {
   const target = knownSpaces().find((s) => s.id === id);
   if (target) write(SPACE_KEY, target);
   return !!target;
+}
+
+// Oublie un espace sur cet appareil (sans rien supprimer côté serveur).
+export function forgetSpace(id) {
+  write(KNOWN_KEY, knownSpaces().filter((s) => s.id !== id));
+  const current = getSpace();
+  if (current && current.id === id) {
+    try { localStorage.removeItem(SPACE_KEY); } catch (err) { /* privé */ }
+  }
 }
 
 export function leaveSpace() {

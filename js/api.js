@@ -1,7 +1,7 @@
 // Accès aux données. Toutes les requêtes de l'appli passent par ici : les
 // vues ne connaissent ni PostgREST ni le Storage.
 
-import { sb, q, invoke, requireClient } from "./db.js?v=21";
+import { sb, q, invoke, requireClient } from "./db.js?v=24";
 
 // Toute requête passe par ici : sans config, message clair plutôt
 // qu'un "Cannot read properties of null".
@@ -11,7 +11,7 @@ const db = () => requireClient();
 
 export function listProjects(spaceId) {
   return q(db().from("projects")
-    .select("id, title, bpm, musical_key, last_activity_at, created_at, creator:participants(pseudo), files(id, kind, status, version_no, approved_at, original_name, mime_type)")
+    .select("id, title, bpm, musical_key, last_activity_at, created_at, created_by, creator:participants(pseudo), files(id, kind, status, version_no, approved_at, original_name, mime_type)")
     .eq("space_id", spaceId)
     .eq("archived", false)
     .order("last_activity_at", { ascending: false }));
@@ -187,6 +187,11 @@ export function deleteFile(file) {
   return invoke("storage", { action: "delete", file_id: file.id });
 }
 
+// Efface un espace entier, fichiers compris (host uniquement).
+export function deleteSpace(spaceId) {
+  return invoke("storage", { action: "delete-space", space_id: spaceId });
+}
+
 export function storageCall(action, params) {
   return invoke("storage", Object.assign({ action }, params || {}));
 }
@@ -244,6 +249,11 @@ export function listTransfers(spaceId) {
 
 export function getTransfer(id) {
   return q(db().from("transfers").select(TRANSFER_COLS).eq("id", id).maybeSingle());
+}
+
+// Fichiers encore utilisés par un envoi (après suppression d'un autre).
+export function listTransferRefs(fileIds) {
+  return q(db().from("transfer_files").select("file_id").in("file_id", fileIds));
 }
 
 export function revokeTransfer(id) {

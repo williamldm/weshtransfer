@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Banc d'essai des vues</title>
-<link rel="stylesheet" href="../css/app.css?v=21">
+<link rel="stylesheet" href="../css/app.css?v=24">
 <style>
   .dev-nav { position: sticky; top: 0; z-index: 99; display: flex; gap: 6px; overflow-x: auto; padding: 8px; background: #000; border-bottom: 1px solid #333; }
   .dev-nav a { flex: none; padding: 4px 10px; border-radius: 99px; background: #222; color: #ccc; font-size: 12px; }
@@ -22,16 +22,16 @@
 <div class="toast-wrap" id="toasts"></div>
 
 <script type="module">
-import { renderProjects } from "../js/views/home.js?v=21";
-import { renderVersion } from "../js/views/project.js?v=21";
-import { renderFileShell, renderComments } from "../js/views/file.js?v=21";
-import { renderTransfers } from "../js/views/transfers.js?v=21";
-import { renderJob } from "../js/views/uploads.js?v=21";
-import * as send from "../js/views/send.js?v=21";
-import { openPeopleSheet } from "../js/views/people.js?v=21";
-import { openUploadSheet } from "../js/views/upload-sheet.js?v=21";
-import { Waveform } from "../js/waveform.js?v=21";
-import { icon } from "../js/icons.js?v=21";
+import { renderProjects } from "../js/views/home.js?v=24";
+import { renderVersion } from "../js/views/project.js?v=24";
+import { renderFileShell, renderComments } from "../js/views/file.js?v=24";
+import { renderTransfers } from "../js/views/transfers.js?v=24";
+import { renderJob } from "../js/views/uploads.js?v=24";
+import * as send from "../js/views/send.js?v=24";
+import { openPeopleSheet } from "../js/views/people.js?v=24";
+import { openUploadSheet } from "../js/views/upload-sheet.js?v=24";
+import { Waveform } from "../js/waveform.js?v=24";
+import { icon } from "../js/icons.js?v=24";
 
 const view = document.getElementById("view");
 const ago = (min) => new Date(Date.now() - min * 60000).toISOString();
@@ -58,7 +58,7 @@ const ctx = {
   space, online: new Set(["p1", "p2", "p3"]),
   bus: { on: () => () => {}, emit() {} },
   navigate: (h) => { location.hash = h.replace("#/", "#"); },
-  setTitle() {}, setBack() {}
+  setTitle() {}, setBack() {}, setDrop() {}
 };
 
 document.getElementById("header").innerHTML =

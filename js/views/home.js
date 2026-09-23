@@ -1,12 +1,12 @@
 // Accueil de l'espace : gros boutons d'action, uploads en cours, morceaux
 // triés par activité récente.
 
-import { listProjects, createProject, listOpenComments } from "../api.js?v=21";
-import { mountUploads } from "./uploads.js?v=21";
-import { openUploadSheet } from "./upload-sheet.js?v=21";
-import { openPeopleSheet } from "./people.js?v=21";
-import { icon } from "../icons.js?v=21";
-import { esc, h, kindBadge, timeAgo, plural, promptSheet, toast, errorText, daysLeft, formatDate } from "../ui.js?v=21";
+import { listProjects, createProject, listOpenComments, deleteProject, deleteFile } from "../api.js?v=24";
+import { mountUploads } from "./uploads.js?v=24";
+import { openUploadSheet } from "./upload-sheet.js?v=24";
+import { openPeopleSheet } from "./people.js?v=24";
+import { icon } from "../icons.js?v=24";
+import { esc, h, kindBadge, timeAgo, plural, promptSheet, toast, errorText, daysLeft, formatDate, actionSheet, confirmSheet } from "../ui.js?v=24";
 
 export const title = (ctx) => ctx.space.name;
 
@@ -21,7 +21,7 @@ function reviewStatus(files, openByFile) {
   return '<span class="status">v' + latest.version_no + " en attente d'écoute</span>";
 }
 
-export function renderProjects(projects, openByFile) {
+export function renderProjects(projects, openByFile, canEdit) {
   const review = !!openByFile;
   if (!projects.length) {
     return '<div class="empty-state">' + icon(review ? "check" : "music", 36) +
@@ -31,13 +31,14 @@ export function renderProjects(projects, openByFile) {
   }
   return projects.map((p) => {
     const files = (p.files || []).filter((f) => f.status === "ready");
+    const menu = canEdit && canEdit(p) ? '<button class="btn btn-ghost btn-icon btn-sm row-menu" data-project-menu="' + p.id + '" aria-label="Options">' + icon("more", 18) + "</button>" : "";
     if (review) {
-      return '<a class="project" href="#/p/' + p.id + '">' +
+      return '<div class="project-row"><a class="project" href="#/p/' + p.id + '">' +
         '<div class="row"><span class="name">' + esc(p.title) + "</span>" +
         '<span class="count">v' + (files.reduce((m, f) => Math.max(m, f.version_no), 0) || 0) + "</span></div>" +
         '<div class="meta">' + esc(timeAgo(p.last_activity_at)) + "</div>" +
         '<div class="kinds">' + reviewStatus(files, openByFile) + "</div>" +
-      "</a>";
+      "</a>" + menu + "</div>";
     }
     const kinds = [...new Set(files.map((f) => f.kind))];
     const bits = [
@@ -46,12 +47,12 @@ export function renderProjects(projects, openByFile) {
       p.bpm ? p.bpm + " BPM" : "",
       p.musical_key || ""
     ].filter(Boolean);
-    return '<a class="project" href="#/p/' + p.id + '">' +
+    return '<div class="project-row"><a class="project" href="#/p/' + p.id + '">' +
       '<div class="row"><span class="name">' + esc(p.title) + "</span>" +
       '<span class="count">' + files.length + "</span></div>" +
       '<div class="meta">' + esc(bits.join(" · ")) + "</div>" +
       (kinds.length ? '<div class="kinds">' + kinds.map(kindBadge).join("") + "</div>" : "") +
-    "</a>";
+    "</a>" + menu + "</div>";
   }).join("");
 }
 
@@ -101,6 +102,33 @@ export async function mount(root, ctx) {
       (left != null ? ' · <span title="' + esc(formatDate(s.purgeAt)) + '">fichiers supprimés dans ' + plural(left, "jour", "jours") + "</span>" : "");
   };
 
+  let lastProjects = [];
+  // supprimer : l'auteur du morceau ou le host
+  const canEdit = (p) => p.created_by === s.participantId || s.isHost;
+
+  list.addEventListener("click", (e) => {
+    const b = e.target.closest("[data-project-menu]");
+    if (!b) return;
+    const p = lastProjects.find((x) => x.id === b.dataset.projectMenu);
+    if (!p) return;
+    actionSheet(p.title, [
+      {
+        label: review ? "Supprimer ce mix et toutes ses versions" : "Supprimer le morceau et ses versions", icon: "trash", danger: true,
+        run: async () => {
+          const ok = await confirmSheet("Toutes les versions, leurs fichiers et leurs commentaires seront effacés.",
+            { ok: "Supprimer", danger: true, title: "Supprimer " + p.title });
+          if (!ok) return;
+          try {
+            for (const f of p.files || []) await deleteFile({ id: f.id }).catch(() => {});
+            await deleteProject(p.id);
+            toast(p.title + " supprimé", "ok");
+            load();
+          } catch (err) { toast(errorText(err), "err"); }
+        }
+      }
+    ]);
+  });
+
   let loading = false;
   let again = false;
   const load = async () => {
@@ -111,9 +139,11 @@ export async function mount(root, ctx) {
         const [projects, open] = await Promise.all([listProjects(s.id), listOpenComments(s.id)]);
         const byFile = new Map();
         for (const c of open) byFile.set(c.file_id, (byFile.get(c.file_id) || 0) + 1);
-        list.innerHTML = renderProjects(projects, byFile);
+        lastProjects = projects;
+        list.innerHTML = renderProjects(projects, byFile, canEdit);
       } else {
-        list.innerHTML = renderProjects(await listProjects(s.id));
+        lastProjects = await listProjects(s.id);
+        list.innerHTML = renderProjects(lastProjects, null, canEdit);
       }
     } catch (err) {
       list.innerHTML = '<p class="empty">' + esc(errorText(err)) + "</p>";

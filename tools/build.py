@@ -11,7 +11,7 @@ shutil.rmtree(out, ignore_errors=True)
 out.mkdir()
 for name in ["index.html", "app.html", "t.html"]:
     shutil.copy2(root / name, out / name)
-for d in ["css", "js", "fonts"]:
+for d in ["css", "js", "fonts", "img"]:
     shutil.copytree(root / d, out / d)
 n = sum(1 for p in out.rglob("*") if p.is_file())
 print(f"_deploy prêt : {n} fichiers. Glisse le dossier sur Netlify (onglet Deploys).")

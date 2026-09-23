@@ -1,9 +1,9 @@
 // Feuille "Participants" : qui est là, inviter, réglages du host.
 
-import { listParticipants, updateSpace } from "../api.js?v=21";
-import { icon } from "../icons.js?v=21";
-import { esc, h, openSheet, avatar, shareLink, copyText, toast, errorText, formatDate, confirmSheet, canShare } from "../ui.js?v=21";
-import { leaveSpace, knownSpaces, switchTo } from "../session.js?v=21";
+import { listParticipants, updateSpace, deleteSpace } from "../api.js?v=24";
+import { icon } from "../icons.js?v=24";
+import { esc, h, openSheet, avatar, shareLink, copyText, toast, errorText, formatDate, confirmSheet, canShare } from "../ui.js?v=24";
+import { leaveSpace, knownSpaces, switchTo, forgetSpace } from "../session.js?v=24";
 
 export function inviteUrl(code) {
   return new URL("index.html?c=" + encodeURIComponent(code), location.href).href;
@@ -94,13 +94,26 @@ export async function openPeopleSheet(ctx) {
         '<button class="btn btn-sm" data-lock>' + icon("lock", 16) + (s.isLocked ? " Rouvrir" : " Fermer") + "</button></div>" +
       '<div class="setting"><div><strong>Suppression des fichiers</strong>' +
         '<div class="muted">' + esc(s.purgeAt ? formatDate(s.purgeAt) : "") + "</div></div>" +
-        '<button class="btn btn-sm" data-extend>+7 jours</button></div>';
+        '<button class="btn btn-sm" data-extend>+7 jours</button></div>' +
+      '<div class="setting"><div><strong>Supprimer l\'espace</strong>' +
+        '<div class="muted">Fichiers, envois et commentaires, pour tout le monde. Définitif.</div></div>' +
+        '<button class="btn btn-sm btn-danger" data-destroy>Supprimer</button></div>';
 
     host.querySelector("[data-lock]").onclick = async () => {
       try {
         const row = await updateSpace(s.id, { is_locked: !s.isLocked });
         s.isLocked = row.is_locked;
         drawHost();
+      } catch (err) { toast(errorText(err), "err"); }
+    };
+    host.querySelector("[data-destroy]").onclick = async () => {
+      const ok = await confirmSheet(s.name + " sera effacé pour tout le monde : fichiers, envois, commentaires. C'est définitif.",
+        { ok: "Tout supprimer", danger: true, title: "Supprimer l'espace" });
+      if (!ok) return;
+      try {
+        await deleteSpace(s.id);
+        forgetSpace(s.id);
+        location.href = "index.html";
       } catch (err) { toast(errorText(err), "err"); }
     };
     host.querySelector("[data-extend]").onclick = async () => {

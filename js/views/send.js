@@ -5,16 +5,17 @@
 import {
   getProject, getFilesByIds, listSpaceFiles, createTransfer, sendTransfer, emailEnabled,
   getTransfer, transferUrl, createProject, signFiles, cachedUrl
-} from "../api.js?v=21";
-import { openUploadSheet } from "./upload-sheet.js?v=21";
-import { mountUploads } from "./uploads.js?v=21";
-import { onUploads, enqueue, checkFile } from "../upload.js?v=21";
-import { categoryOf, canPreview } from "../files.js?v=21";
-import { icon } from "../icons.js?v=21";
+} from "../api.js?v=24";
+import { openUploadSheet } from "./upload-sheet.js?v=24";
+import { mountUploads } from "./uploads.js?v=24";
+import { onUploads, enqueue, checkFile } from "../upload.js?v=24";
+import { categoryOf, canPreview } from "../files.js?v=24";
+import { takePending } from "../pending.js?v=24";
+import { icon } from "../icons.js?v=24";
 import {
   esc, h, formatBytes, formatDuration, plural, toast, errorText, openSheet, copyText, shareLink,
   canShare, formatDate, daysLeft, fileBadge, fileTile
-} from "../ui.js?v=21";
+} from "../ui.js?v=24";
 
 // Dans un espace "envoi", ce composeur EST l'accueil.
 export const title = (ctx) => (ctx && ctx.space.mode === "envoi" ? ctx.space.name : "Envoyer");
@@ -433,6 +434,18 @@ export async function mount(root, ctx, params) {
 
   drawFiles();
   drawChips();
+
+  // Fichiers déposés sur l'accueil : l'upload démarre tout seul ici.
+  if (envoiMode) {
+    takePending().then((files) => { if (files.length) addDirect(files); });
+    const readd = sessionStorage.getItem("seminaire.readd");
+    if (readd) {
+      sessionStorage.removeItem("seminaire.readd");
+      toast(readd === "lourd"
+        ? "Tes fichiers étaient trop lourds pour être gardés en route : ajoute-les ici."
+        : "Ajoute tes fichiers ici pour les envoyer.", "err");
+    }
+  }
 
   return () => { offUploads(); offJobs(); };
 }
