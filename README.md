@@ -1,4 +1,6 @@
-# Séminaire
+# WeshTransfer
+
+En ligne : https://weshtransfer.fr
 
 Partage de sons pour un groupe en résidence : un espace, un code, des blazes,
 des morceaux avec leurs versions, des commentaires horodatés sur la waveform,
@@ -35,8 +37,8 @@ est stocké (`files.backend`).
 Mise en place (interface web B2) :
 
 1. **Bucket** : Create a Bucket, fichiers **privés**, Object Lock désactivé.
-2. **CORS** (Bucket Settings > CORS Rules) : partager avec toutes les
-   origines, pour l'API **compatible S3**. Ça autorise le navigateur à envoyer
+2. **CORS** (Bucket Settings > CORS Rules) : partager avec une seule
+   origine HTTPS, `https://weshtransfer.fr`, pour l'API **compatible S3**. Ça autorise le navigateur à envoyer
    et lire via URL signée ; les fichiers restent privés.
 3. **Lifecycle** : garder uniquement la dernière version (filet de
    sécurité : l'appli supprime déjà toutes les versions elle-même).
@@ -78,7 +80,11 @@ Mise en place (interface web B2) :
 
 5. **Emails** (facultatif, sinon mode lien) : compte Resend + domaine vérifié.
 
-       supabase secrets set RESEND_API_KEY=re_... MAIL_FROM="Séminaire <envoi@domaine.fr>" SITE_URL=https://adresse-du-site
+       supabase secrets set RESEND_API_KEY=re_... MAIL_FROM="WeshTransfer <envoi@weshtransfer.fr>" SITE_URL=https://weshtransfer.fr
+
+   Resend demande d'ajouter quelques enregistrements DNS (DKIM, SPF d'un
+   sous-domaine d'envoi) : ils se posent dans la zone DNS chez o2switch, sans
+   toucher à la messagerie existante du domaine.
 
 6. **Purge quotidienne** : un même secret, jamais versionné, à deux endroits :
 
@@ -104,8 +110,25 @@ Mise en place (interface web B2) :
   typographiques dans le code).
 - `python3 tools/bump.py` : incrémente `?v=N` partout, à chaque mise en ligne.
 
-À déployer : `index.html`, `app.html`, `t.html`, `css/`, `js/`. Pas `dev/`,
-`tools/` ni `supabase/`.
+## Mise en ligne
+
+Hébergement : o2switch (Apache), domaine `weshtransfer.fr`.
+
+    python3 tools/build.py
+
+prépare `_deploy/` : les trois pages, `css/`, `js/`, `fonts/`, `img/`,
+`robots.txt` et `.htaccess`. C'est **le contenu** de ce dossier qui va à la
+racine du site (`public_html` ou le dossier du domaine), `.htaccess` compris
+(fichier caché : l'afficher dans le gestionnaire de fichiers).
+
+Le `.htaccess` force le HTTPS (l'appli en a besoin), renvoie `www` vers le
+domaine nu, et ne sert que les fichiers publics : si le dépôt entier se
+retrouve en ligne, `dev/`, `tools/`, `supabase/` et ce README répondent 404.
+Il faut un certificat valide avant de le déposer (cPanel > SSL/TLS Status >
+Run AutoSSL), sinon le site bascule sur une alerte de sécurité.
+
+Netlify (`netlify.toml`) reste possible pour une copie de test : même
+`_deploy`, mêmes en-têtes.
 
 ## Sécurité
 

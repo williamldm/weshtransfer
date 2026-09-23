@@ -1,0 +1,5 @@
+# Seul l'accueil a vocation à être trouvé. app.html et t.html portent déjà
+# noindex : on les laisse lisibles pour que les robots voient cette consigne
+# (un Disallow la leur cacherait).
+User-agent: *
+Allow: /
