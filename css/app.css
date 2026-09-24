@@ -1,5 +1,5 @@
-@import url("fonts.css?v=38");
-@import url("tokens.css?v=38");
+@import url("fonts.css?v=39");
+@import url("tokens.css?v=39");
 
 /* ================================================================= base */
 *, *::before, *::after { box-sizing: border-box; }
@@ -941,3 +941,22 @@ body.app .app-header { view-transition-name: topbar; }
 .check-line input { flex: none; width: 18px; height: 18px; margin-top: 2px; accent-color: var(--accent); }
 .check-line small { display: block; color: var(--text-faint); font-size: var(--fs-xs); }
 .setting-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
+
+/* ------------------------------------------ retours : points visibles */
+.wave-lg.has-pins { height: 128px; }
+.rv-item { border-left: none; padding-left: 0; }
+.rv-num { display: inline-flex; flex: none; align-items: center; justify-content: center; width: 28px; height: 28px; margin-top: 2px; padding: 0; border: none; border-radius: 50%; background: var(--c); color: #0E0B14; font: 700 13px/1 var(--font); cursor: pointer; }
+.rv-num.is-none { width: 10px; height: 10px; margin: 9px 9px 0; cursor: default; }
+.rv-item.is-done .rv-num { opacity: .55; }
+.rv-item.is-now { margin: 0 calc(-1 * var(--sp-3)); padding: var(--sp-3); border-radius: var(--r-md); background: var(--accent-soft); box-shadow: inset 0 0 0 1px rgba(164, 139, 255, .35); }
+.rv-item.is-now .rv-num { box-shadow: 0 0 0 3px rgba(255, 255, 255, .85); }
+.rv-progress { margin: 0 0 var(--sp-3); }
+.rv-bar { display: flex; gap: 2px; height: 8px; overflow: hidden; border-radius: 99px; background: var(--surface-3); }
+.rv-bar i { display: block; min-width: 6px; }
+.rv-bar-text { margin: 6px 0 0; color: var(--text-dim); font-size: var(--fs-sm); }
+.rv-bar-text strong { color: var(--text); font-weight: 600; }
+.rv-flush { margin: 0 0 var(--sp-4); }
+.rv-notify { display: flex; align-items: center; gap: var(--sp-3); margin-bottom: var(--sp-4); padding: var(--sp-3) var(--sp-4); border: 1px dashed var(--line-strong); border-radius: var(--r-md); color: var(--text-dim); font-size: var(--fs-sm); }
+.rv-notify > .ic { color: var(--accent-bright); }
+.rv-notify > span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.rv-notify strong { color: var(--text); font-weight: 500; }

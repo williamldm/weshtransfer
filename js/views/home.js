@@ -1,13 +1,14 @@
 // Accueil de l'espace : gros boutons d'action, uploads en cours, morceaux
 // triés par activité récente.
 
-import { listProjects, createProject, listReviewComments, deleteProject, deleteFile } from "../api.js?v=38";
-import { stateOf, isEngineerOf } from "./review.js?v=38";
-import { mountUploads } from "./uploads.js?v=38";
-import { openUploadSheet } from "./upload-sheet.js?v=38";
-import { openPeopleSheet } from "./people.js?v=38";
-import { icon } from "../icons.js?v=38";
-import { esc, h, kindBadge, timeAgo, plural, promptSheet, toast, errorText, daysLeft, formatDate, actionSheet, confirmSheet } from "../ui.js?v=38";
+import { listProjects, createProject, listReviewComments, deleteProject, deleteFile, reviewNotifyStatus, reviewSubscribe, reviewUnsubscribe } from "../api.js?v=39";
+import { ensureVerified } from "./send.js?v=39";
+import { stateOf, isEngineerOf } from "./review.js?v=39";
+import { mountUploads } from "./uploads.js?v=39";
+import { openUploadSheet } from "./upload-sheet.js?v=39";
+import { openPeopleSheet } from "./people.js?v=39";
+import { icon } from "../icons.js?v=39";
+import { esc, h, kindBadge, timeAgo, plural, promptSheet, toast, errorText, daysLeft, formatDate, actionSheet, confirmSheet } from "../ui.js?v=39";
 
 export const title = (ctx) => ctx.space.name;
 
@@ -89,6 +90,7 @@ export async function mount(root, ctx) {
       : "") +
     // En retours de mix, l'artiste n'a rien à déposer en priorité : il
     // écoute. Ses actions passent au second plan (une référence à envoyer).
+    (review && s.isHost ? '<div class="rv-notify" data-rv-notify hidden></div>' : "") +
     '<div class="hero-actions">' +
       (review && !s.isHost
         ? '<label class="btn btn-xl">' + icon("upload", 22) + "<span>Envoyer une référence</span>" +
@@ -196,6 +198,40 @@ export async function mount(root, ctx) {
       toast(errorText(err), "err");
     }
   };
+
+  // Ingé : être prévenu par email quand l'artiste a fait ses retours
+  const notify = root.querySelector("[data-rv-notify]");
+  const drawNotify = (email) => {
+    notify.hidden = false;
+    notify.innerHTML = email
+      ? icon("mail", 18) + '<span>Prévenu par email quand l\'artiste a fait ses retours : <strong>' + esc(email) + "</strong></span>" +
+        '<button class="btn btn-ghost btn-sm" data-notify-off>Couper</button>'
+      : icon("mail", 18) + "<span>Être prévenu par email quand l'artiste a fait ses retours</span>" +
+        '<button class="btn btn-sm" data-notify-on>Activer</button>';
+  };
+  if (notify) {
+    reviewNotifyStatus(s.id).then((r) => drawNotify(r && r.email)).catch(() => {});
+    notify.addEventListener("click", async (e) => {
+      if (e.target.closest("[data-notify-off]")) {
+        try { await reviewUnsubscribe(s.id); drawNotify(null); toast("Plus d'emails pour cet espace", "ok"); }
+        catch (err) { toast(errorText(err), "err"); }
+        return;
+      }
+      if (!e.target.closest("[data-notify-on]")) return;
+      let remembered = "";
+      try { remembered = localStorage.getItem("seminaire.replyTo") || ""; } catch (err) { /* privé */ }
+      const email = ((await promptSheet("Ton email", remembered, { max: 254, ok: "Continuer" })) || "").toLowerCase();
+      if (!email) return;
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { toast("Adresse invalide", "err"); return; }
+      if (await ensureVerified(email, { optional: false }) !== "ok") return;
+      try {
+        const r = await reviewSubscribe(s.id, email);
+        try { localStorage.setItem("seminaire.replyTo", email); } catch (err) { /* privé */ }
+        drawNotify(r.email);
+        toast("Un email récapitulatif partira quand l'artiste aura fini ses retours", "ok");
+      } catch (err) { toast(errorText(err), "err"); }
+    });
+  }
 
   const offUploads = mountUploads(root.querySelector("[data-uploads]"));
   const offDb = ctx.bus.on("db", (e) => {

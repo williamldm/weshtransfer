@@ -11,7 +11,7 @@
 
 import { smtpConfig, smtpSendAll, type SmtpConfig } from "./smtp.ts";
 export {
-  esc, formatBytes, formatDate, typeLabel, transferMail, verifyCodeMail, downloadNoticeMail, inviteMail,
+  esc, formatBytes, formatDate, typeLabel, transferMail, verifyCodeMail, downloadNoticeMail, inviteMail, reviewDigestMail,
 } from "./mail-templates.js";
 
 export type Sender = { name?: string; email: string };

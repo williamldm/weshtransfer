@@ -1,16 +1,16 @@
 // Écoute d'une version : grande waveform, transport, commentaires
 // horodatés façon SoundCloud ("à 1:23, la voix sature").
 
-import { getFile, listComments, addComment, deleteComment, signFiles, cachedUrl, cachedDownload, deleteFile, updateFile } from "../api.js?v=38";
-import { createReview } from "./review.js?v=38";
-import { Waveform, formatTime } from "../waveform.js?v=38";
-import { play, toggle, isCurrent, onPlayer, seekRatio, seekSeconds, skip, state as playerState, trackFromFile } from "../player.js?v=38";
-import { icon } from "../icons.js?v=38";
-import { isAudio, canPreview, categoryOf } from "../files.js?v=38";
+import { getFile, listComments, addComment, deleteComment, signFiles, cachedUrl, cachedDownload, deleteFile, updateFile } from "../api.js?v=39";
+import { createReview } from "./review.js?v=39";
+import { Waveform, formatTime } from "../waveform.js?v=39";
+import { play, toggle, isCurrent, onPlayer, seekRatio, seekSeconds, skip, state as playerState, trackFromFile } from "../player.js?v=39";
+import { icon } from "../icons.js?v=39";
+import { isAudio, canPreview, categoryOf } from "../files.js?v=39";
 import {
   esc, h, fileBadge, fileTile, timeAgo, formatBytes, avatar, toast, errorText, triggerDownload, plural,
   confirmSheet, actionSheet, KINDS, openSheet
-} from "../ui.js?v=38";
+} from "../ui.js?v=39";
 
 export const title = () => "Écoute";
 
@@ -79,7 +79,7 @@ export function renderFileShell(file, space) {
           : '<div class="player-card zip-card">' + fileTile(file.original_name, file.mime_type) +
               "<p>Pas d'aperçu pour ce type de fichier : télécharge-le.</p></div>")
       : '<section class="player-card">' +
-          '<div class="wave wave-lg"><canvas></canvas></div>' +
+          '<div class="wave wave-lg' + (review ? " has-pins" : "") + '"><canvas></canvas></div>' +
           '<div class="transport">' +
             '<span class="mono t-time" data-time>0:00</span>' +
             '<button class="btn btn-ghost btn-icon" data-back aria-label="Reculer de 10 secondes">' + icon("back10", 22) + "</button>" +
@@ -147,6 +147,7 @@ export async function mount(root, ctx, params) {
         idleColor: cs.getPropertyValue("--wave-idle").trim(),
         playedColor: cs.getPropertyValue("--wave-played").trim() || "#a78bfa",
         markerColor: cs.getPropertyValue("--accent-hi").trim() || "#c4b5fd",
+        onMarker: (m) => { if (rv) rv.focusMarker(m); },
         onSeek: (ratio, done) => {
           if (!isCurrent(file.id)) {
             if (done) play(track(), { at: ratio * durationSec() });
@@ -378,6 +379,7 @@ export async function mount(root, ctx, params) {
     if (wave) wave.setProgress(isCurrent(file.id) ? s.ratio : 0);
     syncTransport(s);
     if (type === "time" && useTime) syncTimeChip();
+    if (type === "time" && rv && isCurrent(file.id)) rv.onPlayback(currentMs());
     // durée connue seulement à la lecture : on replace les marqueurs
     if (type === "time" && wave && isCurrent(file.id) && s.duration && wave.markers.length === 0 && markers.length) {
       applyMarkers();

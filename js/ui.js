@@ -1,7 +1,7 @@
 // Briques d'interface partagées : DOM, messages, formatage, feuilles.
 
-import { icon } from "./icons.js?v=38";
-import { CATEGORY, categoryOf, extOf } from "./files.js?v=38";
+import { icon } from "./icons.js?v=39";
+import { CATEGORY, categoryOf, extOf } from "./files.js?v=39";
 
 // ------------------------------------------------------------------ DOM
 
@@ -62,6 +62,11 @@ const ERRORS = {
   PAS_TON_ENVOI: "Seul l'expéditeur peut faire ça.",
   EMAIL_EXPEDITEUR_REQUIS: "Donne ton email pour envoyer par email.",
   EMAIL_NON_VERIFIE: "Ton email n'est pas encore vérifié.",
+  RESERVE_INGE: "Réservé à l'ingé son de cet espace.",
+  RESERVE_ARTISTE: "C'est à l'artiste de confirmer cette correction.",
+  VALIDATION_ARTISTE: "C'est à l'artiste de valider le mix, pas à celui qui l'a déposé.",
+  PAS_CORRIGE: "Ce retour n'a pas encore été corrigé.",
+  RETOUR_INCONNU: "Ce retour n'existe plus.",
   EMAIL_INDISPONIBLE: "L'envoi d'emails est coupé pour le moment.",
   TROP_DE_CODES: "Trop de codes demandés. Réessaie dans une heure.",
   ENVOI_CODE_ECHEC: "Le code n'a pas pu partir. Vérifie l'adresse et réessaie.",

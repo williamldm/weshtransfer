@@ -1,7 +1,7 @@
 // Accès aux données. Toutes les requêtes de l'appli passent par ici : les
 // vues ne connaissent ni PostgREST ni le Storage.
 
-import { sb, q, invoke, requireClient } from "./db.js?v=38";
+import { sb, q, invoke, requireClient } from "./db.js?v=39";
 
 // Toute requête passe par ici : sans config, message clair plutôt
 // qu'un "Cannot read properties of null".
@@ -96,6 +96,20 @@ export function setCommentResolved(id, resolved, fileId, note) {
 // L'artiste confirme une correction, ou la rouvre en expliquant.
 export function setCommentVerified(id, ok, reason) {
   return q(db().rpc("set_comment_verified", { p_comment: id, p_ok: !!ok, p_reason: reason || null }));
+}
+
+// Email à l'ingé quand l'artiste a fait ses retours
+export function reviewNotifyStatus(spaceId) {
+  return invoke("review-digest", { action: "status", space_id: spaceId });
+}
+export function reviewSubscribe(spaceId, email) {
+  return invoke("review-digest", { action: "subscribe", space_id: spaceId, email });
+}
+export function reviewUnsubscribe(spaceId) {
+  return invoke("review-digest", { action: "unsubscribe", space_id: spaceId });
+}
+export function reviewFlush(spaceId) {
+  return invoke("review-digest", { action: "flush", space_id: spaceId });
 }
 
 export function isEngineer(projectId) {

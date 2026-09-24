@@ -29,7 +29,7 @@
 <pre id="text"></pre>
 
 <script type="module">
-import { transferMail, verifyCodeMail, downloadNoticeMail, inviteMail } from "../supabase/functions/_shared/mail-templates.js";
+import { transferMail, verifyCodeMail, downloadNoticeMail, inviteMail, reviewDigestMail } from "../supabase/functions/_shared/mail-templates.js";
 
 const site = location.origin;
 const inAWeek = new Date(Date.now() + 7 * 86400e3).toISOString();
@@ -54,6 +54,20 @@ const cases = {
     site, sender: "Lil Brume", title: "Toutes les prises",
     message: "Tout est là.", files: Array.from({ length: 12 }, (_, i) => ({ name: "prise_" + (i + 1) + ".wav", kind: "voix", size: 30_000_000 + i * 1e6 })),
     link: site + "/t.html?k=x", expiresAt: inAWeek, canReply: true,
+  }),
+  "Retours pour l'ingé": () => reviewDigestMail({
+    site, spaceName: "Kenza, EP Nuit blanche", artists: ["Kenza"],
+    projects: [{
+      title: "Nuit blanche", link: site + "/app.html#/f/x", verified: 2, approved: null,
+      items: [
+        { kind: "new", at: 8000, tag: "voix", body: "La voix est trop loin sur le couplet", author: "Kenza", version: "v2" },
+        { kind: "new", at: 83000, tag: "basse", body: "Plus de basse au refrain, ça manque de punch", author: "Kenza", version: "v2" },
+        { kind: "reopen", at: 21000, tag: "batterie", body: "Le kick écrase la basse", author: "Kenza", version: "v1" },
+        { kind: "reply", at: null, tag: null, body: "Un fondu sur 2 mesures", author: "Kenza", version: "v2" },
+      ],
+    }, {
+      title: "Couloir", link: site + "/app.html#/f/y", verified: 0, approved: { version: "v3", by: "Kenza" }, items: [],
+    }],
   }),
   "Code": () => verifyCodeMail({ site, email: "lil.brume@gmail.com", code: "048213", minutes: 15 }),
   "Code (invitation)": () => verifyCodeMail({ site, email: "kenza@gmail.com", code: "731905", minutes: 15, purpose: "pour rejoindre le salon Villa septembre" }),

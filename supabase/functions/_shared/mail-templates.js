@@ -308,6 +308,96 @@ export function inviteMail(input) {
   return { subject, html, text };
 }
 
+// ---------------------------------------- récapitulatif pour l'ingé son
+
+function clock(ms) {
+  const s = Math.max(0, Math.round(ms / 1000));
+  return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0");
+}
+
+const TAG_NAMES = {
+  voix: "Voix", instru: "Instru", basse: "Basse", batterie: "Batterie",
+  effets: "Effets", niveau: "Volume", structure: "Structure", autre: "Autre",
+};
+
+// input : { site, spaceName, artists: ["Kenza"], projects: [{ title, link,
+//   items: [{ kind: "new" | "reopen" | "reply", at, tag, body, author, version }],
+//   verified, approved: { version, by } | null }] }
+export function reviewDigestMail(input) {
+  const site = input.site;
+  const who = input.artists.length ? input.artists.join(", ") : "L'artiste";
+  const count = (k) => input.projects.reduce((s, p) => s + p.items.filter((i) => i.kind === k).length, 0);
+  const news = count("new"), reopened = count("reopen");
+  const verified = input.projects.reduce((s, p) => s + (p.verified || 0), 0);
+  const approved = input.projects.filter((p) => p.approved);
+  const one = input.projects.length === 1 ? input.projects[0].title : null;
+
+  const subject = approved.length && !news && !reopened
+    ? `${who} a validé ${LQ}${approved[0].title}${RQ}`
+    : `${who} a fait ses retours sur ${LQ}${one || input.spaceName}${RQ}`;
+  const bits = [
+    news ? `${news} nouveau${news > 1 ? "x" : ""} retour${news > 1 ? "s" : ""}` : "",
+    reopened ? `${reopened} pas encore réglé${reopened > 1 ? "s" : ""}` : "",
+    verified ? `${verified} correction${verified > 1 ? "s" : ""} validée${verified > 1 ? "s" : ""}` : "",
+    approved.length ? "mix validé" : "",
+  ].filter(Boolean);
+  const preheader = bits.join(", ") + ".";
+
+  const badge = (text, color) =>
+    `<span style="display:inline-block;padding:2px 7px;border-radius:99px;border:1px solid ${color};color:${color};font-family:${MONO};font-size:10px;line-height:1.4;letter-spacing:1px;text-transform:uppercase;">${text}</span>`;
+  const row = (i) => {
+    const time = i.at != null
+      ? `<span style="display:inline-block;padding:1px 6px;border-radius:4px;background:${C.tile};color:${C.bright};font-family:${MONO};font-size:12px;">${clock(i.at)}</span> `
+      : "";
+    const tag = i.tag ? `<span style="color:${C.faint};font-family:${MONO};font-size:11px;letter-spacing:1px;text-transform:uppercase;">${esc(TAG_NAMES[i.tag] || i.tag)}</span> ` : "";
+    const lead = i.kind === "reopen" ? badge("Pas encore réglé", "#E2B55A") + " "
+      : i.kind === "reply" ? `<span style="color:${C.faint};">&#8627; réponse</span> ` : "";
+    return `<tr><td style="padding:12px 0;border-bottom:1px solid ${C.rule};font-family:${SANS};font-size:15px;line-height:1.5;color:${C.text};">` +
+      `<div style="margin-bottom:4px;">${lead}${time}${tag}</div>${esc(i.body)}` +
+      `<div style="margin-top:3px;font-size:12px;color:${C.faint};">${esc(i.author || "")}${i.version ? " · " + esc(i.version) : ""}</div></td></tr>`;
+  };
+
+  const blocks = input.projects.map((p) =>
+    `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:28px 0 0;">` +
+      `<tr><td style="padding:0 0 8px;border-bottom:1px solid ${C.line};">` +
+        `<span style="font-family:${DISPLAY};font-size:20px;font-weight:700;color:${C.text};">${esc(p.title)}</span></td></tr>` +
+      (p.approved
+        ? `<tr><td style="padding:12px 14px;background:#16261C;border-radius:0 0 10px 10px;font-family:${SANS};font-size:15px;color:#6FCF8E;">&#10003; <strong>${esc(p.approved.version)} validée</strong> par ${esc(p.approved.by || "l'artiste")}</td></tr>`
+        : "") +
+      p.items.map(row).join("") +
+      (p.verified
+        ? `<tr><td style="padding:12px 0 0;font-family:${SANS};font-size:14px;color:#6FCF8E;">&#10003; ${p.verified} correction${p.verified > 1 ? "s" : ""} validée${p.verified > 1 ? "s" : ""} par l'artiste</td></tr>`
+        : "") +
+      `<tr><td style="padding:14px 0 0;"><a href="${esc(p.link)}" style="color:${C.bright};font-family:${SANS};font-size:14px;font-weight:600;text-decoration:none;">Ouvrir ${esc(p.title)}&nbsp;&rarr;</a></td></tr>` +
+    `</table>`).join("");
+
+  const body =
+    eyebrow("Retours de mix · " + esc(input.spaceName)) +
+    heading(approved.length && !news && !reopened ? "C'est validé." : `${esc(who)} a fait ses retours.`) +
+    para(esc(bits.join(" · "))) +
+    button(input.projects[0].link, "Voir les retours&nbsp;&rarr;") +
+    blocks +
+    small("Les liens s'ouvrent sur l'appareil avec lequel tu es dans l'espace.", "24px 0 0");
+
+  const footer = `<p style="margin:0;">Tu reçois cet email parce que tu as activé les notifications dans ${LQ}${esc(input.spaceName)}${RQ}. Pour les couper : l'accueil de l'espace, ligne ${LQ}Prévenu par email${RQ}.</p>`;
+
+  const html = layout({ site, title: subject, preheader, body, footer });
+  const text = tidy([
+    `${who} a fait ses retours (${bits.join(", ")}).`,
+    ...input.projects.map((p) => [
+      "",
+      `== ${p.title}`,
+      p.approved ? `VALIDÉ : ${p.approved.version} par ${p.approved.by || "l'artiste"}` : "",
+      ...p.items.map((i) => `- ${i.kind === "reopen" ? "[pas encore réglé] " : i.kind === "reply" ? "[réponse] " : ""}${i.at != null ? clock(i.at) + " " : ""}${i.tag ? "[" + (TAG_NAMES[i.tag] || i.tag) + "] " : ""}${i.body} (${i.author || ""})`),
+      p.verified ? `${p.verified} correction(s) validée(s) par l'artiste.` : "",
+      `Ouvrir : ${p.link}`,
+    ].join("\n")),
+    "",
+    textFooter(site),
+  ]);
+  return { subject, html, text };
+}
+
 // ------------------------------------------ avis de premier téléchargement
 
 // input : { site, who, title }

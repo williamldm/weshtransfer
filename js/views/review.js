@@ -14,11 +14,11 @@
 
 import {
   listCommentsOf, addComment, deleteComment, setCommentResolved, setCommentVerified,
-  setFileApproved, updateFile
-} from "../api.js?v=38";
-import { formatTime } from "../waveform.js?v=38";
-import { icon } from "../icons.js?v=38";
-import { esc, h, timeAgo, toast, errorText, plural, confirmSheet, openSheet, copyText, triggerDownload } from "../ui.js?v=38";
+  setFileApproved, updateFile, reviewFlush
+} from "../api.js?v=39";
+import { formatTime } from "../waveform.js?v=39";
+import { icon } from "../icons.js?v=39";
+import { esc, h, timeAgo, toast, errorText, plural, confirmSheet, openSheet, copyText, triggerDownload } from "../ui.js?v=39";
 
 export const TAGS = [
   ["voix", "Voix"], ["instru", "Instru"], ["basse", "Basse"], ["batterie", "Batterie"],
@@ -27,9 +27,9 @@ export const TAGS = [
 const TAG_LABEL = Object.fromEntries(TAGS);
 
 const STATES = {
-  open: { label: "À corriger", cls: "is-open" },
-  verify: { label: "Corrigé, à vérifier", cls: "is-verify" },
-  done: { label: "Réglé", cls: "is-done" }
+  open: { label: "À corriger", cls: "is-open", color: "#E2B55A" },
+  verify: { label: "Corrigé, à vérifier", cls: "is-verify", color: "#A48BFF" },
+  done: { label: "Réglé", cls: "is-done", color: "#6FCF8E" }
 };
 
 export const stateOf = (c) => (!c.resolved_at ? "open" : !c.verified_at ? "verify" : "done");
@@ -92,6 +92,7 @@ export function renderReviewShell(engineer) {
           (engineer ? "" : "Pas besoin de vocabulaire technique. Mets en pause au bon endroit, l'horodatage suit.") +
           '</span><span class="spacer"></span><button class="btn btn-primary btn-sm" type="submit">Publier</button></div>' +
       "</form>" +
+      (engineer ? "" : '<button type="button" class="btn btn-block rv-flush" data-rv-flush hidden>' + icon("send", 18) + "<span>J'ai fini mes retours : prévenir l'ingé</span></button>") +
 
       '<div class="section-head rv-head"><h2>Retours</h2>' +
         (engineer
@@ -101,6 +102,7 @@ export function renderReviewShell(engineer) {
             "</div>"
           : "") +
       "</div>" +
+      '<div class="rv-progress" data-rv-progress></div>' +
       '<div class="chips rv-filters" data-rv-filters>' +
         ["open", "verify", "done"].map((k) =>
           '<button type="button" class="chip" data-filter="' + k + '">' + STATES[k].label + ' <span class="count" data-n="' + k + '">0</span></button>').join("") +
@@ -110,7 +112,7 @@ export function renderReviewShell(engineer) {
   );
 }
 
-function renderItem(c, replies, ctx, file, versionOf, engineer) {
+function renderItem(c, replies, ctx, file, versionOf, engineer, num, active) {
   const me = ctx.space.participantId;
   const st = stateOf(c);
   const mine = c.author_id === me;
@@ -129,7 +131,9 @@ function renderItem(c, replies, ctx, file, versionOf, engineer) {
   if (!engineer && st === "done") actions += '<button class="btn btn-sm btn-ghost" data-reopen>Rouvrir</button>';
   actions += '<button class="btn btn-sm btn-ghost" data-reply>' + icon("comment", 14) + " Répondre</button>";
 
-  return '<li class="comment rv-item ' + STATES[st].cls + '" data-id="' + c.id + '">' +
+  return '<li class="comment rv-item ' + STATES[st].cls + (active ? " is-now" : "") + '" data-id="' + c.id + '">' +
+    (num ? '<button type="button" class="rv-num" data-at="' + c.at_ms + '" style="--c:' + STATES[st].color + '" aria-label="Retour ' + num + ', écouter">' + num + "</button>"
+      : '<span class="rv-num is-none" style="--c:' + STATES[st].color + '"></span>') +
     '<div class="c-body">' +
       '<div class="c-head">' +
         '<span class="rv-state">' + STATES[st].label + "</span>" +
@@ -170,6 +174,8 @@ export function createReview(o) {
   let engineer = false;
   let all = [];          // retours et réponses, toutes versions jusqu'à celle affichée
   let filter = null;     // choisi au premier chargement selon le rôle
+  let activeId = null;   // retour mis en avant (lecture en cours, pastille touchée)
+  let numbers = new Map();
   let tag = null;
   let useTime = true;
 
@@ -214,13 +220,69 @@ export function createReview(o) {
       if (!replies.has(r.parent_id)) replies.set(r.parent_id, []);
       replies.get(r.parent_id).push(r);
     }
+    // numéros dans l'ordre du morceau, les mêmes sur la forme d'onde et
+    // dans la liste, quel que soit le filtre
+    numbers = new Map(items.filter((c) => c.at_ms != null).sort(byTime).map((c, i) => [c.id, i + 1]));
+
     const shown = items.filter((c) => stateOf(c) === filter).sort(byTime);
     q("[data-rv-list]").innerHTML = shown.length
-      ? shown.map((c) => renderItem(c, (replies.get(c.id) || []).sort((a, b) => (a.created_at < b.created_at ? -1 : 1)), ctx, file, versionOf, engineer)).join("")
+      ? shown.map((c) => renderItem(c, (replies.get(c.id) || []).sort((a, b) => (a.created_at < b.created_at ? -1 : 1)),
+          ctx, file, versionOf, engineer, numbers.get(c.id), c.id === activeId)).join("")
       : '<li class="comment-empty">' + emptyText(counts) + "</li>";
 
-    // sur la waveform : ce qui reste à corriger ou à vérifier
-    o.setMarkers(items.filter((c) => c.at_ms != null && stateOf(c) !== "done").map((c) => ({ atMs: c.at_ms })));
+    drawProgress(counts);
+    const flush = q("[data-rv-flush]");
+    if (flush) flush.hidden = !items.some((c) => c.author_id === ctx.space.participantId);
+    drawMarkers();
+  }
+
+  // Sur la forme d'onde : une pastille numérotée par retour, couleur de
+  // son état ; les réglés restent, en retrait.
+  function drawMarkers() {
+    o.setMarkers(top().filter((c) => c.at_ms != null).map((c) => ({
+      id: c.id, atMs: c.at_ms, label: numbers.get(c.id), color: STATES[stateOf(c)].color,
+      dim: stateOf(c) === "done", active: c.id === activeId
+    })));
+  }
+
+  // Barre d'avancement : réglés / à vérifier / à corriger
+  function drawProgress(counts) {
+    const box = q("[data-rv-progress]");
+    const total = counts.open + counts.verify + counts.done;
+    if (!total) { box.innerHTML = ""; return; }
+    const seg = (k) => counts[k] ? '<i style="flex:' + counts[k] + ";background:" + STATES[k].color + '"></i>' : "";
+    box.innerHTML =
+      '<div class="rv-bar">' + seg("done") + seg("verify") + seg("open") + "</div>" +
+      '<p class="rv-bar-text"><strong>' + (counts.done ? counts.done + " sur " + total + "</strong> " + (counts.done > 1 ? "réglés" : "réglé")
+        : "Aucun réglé</strong> sur " + total) +
+        (counts.verify ? " · " + counts.verify + " à vérifier" : "") + (counts.open ? " · " + counts.open + " à corriger" : "") + "</p>";
+  }
+
+  // Met un retour en avant : dans la liste (et le filtre qui le contient)
+  // et sur la forme d'onde. scroll : l'amener à l'écran.
+  function highlight(id, scroll) {
+    if (id === activeId && !scroll) return;
+    activeId = id;
+    const c = id && top().find((x) => x.id === id);
+    if (c && scroll && stateOf(c) !== filter) { filter = stateOf(c); draw(); }
+    for (const li of el.querySelectorAll(".rv-item")) li.classList.toggle("is-now", li.dataset.id === id);
+    drawMarkers();
+    if (c && scroll) {
+      const li = el.querySelector('.rv-item[data-id="' + id + '"]');
+      if (li) li.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }
+
+  // Pendant la lecture : le retour qu'on est en train d'entendre s'allume
+  // (de 0,3 s avant son horodatage à 4 s après).
+  function onPlayback(ms) {
+    let now = null;
+    for (const c of top()) {
+      if (c.at_ms == null || stateOf(c) === "done") continue;
+      if (ms >= c.at_ms - 300 && ms <= c.at_ms + 4000 && (!now || c.at_ms > now.at_ms)) now = c;
+    }
+    const id = now ? now.id : null;
+    if (id !== activeId) highlight(id, false);
   }
 
   function emptyText(counts) {
@@ -404,6 +466,20 @@ export function createReview(o) {
       }
     });
 
+    const flushBtn = q("[data-rv-flush]");
+    if (flushBtn) {
+      flushBtn.onclick = async () => {
+        flushBtn.disabled = true;
+        try {
+          const r = await reviewFlush(ctx.space.id);
+          toast(r && r.sent ? "C'est parti : l'ingé reçoit tes retours par email"
+            : r && r.subscribed ? "L'ingé a déjà tout reçu. Il verra la suite dans l'espace."
+            : "L'ingé n'a pas activé les emails : il verra tes retours en ouvrant l'espace.", "ok");
+        } catch (err) { toast(errorText(err), "err"); }
+        flushBtn.disabled = false;
+      };
+    }
+
     q("[data-rv-filters]").addEventListener("click", (e) => {
       const b = e.target.closest("[data-filter]");
       if (b) { filter = b.dataset.filter; draw(); }
@@ -492,5 +568,9 @@ export function createReview(o) {
     });
   }
 
-  return { setFile, reload, draw, syncTime, focusComposer, get useTime() { return useTime; } };
+  return {
+    setFile, reload, draw, syncTime, focusComposer, onPlayback,
+    focusMarker: (m) => { if (m && m.id) highlight(m.id, true); },
+    get useTime() { return useTime; }
+  };
 }

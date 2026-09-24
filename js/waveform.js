@@ -20,11 +20,12 @@ export class Waveform {
 
     this.peaks = null;
     this.progress = 0;     // 0..1
-    this.markers = [];     // [{ ratio, count }]
+    this.markers = [];     // [{ ratio, count, color, label, active, dim }]
     this.width = 0;
     this.height = 0;
 
     this.onSeek = options.onSeek || null;
+    this.onMarker = options.onMarker || null;   // tap sur une pastille numérotée
 
     this._resize = this._resize.bind(this);
     this._observer = new ResizeObserver(this._resize);
@@ -53,11 +54,17 @@ export class Waveform {
     this.draw();
   }
 
-  // markers : [{ atMs, count }] ; duree en ms pour convertir en ratio
+  // markers : [{ atMs, count, color?, label?, active?, dim?, id? }] ; duree
+  // en ms pour convertir en ratio. Avec label : pastille numérotée en haut
+  // (retours de mix), sinon simple trait.
   setMarkers(markers, durationMs) {
     this.markers = (markers || [])
       .filter((m) => durationMs > 0 && m.atMs != null)
-      .map((m) => ({ ratio: clamp01(m.atMs / durationMs), count: m.count || 1 }));
+      .map((m) => ({
+        ratio: clamp01(m.atMs / durationMs), count: m.count || 1, id: m.id || null,
+        color: m.color || null, label: m.label != null ? String(m.label) : null, active: !!m.active, dim: !!m.dim
+      }))
+      .sort((a, b) => a.ratio - b.ratio);
     this.draw();
   }
 
@@ -93,7 +100,31 @@ export class Waveform {
       return clamp01((clientX - rect.left) / rect.width);
     };
 
+    // pastille touchée ? (bande du haut, au plus près)
+    const pinAt = (e) => {
+      if (!this._pinned()) return null;
+      const rect = canvas.getBoundingClientRect();
+      const y = e.clientY - rect.top;
+      if (y > PIN_BAND + 4) return null;
+      const x = e.clientX - rect.left;
+      let best = null;
+      let dist = PIN_R + 6;
+      for (const m of this.markers) {
+        const d = Math.abs(this._pinX(m, this.width) - x);
+        if (d < dist) { dist = d; best = m; }
+      }
+      return best;
+    };
+
     const down = (e) => {
+      const pin = pinAt(e);
+      if (pin) {
+        e.preventDefault();
+        this.setProgress(pin.ratio);
+        this.onSeek(pin.ratio, true);
+        if (this.onMarker) this.onMarker(pin);
+        return;
+      }
       dragging = true;
       before = this.progress;
       canvas.setPointerCapture(e.pointerId);
@@ -147,7 +178,9 @@ export class Waveform {
 
     const slot = opts.barWidth + opts.barGap;
     const bars = Math.max(1, Math.floor(w / slot));
-    const mid = h / 2;
+    // bande réservée en haut pour les pastilles numérotées
+    const top = this._pinned() ? PIN_BAND : 0;
+    const mid = top + (h - top) / 2;
     const playedX = this.progress * w;
 
     if (!this.peaks) {
@@ -156,7 +189,7 @@ export class Waveform {
       for (let i = 0; i < bars; i++) {
         const value = this._sample(i, bars);
         const x = i * slot;
-        const barH = Math.max(opts.minBarHeight, (value / 255) * (h - 8));
+        const barH = Math.max(opts.minBarHeight, (value / 255) * (h - top - 8));
 
         ctx.fillStyle = x + opts.barWidth <= playedX ? opts.playedColor : opts.idleColor;
         roundBar(ctx, x, mid - barH / 2, opts.barWidth, barH);
@@ -195,8 +228,17 @@ export class Waveform {
     ctx.fillRect(0, mid - 1, playedX, 2);
   }
 
+  _pinned() {
+    return this.markers.some((m) => m.label);
+  }
+
+  _pinX(m, w) {
+    return Math.min(Math.max(m.ratio * w, PIN_R + 1), w - PIN_R - 1);
+  }
+
   _drawMarkers(w, h) {
     const { ctx, opts } = this;
+    if (this._pinned()) return this._drawPins(w, h);
     for (const m of this.markers) {
       const x = m.ratio * w;
       ctx.fillStyle = opts.markerColor;
@@ -209,6 +251,55 @@ export class Waveform {
     }
   }
 }
+
+const PIN_BAND = 24;
+const PIN_R = 9;
+
+// Retours de mix : trait de couleur à travers la forme d'onde et pastille
+// numérotée au-dessus (la couleur dit l'état : à corriger, à vérifier,
+// réglé). Deux pastilles trop proches : la seconde devient un simple point.
+Waveform.prototype._drawPins = function (w, h) {
+  const ctx = this.ctx;
+  let lastX = -100;
+  // les actives en dernier, pour passer au-dessus
+  const order = this.markers.slice().sort((a, b) => Number(a.active) - Number(b.active));
+  for (const m of order) {
+    const x = m.ratio * w;
+    const color = m.color || this.opts.markerColor;
+    ctx.globalAlpha = m.dim ? 0.35 : m.active ? 1 : 0.8;
+    ctx.fillStyle = color;
+    ctx.fillRect(x - (m.active ? 1.5 : 1), PIN_BAND - 4, m.active ? 3 : 2, h - PIN_BAND + 4);
+    ctx.globalAlpha = 1;
+  }
+  for (const m of order) {
+    const x = this._pinX(m, w);
+    const color = m.color || this.opts.markerColor;
+    const tooClose = !m.active && Math.abs(x - lastX) < PIN_R * 2 - 2;
+    ctx.globalAlpha = m.dim ? 0.45 : 1;
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    if (tooClose) {
+      ctx.arc(x, PIN_BAND / 2, 3.5, 0, Math.PI * 2);
+      ctx.fill();
+    } else {
+      const r = m.active ? PIN_R + 2 : PIN_R;
+      ctx.arc(x, PIN_BAND / 2, r, 0, Math.PI * 2);
+      ctx.fill();
+      if (m.active) {
+        ctx.strokeStyle = "#ffffff";
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      }
+      ctx.fillStyle = "#0E0B14";
+      ctx.font = "700 " + (m.label.length > 1 ? 10 : 11) + "px -apple-system, system-ui, sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(m.label, x, PIN_BAND / 2 + 0.5);
+      lastX = x;
+    }
+    ctx.globalAlpha = 1;
+  }
+};
 
 function roundBar(ctx, x, y, w, h) {
   const r = Math.min(w / 2, h / 2, 1.5);

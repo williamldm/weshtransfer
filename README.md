@@ -81,7 +81,7 @@ Réglages du bucket (posés par l'API `b2_update_bucket`) :
 3. **Auth** : Authentication > Sign In / Providers > Anonymous sign-ins : ON.
 4. **Edge Functions** (toutes en `--no-verify-jwt`, elles vérifient elles-mêmes) :
 
-       supabase functions deploy storage send-transfer transfer-open verify-email contacts invite purge-spaces --no-verify-jwt --use-api
+       supabase functions deploy storage send-transfer transfer-open verify-email contacts invite review-digest purge-spaces --no-verify-jwt --use-api
 
 5. **Emails** (facultatif, sinon mode lien). Deux voies, essayées dans cet
    ordre, chaque message refusé par la première repartant par la seconde :
@@ -181,6 +181,17 @@ sur un nouvel appareil, la même personne revérifie et reprend sa place
 (même blaze). L'hôte peut repasser en "entrée avec le code". Codes :
 `_shared/codes.ts` (mêmes limites que la vérification de l'expéditeur).
 Edge Function `invite`, table `space_invites`.
+
+### Email à l'ingé son (retours de mix)
+
+L'ingé active "Prévenu par email" sur l'accueil de son espace de retours
+(adresse vérifiée par code, table `review_subscriptions` fermée au
+navigateur). Un seul email récapitulatif part quand l'artiste n'a plus
+rien fait depuis 10 minutes (pg_cron `seminaire-retours`, toutes les 5
+minutes, Edge Function `review-digest`), ou tout de suite si l'artiste
+appuie sur "J'ai fini mes retours : prévenir l'ingé". Contenu : nouveaux
+retours, "pas encore réglé" (`comments.reopened_at`), réponses,
+corrections validées, mix validé.
 
 ### Garde-fous contre les abus
 
