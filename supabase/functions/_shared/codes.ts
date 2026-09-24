@@ -33,7 +33,7 @@ function newCode(): string {
 
 const hashOf = (uid: string, email: string, code: string) => sha256(`${uid}:${email}:${code}`);
 
-export type CodeResult = { ok: true; verified?: boolean } | { ok: false; error: string; status: number; detail?: string };
+export type CodeResult = { ok: true; verified?: boolean; reused?: boolean } | { ok: false; error: string; status: number; detail?: string };
 
 // Envoie un code à `email` pour l'appareil `uid`. purpose : phrase de
 // l'email ("pour rejoindre le salon X"), facultative.
@@ -57,9 +57,17 @@ export async function requestCode(
 
   // ménage : les codes de plus d'un jour ne servent plus qu'aux limites
   await db.from("email_codes").delete().lt("created_at", dayAgo);
-  // un seul code valable à la fois par appareil et par adresse
-  await db.from("email_codes").update({ expires_at: new Date().toISOString() })
-    .eq("user_id", uid).eq("email", email).gt("expires_at", new Date().toISOString());
+
+  // Double appui, fenêtre fermée puis rouverte : un code parti il y a moins
+  // d'une minute suffit, pas de second email. (Avant, chaque demande
+  // annulait la précédente : on tapait le code du premier email reçu et il
+  // était refusé.)
+  const { data: recent } = await db.from("email_codes").select("id")
+    .eq("user_id", uid).eq("email", email)
+    .gt("expires_at", new Date().toISOString())
+    .gt("created_at", new Date(Date.now() - 60e3).toISOString())
+    .limit(1).maybeSingle();
+  if (recent) return { ok: true, reused: true };
 
   const code = newCode();
   const { data: row, error } = await db.from("email_codes").insert({
@@ -84,20 +92,27 @@ export async function confirmCode(db: any, uid: string, email: string, rawCode: 
   const code = String(rawCode ?? "").replace(/\D/g, "");
   if (code.length !== 6) return { ok: false, error: "CODE_FAUX", status: 400 };
 
-  const { data: row } = await db.from("email_codes")
+  // Tous les codes encore valables de cet appareil pour cette adresse : si
+  // plusieurs emails sont partis, n'importe lequel marche. Les essais sont
+  // comptés sur le plus récent (5 au plus).
+  const { data: rows } = await db.from("email_codes")
     .select("id, code_hash, attempts, expires_at")
     .eq("user_id", uid).eq("email", email)
-    .order("created_at", { ascending: false }).limit(1).maybeSingle();
+    .gt("expires_at", new Date().toISOString())
+    .order("created_at", { ascending: false }).limit(5);
+  const valid = (rows ?? []) as { id: string; code_hash: string; attempts: number }[];
+  if (!valid.length) return { ok: false, error: "CODE_EXPIRE", status: 410 };
+  const latest = valid[0];
+  if (latest.attempts >= MAX_ATTEMPTS) return { ok: false, error: "TROP_D_ESSAIS", status: 429 };
 
-  if (!row || new Date(row.expires_at) < new Date()) return { ok: false, error: "CODE_EXPIRE", status: 410 };
-  if (row.attempts >= MAX_ATTEMPTS) return { ok: false, error: "TROP_D_ESSAIS", status: 429 };
-
-  if (row.code_hash !== await hashOf(uid, email, code)) {
-    await db.from("email_codes").update({ attempts: row.attempts + 1 }).eq("id", row.id);
-    return { ok: false, error: row.attempts + 1 >= MAX_ATTEMPTS ? "TROP_D_ESSAIS" : "CODE_FAUX", status: 400 };
+  const hash = await hashOf(uid, email, code);
+  if (!valid.some((r) => r.code_hash === hash)) {
+    await db.from("email_codes").update({ attempts: latest.attempts + 1 }).eq("id", latest.id);
+    return { ok: false, error: latest.attempts + 1 >= MAX_ATTEMPTS ? "TROP_D_ESSAIS" : "CODE_FAUX", status: 400 };
   }
 
   await db.from("sender_emails").upsert({ user_id: uid, email }, { onConflict: "user_id,email" });
-  await db.from("email_codes").update({ expires_at: new Date().toISOString() }).eq("id", row.id);
+  await db.from("email_codes").update({ expires_at: new Date().toISOString() })
+    .in("id", valid.map((r) => r.id));
   return { ok: true, verified: true };
 }
