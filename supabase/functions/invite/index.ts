@@ -28,7 +28,7 @@ type Invite = {
 };
 type Space = {
   id: string; name: string; code: string; mode: string; access: string;
-  expires_at: string; purge_at: string; is_locked: boolean; max_file_bytes: number;
+  expires_at: string; purge_at: string | null; is_locked: boolean; max_file_bytes: number;
 };
 
 function newToken(): string {
@@ -80,7 +80,9 @@ Deno.serve(async (req) => {
       return json({ error: "QUOTA_INVITATIONS" }, 429);
     }
 
-    const expires = new Date(Math.min(Date.now() + INVITE_DAYS * 86400e3, new Date(space.purge_at).getTime())).toISOString();
+    // purge_at vide : espace de retours conservé sans limite
+    const until = Date.now() + INVITE_DAYS * 86400e3;
+    const expires = new Date(space.purge_at ? Math.min(until, new Date(space.purge_at).getTime()) : until).toISOString();
     const outgoing = [];
     for (const email of emails) {
       const token = newToken();
@@ -112,7 +114,7 @@ Deno.serve(async (req) => {
   const { data: space } = await db.from("spaces")
     .select("id, name, code, mode, access, expires_at, purge_at, is_locked, max_file_bytes")
     .eq("id", invite.space_id).maybeSingle<Space>();
-  if (!space || new Date(space.purge_at) < new Date()) return json({ error: "ESPACE_EXPIRE" }, 410);
+  if (!space || (space.purge_at && new Date(space.purge_at) < new Date())) return json({ error: "ESPACE_EXPIRE" }, 410);
   if (new Date(invite.expires_at) < new Date()) return json({ error: "INVITATION_EXPIREE" }, 410);
 
   if (body.action === "info") {

@@ -1,13 +1,13 @@
 // Accueil de l'espace : gros boutons d'action, uploads en cours, morceaux
 // triés par activité récente.
 
-import { listProjects, createProject, listReviewComments, deleteProject, deleteFile } from "../api.js?v=37";
-import { stateOf, isEngineerOf } from "./review.js?v=37";
-import { mountUploads } from "./uploads.js?v=37";
-import { openUploadSheet } from "./upload-sheet.js?v=37";
-import { openPeopleSheet } from "./people.js?v=37";
-import { icon } from "../icons.js?v=37";
-import { esc, h, kindBadge, timeAgo, plural, promptSheet, toast, errorText, daysLeft, formatDate, actionSheet, confirmSheet } from "../ui.js?v=37";
+import { listProjects, createProject, listReviewComments, deleteProject, deleteFile } from "../api.js?v=38";
+import { stateOf, isEngineerOf } from "./review.js?v=38";
+import { mountUploads } from "./uploads.js?v=38";
+import { openUploadSheet } from "./upload-sheet.js?v=38";
+import { openPeopleSheet } from "./people.js?v=38";
+import { icon } from "../icons.js?v=38";
+import { esc, h, kindBadge, timeAgo, plural, promptSheet, toast, errorText, daysLeft, formatDate, actionSheet, confirmSheet } from "../ui.js?v=38";
 
 export const title = (ctx) => ctx.space.name;
 
@@ -119,7 +119,8 @@ export async function mount(root, ctx) {
     const left = s.purgeAt ? daysLeft(s.purgeAt) : null;
     meta.innerHTML =
       '<span class="dot-online"></span>' + plural(Math.max(online, 1), "personne en ligne", "personnes en ligne") +
-      (left != null ? ' · <span title="' + esc(formatDate(s.purgeAt)) + '">fichiers supprimés dans ' + plural(left, "jour", "jours") + "</span>" : "");
+      (left != null ? ' · <span title="' + esc(formatDate(s.purgeAt)) + '">fichiers supprimés dans ' + plural(left, "jour", "jours") + "</span>"
+        : s.purgeAt === null ? " · conservé sans limite" : "");
   };
 
   let lastProjects = [];

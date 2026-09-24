@@ -1,7 +1,7 @@
 // Briques d'interface partagées : DOM, messages, formatage, feuilles.
 
-import { icon } from "./icons.js?v=37";
-import { CATEGORY, categoryOf, extOf } from "./files.js?v=37";
+import { icon } from "./icons.js?v=38";
+import { CATEGORY, categoryOf, extOf } from "./files.js?v=38";
 
 // ------------------------------------------------------------------ DOM
 
@@ -68,6 +68,8 @@ const ERRORS = {
   CODE_FAUX: "Ce n'est pas le bon code.",
   TROP_D_ESSAIS_CODE: "Trop de codes essayés. Réessaie dans une heure.",
   DUREE_MAX: "Un espace vit 60 jours au plus, prolongations comprises.",
+  CONSERVATION_RETOURS: "La conservation sans limite est réservée aux espaces de retours.",
+  QUOTA_CONSERVATION: "Tu as déjà 3 espaces conservés sans limite. Supprimes-en un ou remets-lui une date.",
   ESPACE_PLEIN: "Cet espace a atteint sa taille maximale.",
   TROP_RAPIDE: "Doucement : réessaie dans une minute.",
   QUOTA_ENVOIS: "100 envois par jour et par espace, c'est la limite.",

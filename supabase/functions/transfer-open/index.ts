@@ -22,7 +22,7 @@ type Transfer = {
   notify_sender: boolean;
   expires_at: string;
   sender: { pseudo: string } | null;
-  space: { name: string; purge_at: string } | null;
+  space: { name: string; purge_at: string | null } | null;
 };
 
 const TRANSFER_COLS =
@@ -55,7 +55,7 @@ Deno.serve(async (req) => {
   if (!transfer) return json({ error: "LIEN_INCONNU" }, 404);
 
   const expired = new Date(transfer.expires_at) < new Date()
-    || (transfer.space && new Date(transfer.space.purge_at) < new Date());
+    || (!!transfer.space?.purge_at && new Date(transfer.space.purge_at) < new Date());
 
   if (expired) {
     return json({

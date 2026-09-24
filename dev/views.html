@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Banc d'essai des vues</title>
-<link rel="stylesheet" href="../css/app.css?v=37">
+<link rel="stylesheet" href="../css/app.css?v=38">
 <style>
   .dev-nav { position: sticky; top: 0; z-index: 99; display: flex; gap: 6px; overflow-x: auto; padding: 8px; background: #000; border-bottom: 1px solid #333; }
   .dev-nav a { flex: none; padding: 4px 10px; border-radius: 99px; background: #222; color: #ccc; font-size: 12px; }
@@ -22,16 +22,16 @@
 <div class="toast-wrap" id="toasts"></div>
 
 <script type="module">
-import { renderProjects } from "../js/views/home.js?v=37";
-import { renderVersion } from "../js/views/project.js?v=37";
-import { renderFileShell, renderComments } from "../js/views/file.js?v=37";
-import { renderTransfers } from "../js/views/transfers.js?v=37";
-import { renderJob } from "../js/views/uploads.js?v=37";
-import * as send from "../js/views/send.js?v=37";
-import { openPeopleSheet } from "../js/views/people.js?v=37";
-import { openUploadSheet } from "../js/views/upload-sheet.js?v=37";
-import { Waveform } from "../js/waveform.js?v=37";
-import { icon } from "../js/icons.js?v=37";
+import { renderProjects } from "../js/views/home.js?v=38";
+import { renderVersion } from "../js/views/project.js?v=38";
+import { renderFileShell, renderComments } from "../js/views/file.js?v=38";
+import { renderTransfers } from "../js/views/transfers.js?v=38";
+import { renderJob } from "../js/views/uploads.js?v=38";
+import * as send from "../js/views/send.js?v=38";
+import { openPeopleSheet } from "../js/views/people.js?v=38";
+import { openUploadSheet } from "../js/views/upload-sheet.js?v=38";
+import { Waveform } from "../js/waveform.js?v=38";
+import { icon } from "../js/icons.js?v=38";
 
 const view = document.getElementById("view");
 const ago = (min) => new Date(Date.now() - min * 60000).toISOString();

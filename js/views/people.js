@@ -1,9 +1,9 @@
 // Feuille "Participants" : qui est là, inviter, réglages du host.
 
-import { listParticipants, updateSpace, deleteSpace, inviteByEmail, listInvites, deleteInvite } from "../api.js?v=37";
-import { icon } from "../icons.js?v=37";
-import { esc, h, openSheet, avatar, shareLink, copyText, toast, errorText, formatDate, confirmSheet, canShare, promptSheet } from "../ui.js?v=37";
-import { leaveSpace, knownSpaces, switchTo, forgetSpace, renameMe } from "../session.js?v=37";
+import { listParticipants, updateSpace, deleteSpace, inviteByEmail, listInvites, deleteInvite } from "../api.js?v=38";
+import { icon } from "../icons.js?v=38";
+import { esc, h, openSheet, avatar, shareLink, copyText, toast, errorText, formatDate, confirmSheet, canShare, promptSheet } from "../ui.js?v=38";
+import { leaveSpace, knownSpaces, switchTo, forgetSpace, renameMe } from "../session.js?v=38";
 
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
@@ -196,9 +196,14 @@ export async function openPeopleSheet(ctx) {
       '<div class="setting"><div><strong>Entrées ' + (s.isLocked ? "fermées" : "ouvertes") + "</strong>" +
         '<div class="muted">' + (s.isLocked ? "Seuls les participants actuels peuvent revenir." : "Toute personne avec le code peut entrer.") + "</div></div>" +
         '<button class="btn btn-sm" data-lock>' + icon("lock", 16) + (s.isLocked ? " Rouvrir" : " Fermer") + "</button></div>" +
-      '<div class="setting"><div><strong>Suppression des fichiers</strong>' +
-        '<div class="muted">' + esc(s.purgeAt ? formatDate(s.purgeAt) : "") + "</div></div>" +
-        '<button class="btn btn-sm" data-extend>+7 jours</button></div>' +
+      (s.purgeAt === null
+        ? '<div class="setting"><div><strong>Jamais supprimé</strong>' +
+            '<div class="muted">Les mix et leurs retours restent jusqu\'à ce que tu supprimes l\'espace toi-même.</div></div>' +
+            '<button class="btn btn-sm" data-keep="off">Remettre une date</button></div>'
+        : '<div class="setting"><div><strong>Suppression des fichiers</strong>' +
+            '<div class="muted">' + esc(s.purgeAt ? formatDate(s.purgeAt) : "") + "</div></div>" +
+            '<div class="setting-actions"><button class="btn btn-sm" data-extend>+7 jours</button>' +
+            (s.mode === "revue" ? '<button class="btn btn-sm" data-keep="on">Ne jamais supprimer</button>' : "") + "</div></div>") +
       '<div class="setting"><div><strong>Supprimer l\'espace</strong>' +
         '<div class="muted">Fichiers, envois et commentaires, pour tout le monde. Définitif.</div></div>' +
         '<button class="btn btn-sm btn-danger" data-destroy>Supprimer</button></div>';
@@ -238,7 +243,27 @@ export async function openPeopleSheet(ctx) {
         location.href = "index.html";
       } catch (err) { toast(errorText(err), "err"); }
     };
-    host.querySelector("[data-extend]").onclick = async () => {
+    // Retours : garder les mix sans date limite (3 espaces par personne)
+    const keep = host.querySelector("[data-keep]");
+    if (keep) {
+      keep.onclick = async () => {
+        const on = keep.dataset.keep === "on";
+        if (on) {
+          const ok = await confirmSheet("Les mix, leurs versions et les retours resteront jusqu'à ce que tu supprimes l'espace toi-même.",
+            { ok: "Ne jamais supprimer", title: "Conservation sans limite" });
+          if (!ok) return;
+        }
+        try {
+          const row = await updateSpace(s.id, { purge_at: on ? null : new Date(Date.now() + 37 * 86400000).toISOString() });
+          s.purgeAt = row.purge_at;
+          toast(on ? "Cet espace ne sera jamais supprimé automatiquement" : "Fichiers conservés jusqu'au " + formatDate(s.purgeAt), "ok");
+          drawHost();
+        } catch (err) { toast(errorText(err), "err"); }
+      };
+    }
+
+    const extendBtn = host.querySelector("[data-extend]");
+    if (extendBtn) extendBtn.onclick = async () => {
       try {
         const base = Math.max(Date.now(), new Date(s.purgeAt).getTime());
         const row = await updateSpace(s.id, { purge_at: new Date(base + 7 * 86400000).toISOString() });

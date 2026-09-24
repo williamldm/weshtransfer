@@ -3,11 +3,11 @@
 // les espaces déjà ouverts sur cet appareil (ouvrir, oublier, supprimer).
 // session.js / api.js ne sont chargés qu'au moment d'agir.
 
-import { icon } from "./icons.js?v=37";
-import { esc, h, errorText, formatBytes, plural, actionSheet, confirmSheet, toast } from "./ui.js?v=37";
-import { isBlocked } from "./files.js?v=37";
-import { putPending, MAX_BYTES } from "./pending.js?v=37";
-import { mountWallpaperNote } from "./wallpapers.js?v=37";
+import { icon } from "./icons.js?v=38";
+import { esc, h, errorText, formatBytes, plural, actionSheet, confirmSheet, toast } from "./ui.js?v=38";
+import { isBlocked } from "./files.js?v=38";
+import { putPending, MAX_BYTES } from "./pending.js?v=38";
+import { mountWallpaperNote } from "./wallpapers.js?v=38";
 
 const PSEUDO_KEY = "seminaire.pseudo";
 const MODE_LABEL = { envoi: "Envois", seminaire: "Salon", revue: "Retours" };
@@ -86,6 +86,7 @@ const VIEWS = {
       '<p class="deck-lead">Tu déposes ton mix, l\'artiste le commente à la seconde près. Tu coches ce que tu as corrigé, tu envoies la v2, il valide.</p>' +
       field("project", "Artiste ou projet", 'maxlength="60" placeholder="Ex : Kenza, EP Nuit blanche"') +
       pseudoField() +
+      '<label class="check-line"><input type="checkbox" name="keep"><span>Ne jamais supprimer les mix<small>Sinon, effacés au bout de 37 jours. Modifiable ensuite.</small></span></label>' +
       '<p class="form-error" data-err hidden></p>' +
       '<button class="btn btn-primary btn-block btn-xl" type="submit">Ouvrir l\'espace de retours</button>' +
       '<p class="deck-note">L\'artiste reçoit une invitation par email et vérifie son adresse avant d\'entrer. Pas de compte.</p>' +
@@ -177,7 +178,7 @@ function spaceMenu(k) {
     {
       label: "Oublier sur cet appareil", icon: "logout",
       run: async () => {
-        const session = await import("./session.js?v=37");
+        const session = await import("./session.js?v=38");
         session.forgetSpace(k.id);
         toast("\"" + k.name + "\" n'apparaît plus ici. Rien n'a été supprimé.", "ok");
         drawSpacesLink();
@@ -192,9 +193,9 @@ function spaceMenu(k) {
           { ok: "Tout supprimer", danger: true, title: "Supprimer l'espace" });
         if (!ok) return;
         try {
-          const session = await import("./session.js?v=37");
+          const session = await import("./session.js?v=38");
           await session.ensureAuth();
-          const api = await import("./api.js?v=37");
+          const api = await import("./api.js?v=38");
           await api.deleteSpace(k.id);
           session.forgetSpace(k.id);
           toast("\"" + k.name + "\" a été supprimé.", "ok");
@@ -243,7 +244,7 @@ deck.addEventListener("submit", async (e) => {
     if (mine) {
       // nouveau blaze : dans l'espace d'envoi, et dans son nom "Envois de ..."
       if (renaming && pseudo !== pseudoBefore) {
-        const session = await import("./session.js?v=37");
+        const session = await import("./session.js?v=38");
         await session.renameMe(mine.id, pseudo);
         if (/^Envois de /.test(mine.name)) await session.renameSpace(mine.id, "Envois de " + pseudo).catch(() => {});
       }
@@ -252,10 +253,18 @@ deck.addEventListener("submit", async (e) => {
       return;
     }
 
-    const session = await import("./session.js?v=37");
+    const session = await import("./session.js?v=38");
     if (kind === "join") await session.joinSpace(val("code"), pseudo);
     else if (kind === "salon") await session.createSpace(val("name"), "seminaire", pseudo);
-    else if (kind === "revue") await session.createSpace(val("project"), "revue", pseudo);
+    else if (kind === "revue") {
+      const created = await session.createSpace(val("project"), "revue", pseudo);
+      if (form.querySelector("[name=keep]").checked) {
+        const api = await import("./api.js?v=38");
+        await api.updateSpace(created.id, { purge_at: null }).catch((err) => {
+          try { sessionStorage.setItem("seminaire.flash", errorText(err)); } catch (e3) { /* privé */ }
+        });
+      }
+    }
     else await session.createSpace("Envois de " + pseudo, "envoi", pseudo);
     location.href = "app.html#/projects";
   } catch (e2) {
@@ -284,7 +293,7 @@ document.addEventListener("click", (e) => {
 async function openInvite(token) {
   show("invite");
   const box = deck.querySelector("[data-invite-view]");
-  const session = await import("./session.js?v=37");
+  const session = await import("./session.js?v=38");
   let info;
   try {
     info = await session.inviteInfo(token);

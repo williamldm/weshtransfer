@@ -15,10 +15,10 @@
 import {
   listCommentsOf, addComment, deleteComment, setCommentResolved, setCommentVerified,
   setFileApproved, updateFile
-} from "../api.js?v=37";
-import { formatTime } from "../waveform.js?v=37";
-import { icon } from "../icons.js?v=37";
-import { esc, h, timeAgo, toast, errorText, plural, confirmSheet, openSheet, copyText, triggerDownload } from "../ui.js?v=37";
+} from "../api.js?v=38";
+import { formatTime } from "../waveform.js?v=38";
+import { icon } from "../icons.js?v=38";
+import { esc, h, timeAgo, toast, errorText, plural, confirmSheet, openSheet, copyText, triggerDownload } from "../ui.js?v=38";
 
 export const TAGS = [
   ["voix", "Voix"], ["instru", "Instru"], ["basse", "Basse"], ["batterie", "Batterie"],

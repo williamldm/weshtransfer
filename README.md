@@ -195,7 +195,7 @@ disjoncteurs globaux. Migration `..._seminar_abuse_limits.sql`.
 | Upload pour tout le site, sur 24 h | 200 Go (`UPLOAD_GLOBAL_DAY_GB`) |
 | Taille d'un espace | 50 Go (`SPACE_MAX_GB`), 1 000 fichiers, 500 morceaux |
 | Uploads ouverts en même temps | 12 par appareil |
-| Durée de vie d'un espace | 60 jours au plus, prolongations comprises |
+| Durée de vie d'un espace | 60 jours au plus, prolongations comprises ; espaces de retours : option "ne jamais supprimer" (`purge_at` vide), 3 par créateur, 500 au total |
 | Création d'espaces | 5 par jour et par appareil, 10 par IP |
 | Codes d'espace faux | 10 par heure et par appareil, 30 par IP |
 | Commentaires | 20 par minute et par personne, 5 000 par espace |
