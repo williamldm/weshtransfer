@@ -15,10 +15,11 @@
 import {
   listCommentsOf, addComment, deleteComment, setCommentResolved, setCommentVerified,
   setFileApproved, updateFile, reviewFlush
-} from "../api.js?v=39";
-import { formatTime } from "../waveform.js?v=39";
-import { icon } from "../icons.js?v=39";
-import { esc, h, timeAgo, toast, errorText, plural, confirmSheet, openSheet, copyText, triggerDownload } from "../ui.js?v=39";
+} from "../api.js?v=40";
+import { formatTime } from "../waveform.js?v=40";
+import { icon } from "../icons.js?v=40";
+import { esc, h, timeAgo, toast, errorText, plural, confirmSheet, openSheet, copyText, triggerDownload, formatBytes } from "../ui.js?v=40";
+import { enqueue, onUploads, checkFile } from "../upload.js?v=40";
 
 export const TAGS = [
   ["voix", "Voix"], ["instru", "Instru"], ["basse", "Basse"], ["batterie", "Batterie"],
@@ -189,6 +190,7 @@ export function createReview(o) {
     engineer = isEngineerOf(ctx.space, versions.length ? versions : [f]);
     el.innerHTML = renderReviewShell(engineer);
     bind();
+    if (engineer && ctx.setDrop) ctx.setDrop((files) => openUpdate(files));
   }
 
   async function reload() {
@@ -310,12 +312,20 @@ export function createReview(o) {
               (counts.verify ? '<span class="st">' + counts.verify + " chez l'artiste</span>" : "") +
               (counts.done ? '<span class="st st-ok">' + plural(counts.done, "réglé", "réglés") + "</span>" : "") +
             "</span></div>" +
+          '<label class="btn btn-primary btn-block rv-update">' + icon("upload", 18) +
+            "<span>Envoyer la v" + nextVersion() + " corrigée</span>" +
+            '<input type="file" hidden data-rv-update></label>' +
+          '<p class="hint rv-update-hint">Ou glisse le fichier sur la page. Tu coches ce qui est corrigé, puis ça part.</p>' +
           (canWrite
             ? '<label class="field rv-changelog"><span class="label">Ce qui change dans la ' + v + ", pour l'artiste</span>" +
                 '<textarea class="input" rows="2" maxlength="2000" data-changelog placeholder="Ex : voix remontée, basse moins envahissante au refrain, fin raccourcie">' + esc(file.changelog || "") + "</textarea>" +
                 '<span class="hint" data-changelog-state>' + (file.changelog ? "L'artiste le lit en premier en ouvrant la " + v + "." : "Coche aussi, dans la liste, les retours corrigés dans cette version.") + "</span></label>"
             : (file.changelog ? '<p class="rv-changelog-text">' + esc(file.changelog) + "</p>" : "")) +
         "</div>";
+      box.querySelector("[data-rv-update]").onchange = (e) => {
+        openUpdate(e.target.files);
+        e.target.value = "";
+      };
       const ta = box.querySelector("[data-changelog]");
       if (ta) {
         let saved = file.changelog || "";
@@ -408,6 +418,108 @@ export function createReview(o) {
     syncTime();
     ta.scrollIntoView({ behavior: "smooth", block: "center" });
     setTimeout(() => ta.focus(), 250);
+  }
+
+  // ---------------------------------------- envoyer la version corrigée
+  // Depuis la page où l'on voit les retours : on choisit le fichier, on dit
+  // ce qui change, on coche ce qui est corrigé, ça part. À l'arrivée, la
+  // note est posée, les retours cochés passent en "corrigé dans la vN", et
+  // on bascule sur la nouvelle version.
+
+  function nextVersion() {
+    return Math.max(file.version_no, ...versions.map((v) => v.version_no)) + 1;
+  }
+
+  function openUpdate(list) {
+    const picked = list && list.length !== undefined ? list[0] : list;
+    if (!picked) return;
+    const bad = checkFile(picked, ctx.space.maxFileBytes);
+    if (bad) { toast(picked.name + " : " + bad, "err"); return; }
+    const n = nextVersion();
+    const open = top().filter((c) => stateOf(c) === "open").sort(byTime);
+
+    const body = h(
+      '<form class="rv-upd" novalidate>' +
+        '<div class="rv-upd-file">' + icon("music", 20) + '<span class="rv-upd-name">' + esc(picked.name) + "</span>" +
+          '<span class="mono">' + formatBytes(picked.size) + "</span></div>" +
+        '<label class="field"><span class="label">Ce qui change dans la v' + n + "</span>" +
+          '<textarea class="input" name="changelog" rows="2" maxlength="2000" placeholder="Ex : voix remontée, basse plus présente au refrain"></textarea></label>' +
+        (open.length
+          ? '<div class="field"><div class="rv-upd-head"><span class="label">Corrigé dans la v' + n + "</span>" +
+              '<button type="button" class="link-btn" data-all>Tout cocher</button></div>' +
+              '<ul class="rv-upd-list">' + open.map((c) =>
+                '<li><label><input type="checkbox" value="' + c.id + '">' +
+                  (numbers.get(c.id) ? '<span class="rv-num" style="--c:' + STATES.open.color + '">' + numbers.get(c.id) + "</span>" : "") +
+                  "<span>" + (c.at_ms != null ? '<b class="mono">' + formatTime(c.at_ms / 1000) + "</b> " : "") + esc(c.body) + "</span></label></li>").join("") +
+              "</ul></div>"
+          : '<p class="hint">Aucun retour ouvert : la v' + n + " part telle quelle.</p>") +
+        '<div class="rv-upd-progress" data-progress hidden><div class="rv-bar"><i data-bar style="flex:0;background:#A48BFF"></i><i data-rest style="flex:1"></i></div>' +
+          '<p class="hint" data-status></p></div>' +
+        '<button class="btn btn-primary btn-block btn-xl" type="submit" data-send>' + icon("upload", 20) + "<span>Envoyer la v" + n + "</span></button>" +
+      "</form>"
+    );
+    const sheet = openSheet({ title: "Envoyer la v" + n, body });
+    const allBtn = body.querySelector("[data-all]");
+    if (allBtn) {
+      allBtn.onclick = () => {
+        const boxes = [...body.querySelectorAll("input[type=checkbox]")];
+        const on = boxes.some((b) => !b.checked);
+        for (const b of boxes) b.checked = on;
+        allBtn.textContent = on ? "Tout décocher" : "Tout cocher";
+      };
+    }
+
+    body.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const changelog = body.querySelector("[name=changelog]").value.trim();
+      const fixed = [...body.querySelectorAll("input[type=checkbox]:checked")].map((b) => b.value);
+      const send = body.querySelector("[data-send]");
+      const status = body.querySelector("[data-status]");
+      const bar = body.querySelector("[data-bar]");
+      const rest = body.querySelector("[data-rest]");
+      send.disabled = true;
+      send.innerHTML = '<span class="spinner"></span><span>Envoi de la v' + n + "…</span>";
+      body.querySelector("[data-progress]").hidden = false;
+      for (const b of body.querySelectorAll("input, textarea")) b.disabled = true;
+
+      const [job] = enqueue([picked], {
+        spaceId: ctx.space.id, projectId: file.project_id, projectTitle: file.project ? file.project.title : "",
+        kind: "mix", label: null, bpm: null, musicalKey: null, tag: "rv-update-" + file.id
+      });
+      const from = location.hash;
+      let finished = false;
+      const off = onUploads(async (j) => {
+        if (j.id !== job.id || finished) return;
+        if (j.state === "uploading" && j.size) {
+          const pct = Math.min(100, Math.round((j.loaded / j.size) * 100));
+          bar.style.flex = String(pct);
+          rest.style.flex = String(100 - pct);
+          status.textContent = pct + " % · " + formatBytes(j.loaded) + " sur " + formatBytes(j.size) +
+            " · tu peux fermer, l'envoi continue";
+        } else if (j.state === "waiting" || j.state === "saving") {
+          status.textContent = "Enregistrement de la v" + n + "…";
+        } else if (j.state === "done" && j.result) {
+          finished = true;
+          off();
+          const newId = j.result.id;
+          try {
+            if (changelog) await updateFile(newId, { changelog });
+            for (const id of fixed) await setCommentResolved(id, true, newId, null);
+          } catch (err) { toast(errorText(err), "err"); }
+          sheet.close();
+          toast("v" + j.result.version_no + " envoyée" + (fixed.length ? " · " + plural(fixed.length, "retour marqué corrigé", "retours marqués corrigés") : ""), "ok");
+          // on bascule sur la nouvelle version, si on est resté sur la page
+          if (location.hash === from) ctx.navigate("#/f/" + newId);
+        } else if (j.state === "error" || j.state === "canceled") {
+          finished = true;
+          off();
+          status.textContent = j.state === "error" ? (j.error || "L'envoi a échoué.") : "Envoi annulé.";
+          send.disabled = false;
+          send.textContent = "Fermer";
+          send.onclick = (ev) => { ev.preventDefault(); sheet.close(); };
+        }
+      });
+    });
   }
 
   // Liste texte pour la session de l'ingé : horodatage, étiquette, retour.
