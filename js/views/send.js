@@ -6,18 +6,18 @@ import {
   getProject, getFilesByIds, createTransfer, sendTransfer, emailEnabled,
   getTransfer, transferUrl, createProject, signFiles, cachedUrl,
   knownVerified, listContacts, forgetContact
-} from "../api.js?v=41";
-import { ensureVerified } from "../verify.js?v=41";
-import { openUploadSheet } from "./upload-sheet.js?v=41";
-import { mountUploads } from "./uploads.js?v=41";
-import { onUploads, enqueue, checkFile } from "../upload.js?v=41";
-import { categoryOf, canPreview } from "../files.js?v=41";
-import { takePending } from "../pending.js?v=41";
-import { icon } from "../icons.js?v=41";
+} from "../api.js?v=42";
+import { ensureVerified } from "../verify.js?v=42";
+import { openUploadSheet } from "./upload-sheet.js?v=42";
+import { mountUploads } from "./uploads.js?v=42";
+import { onUploads, enqueue, checkFile } from "../upload.js?v=42";
+import { categoryOf, canPreview } from "../files.js?v=42";
+import { takePending } from "../pending.js?v=42";
+import { icon } from "../icons.js?v=42";
 import {
   esc, h, formatBytes, formatDuration, plural, toast, errorText, openSheet, copyText, shareLink,
   canShare, formatDate, daysLeft, fileBadge, fileTile
-} from "../ui.js?v=41";
+} from "../ui.js?v=42";
 
 // Dans un espace "envoi", ce composeur EST l'accueil.
 export const title = (ctx) => (ctx && ctx.space.mode === "envoi" ? ctx.space.name : "Envoyer");

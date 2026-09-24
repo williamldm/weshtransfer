@@ -129,7 +129,7 @@ a{color:${C.bright}}
 <tr><td align="center" style="padding:28px 12px 44px;">
 <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:600px;">
 <tr><td class="wt-pad" style="padding:0 6px 22px;">
-<a href="${site}/" style="text-decoration:none;"><img src="${site}/img/mail/logo.png" width="212" alt="WeshTransfer" style="display:block;width:212px;max-width:100%;height:auto;border:0;color:${C.bright};font-family:${DISPLAY};font-size:22px;font-weight:800;"></a>
+<a href="${site}/" style="text-decoration:none;"><img src="${site}/img/mail/logo.png" width="196" alt="WeshTransfer" style="display:block;width:196px;max-width:100%;height:auto;border:0;color:${C.bright};font-family:${DISPLAY};font-size:22px;font-weight:800;"></a>
 </td></tr>
 <tr><td bgcolor="${C.card}" style="background:${C.card};border:1px solid ${C.line};border-radius:18px;overflow:hidden;">
 <img src="${site}/img/mail/scene.jpg" width="600" alt="" style="display:block;width:100%;max-width:600px;height:auto;border:0;border-radius:17px 17px 0 0;">
