@@ -1,21 +1,21 @@
 // Coquille de l'appli : démarrage, routeur à hash, en-tête, bus
 // d'événements, temps réel. Chaque vue est un module avec mount().
 
-import { restore, getSpace, leaveSpace } from "./session.js?v=40";
-import { connectSpace } from "./realtime.js?v=40";
-import { bindPlayerBar } from "./player.js?v=40";
-import { activeCount, onUploads } from "./upload.js?v=40";
-import { openPeopleSheet } from "./views/people.js?v=40";
-import { openUploadSheet } from "./views/upload-sheet.js?v=40";
-import { icon } from "./icons.js?v=40";
-import { monogram } from "./brand.js?v=40";
-import { toast, errorText, esc } from "./ui.js?v=40";
+import { restore, getSpace, leaveSpace } from "./session.js?v=41";
+import { connectSpace } from "./realtime.js?v=41";
+import { bindPlayerBar } from "./player.js?v=41";
+import { activeCount, onUploads } from "./upload.js?v=41";
+import { openPeopleSheet } from "./views/people.js?v=41";
+import { openUploadSheet } from "./views/upload-sheet.js?v=41";
+import { icon } from "./icons.js?v=41";
+import { monogram } from "./brand.js?v=41";
+import { toast, errorText, esc } from "./ui.js?v=41";
 
-import * as home from "./views/home.js?v=40";
-import * as project from "./views/project.js?v=40";
-import * as file from "./views/file.js?v=40";
-import * as send from "./views/send.js?v=40";
-import * as transfers from "./views/transfers.js?v=40";
+import * as home from "./views/home.js?v=41";
+import * as project from "./views/project.js?v=41";
+import * as file from "./views/file.js?v=41";
+import * as send from "./views/send.js?v=41";
+import * as transfers from "./views/transfers.js?v=41";
 
 // L'accueil dépend du mode de l'espace : morceaux (séminaire) ou
 // directement le composeur d'envoi (espace dédié aux envois).
@@ -265,6 +265,9 @@ async function boot() {
   bindDrop();
   connectSpace(space, bus);
   window.addEventListener("hashchange", routeSmoothly);
+
+  // compte : "Mes espaces" à jour depuis le serveur (autres appareils)
+  import("./session.js?v=41").then((m) => m.syncSpaces()).catch(() => {});
 
   // message laissé par l'accueil (ex. réglage refusé à la création)
   try {

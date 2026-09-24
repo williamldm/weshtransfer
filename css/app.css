@@ -1,5 +1,5 @@
-@import url("fonts.css?v=40");
-@import url("tokens.css?v=40");
+@import url("fonts.css?v=41");
+@import url("tokens.css?v=41");
 
 /* ================================================================= base */
 *, *::before, *::after { box-sizing: border-box; }
@@ -977,3 +977,8 @@ body.app .app-header { view-transition-name: topbar; }
 .rv-upd-list .rv-num { width: 24px; height: 24px; margin-top: 1px; font-size: 12px; cursor: inherit; }
 .rv-upd-list b { color: var(--accent-hi); font-weight: 500; }
 .rv-upd-progress .rv-bar i[data-rest] { background: transparent; }
+
+/* compte (accueil, "Mes espaces") */
+.account-box { margin-bottom: var(--sp-4); padding-bottom: var(--sp-4); border-bottom: 1px solid var(--line); }
+.account-box .as-who { margin-bottom: var(--sp-2); }
+.account-box .deck-note { margin: 0 0 var(--sp-3); text-align: left; }

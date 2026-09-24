@@ -3,11 +3,11 @@
 // les espaces déjà ouverts sur cet appareil (ouvrir, oublier, supprimer).
 // session.js / api.js ne sont chargés qu'au moment d'agir.
 
-import { icon } from "./icons.js?v=40";
-import { esc, h, errorText, formatBytes, plural, actionSheet, confirmSheet, toast } from "./ui.js?v=40";
-import { isBlocked } from "./files.js?v=40";
-import { putPending, MAX_BYTES } from "./pending.js?v=40";
-import { mountWallpaperNote } from "./wallpapers.js?v=40";
+import { icon } from "./icons.js?v=41";
+import { esc, h, errorText, formatBytes, plural, actionSheet, confirmSheet, toast } from "./ui.js?v=41";
+import { isBlocked } from "./files.js?v=41";
+import { putPending, MAX_BYTES } from "./pending.js?v=41";
+import { mountWallpaperNote } from "./wallpapers.js?v=41";
 
 const PSEUDO_KEY = "seminaire.pseudo";
 const MODE_LABEL = { envoi: "Envois", seminaire: "Salon", revue: "Retours" };
@@ -34,10 +34,41 @@ function goTo(space) {
   location.href = "app.html#/projects";
 }
 
+// Compte connecté sur cet appareil (lu dans la session gardée par
+// Supabase, sans rien charger). null = pas connecté.
+function accountEmail() {
+  try {
+    const s = JSON.parse(localStorage.getItem("seminaire.auth") || "null");
+    return (s && s.user && s.user.email) || null;
+  } catch (err) { return null; }
+}
+const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+
 function drawSpacesLink() {
   const n = known().length;
-  spacesLink.hidden = !n;
-  spacesLink.textContent = "Mes espaces (" + n + ")";
+  spacesLink.hidden = false;
+  spacesLink.textContent = n ? "Mes espaces (" + n + ")" : accountEmail() ? "Mon compte" : "Se connecter";
+}
+
+// Pas encore connecté : l'email tapé devient le compte (code reçu à cette
+// adresse, une fois par appareil), et les espaces de l'appareil le suivent.
+async function ensureAccount(form, fail) {
+  if (accountEmail()) return true;
+  const input = form.querySelector("[name=email]");
+  const email = input ? input.value.trim().toLowerCase() : "";
+  if (!EMAIL_RE.test(email)) {
+    if (input) input.focus();
+    fail("Ton email sert de compte (sans mot de passe) : on en a besoin.");
+    return false;
+  }
+  const session = await import("./session.js?v=41");
+  await session.ensureAuth();
+  const { ensureVerified } = await import("./verify.js?v=41");
+  if (await ensureVerified(email, { optional: false }) !== "ok") return false;
+  await session.login(email);
+  try { localStorage.setItem("seminaire.replyTo", email); } catch (err) { /* privé */ }
+  drawSpacesLink();
+  return true;
 }
 
 // --------------------------------------------------------------- onglets
@@ -46,6 +77,14 @@ const field = (name, label, attrs, value) =>
   '<label class="field"><span class="label">' + label + '</span><input class="input" name="' + name + '" ' + attrs +
   ' value="' + esc(value || "") + '"></label>';
 const pseudoField = () => field("pseudo", "Ton blaze", 'maxlength="24" autocomplete="nickname" placeholder="Comment on te reconnaît"', savedPseudo());
+// Ton email = ton compte. Déjà connecté : une ligne, pas de champ.
+function accountField() {
+  const acc = accountEmail();
+  if (acc) return '<p class="as-who">Connecté : <strong>' + esc(acc) + '</strong> <button type="button" class="link-btn" data-goto-account>compte</button></p>';
+  let remembered = "";
+  try { remembered = localStorage.getItem("seminaire.replyTo") || ""; } catch (err) { /* privé */ }
+  return field("email", "Ton email", 'type="text" inputmode="email" autocomplete="email" autocapitalize="off" spellcheck="false" maxlength="254" placeholder="ton compte, sans mot de passe"', remembered);
+}
 
 const VIEWS = {
   send() {
@@ -66,6 +105,7 @@ const VIEWS = {
       (mine && !renaming
         ? '<p class="as-who">Envoyé par <strong>' + esc(savedPseudo() || "toi") + '</strong> <button type="button" class="link-btn" data-rename>changer</button></p>'
         : pseudoField()) +
+      accountField() +
       '<p class="form-error" data-err hidden></p>' +
       '<button class="btn btn-primary btn-block btn-xl" type="submit">Transférer</button>' +
       '<p class="deck-note">Tu ajouteras les adresses à l\'étape suivante. Sans compte, ni pour toi ni pour eux.</p>' +
@@ -76,6 +116,7 @@ const VIEWS = {
       '<p class="deck-lead">Un espace pour ton groupe, ta résidence, ton séminaire. Chacun y dépose ses sons ; versions et commentaires horodatés arrivent en temps réel.</p>' +
       field("name", "Nom du salon", 'maxlength="60" placeholder="Ex : Villa septembre, Studio B"') +
       pseudoField() +
+      accountField() +
       '<p class="form-error" data-err hidden></p>' +
       '<button class="btn btn-primary btn-block btn-xl" type="submit">Ouvrir le salon</button>' +
       '<p class="deck-note">Tu en deviens le host. Tu invites les membres par email : chacun vérifie son adresse avant d\'entrer.</p>' +
@@ -86,6 +127,7 @@ const VIEWS = {
       '<p class="deck-lead">Tu déposes ton mix, l\'artiste le commente à la seconde près. Tu coches ce que tu as corrigé, tu envoies la v2, il valide.</p>' +
       field("project", "Artiste ou projet", 'maxlength="60" placeholder="Ex : Kenza, EP Nuit blanche"') +
       pseudoField() +
+      accountField() +
       '<label class="check-line"><input type="checkbox" name="keep"><span>Ne jamais supprimer les mix<small>Sinon, effacés au bout de 37 jours. Modifiable ensuite.</small></span></label>' +
       '<p class="form-error" data-err hidden></p>' +
       '<button class="btn btn-primary btn-block btn-xl" type="submit">Ouvrir l\'espace de retours</button>' +
@@ -97,6 +139,7 @@ const VIEWS = {
       '<p class="deck-lead">Le code qu\'on t\'a donné, et ton blaze.</p>' +
       '<label class="field"><span class="label">Code</span><input class="input input-code" name="code" maxlength="8" autocapitalize="characters" autocomplete="off" autocorrect="off" spellcheck="false" placeholder="ABC123" value="' + esc(code || "") + '"></label>' +
       pseudoField() +
+      accountField() +
       '<p class="form-error" data-err hidden></p>' +
       '<button class="btn btn-primary btn-block btn-xl" type="submit">Entrer</button>' +
     "</form>";
@@ -106,8 +149,20 @@ const VIEWS = {
   },
   spaces() {
     const list = known();
-    if (!list.length) return '<p class="deck-lead">Aucun espace sur cet appareil.</p>';
-    return '<p class="deck-lead">Les espaces ouverts sur cet appareil. Les oublier ne supprime rien ; seul le host peut tout effacer.</p>' +
+    const acc = accountEmail();
+    const account = acc
+      ? '<div class="account-box"><p class="as-who">Connecté : <strong>' + esc(acc) + "</strong></p>" +
+          '<p class="deck-note">Tes espaces, envois et blazes te suivent sur tous tes appareils.</p>' +
+          '<button type="button" class="btn btn-ghost btn-sm" data-logout>Se déconnecter de cet appareil</button></div>'
+      : '<form class="account-box" data-form="account" novalidate>' +
+          '<p class="deck-lead">Retrouve tes espaces sur tous tes appareils. Pas de mot de passe : un code à ton adresse, une fois par appareil.</p>' +
+          accountField() +
+          '<p class="form-error" data-err hidden></p>' +
+          '<button class="btn btn-primary btn-block" type="submit">Se connecter</button></form>';
+    if (!list.length) return account + '<p class="deck-lead">' + (acc ? "Aucun espace pour l'instant." : "Aucun espace sur cet appareil.") + "</p>";
+    return account +
+      '<p class="deck-lead">' + (acc ? "Les espaces de ton compte." : "Les espaces ouverts sur cet appareil.") +
+        " Les oublier ne supprime rien ; seul le host peut tout effacer.</p>" +
       '<ul class="my-spaces">' + list.map((k) =>
         '<li data-id="' + esc(k.id) + '">' +
           '<button type="button" class="ms-open" data-open-space>' +
@@ -178,7 +233,7 @@ function spaceMenu(k) {
     {
       label: "Oublier sur cet appareil", icon: "logout",
       run: async () => {
-        const session = await import("./session.js?v=40");
+        const session = await import("./session.js?v=41");
         session.forgetSpace(k.id);
         toast("\"" + k.name + "\" n'apparaît plus ici. Rien n'a été supprimé.", "ok");
         drawSpacesLink();
@@ -193,9 +248,9 @@ function spaceMenu(k) {
           { ok: "Tout supprimer", danger: true, title: "Supprimer l'espace" });
         if (!ok) return;
         try {
-          const session = await import("./session.js?v=40");
+          const session = await import("./session.js?v=41");
           await session.ensureAuth();
-          const api = await import("./api.js?v=40");
+          const api = await import("./api.js?v=41");
           await api.deleteSpace(k.id);
           session.forgetSpace(k.id);
           toast("\"" + k.name + "\" a été supprimé.", "ok");
@@ -220,10 +275,10 @@ deck.addEventListener("submit", async (e) => {
   const fail = (msg) => { err.textContent = msg; err.hidden = false; };
   err.hidden = true;
 
-  const mine = kind === "send" && known().find((k) => k.mode === "envoi");
+  let mine = kind === "send" && known().find((k) => k.mode === "envoi");
   const pseudoBefore = savedPseudo();
   const pseudo = mine && !renaming ? pseudoBefore : val("pseudo");
-  if (!mine && pseudo.length < 2) return fail("Ton blaze doit faire au moins 2 caractères.");
+  if (kind !== "account" && !mine && pseudo.length < 2) return fail("Ton blaze doit faire au moins 2 caractères.");
   if (kind === "join" && val("code").length < 5) return fail("Le code fait au moins 5 caractères.");
   if (kind === "salon" && !val("name")) return fail("Donne un nom à ton salon.");
   if (kind === "revue" && !val("project")) return fail("Pour quel artiste ou quel projet ?");
@@ -232,6 +287,16 @@ deck.addEventListener("submit", async (e) => {
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner"></span><span>Un instant…</span>';
   try {
+    // tout se rattache à un compte : email vérifié d'abord
+    if (!(await ensureAccount(form, fail))) {
+      btn.disabled = false;
+      btn.textContent = label;
+      return;
+    }
+    if (kind === "account") { show("spaces"); return; }
+    // connecté à l'instant : le compte a peut-être déjà son espace d'envoi
+    if (kind === "send" && !mine) mine = known().find((k) => k.mode === "envoi");
+
     if (pseudo) savePseudo(pseudo);
 
     // les fichiers déposés ici repartent à l'étape suivante
@@ -244,7 +309,7 @@ deck.addEventListener("submit", async (e) => {
     if (mine) {
       // nouveau blaze : dans l'espace d'envoi, et dans son nom "Envois de ..."
       if (renaming && pseudo !== pseudoBefore) {
-        const session = await import("./session.js?v=40");
+        const session = await import("./session.js?v=41");
         await session.renameMe(mine.id, pseudo);
         if (/^Envois de /.test(mine.name)) await session.renameSpace(mine.id, "Envois de " + pseudo).catch(() => {});
       }
@@ -253,13 +318,13 @@ deck.addEventListener("submit", async (e) => {
       return;
     }
 
-    const session = await import("./session.js?v=40");
+    const session = await import("./session.js?v=41");
     if (kind === "join") await session.joinSpace(val("code"), pseudo);
     else if (kind === "salon") await session.createSpace(val("name"), "seminaire", pseudo);
     else if (kind === "revue") {
       const created = await session.createSpace(val("project"), "revue", pseudo);
       if (form.querySelector("[name=keep]").checked) {
-        const api = await import("./api.js?v=40");
+        const api = await import("./api.js?v=41");
         await api.updateSpace(created.id, { purge_at: null }).catch((err) => {
           try { sessionStorage.setItem("seminaire.flash", errorText(err)); } catch (e3) { /* privé */ }
         });
@@ -274,9 +339,20 @@ deck.addEventListener("submit", async (e) => {
   }
 });
 
-document.addEventListener("click", (e) => {
+document.addEventListener("click", async (e) => {
   const b = e.target.closest(".deck-tabs [data-tab], .deck-foot [data-tab]");
   if (b) show(b.dataset.tab);
+  if (e.target.closest("[data-goto-account]")) show("spaces");
+  if (e.target.closest("[data-logout]")) {
+    const ok = await confirmSheet("Rien n'est supprimé : tu retrouveras tout en te reconnectant avec ton email.",
+      { ok: "Se déconnecter", title: "Se déconnecter de cet appareil" });
+    if (!ok) return;
+    const session = await import("./session.js?v=41");
+    await session.logout();
+    drawSpacesLink();
+    show("send");
+    toast("Déconnecté de cet appareil", "ok");
+  }
   if (e.target.closest("[data-rename]")) {
     renaming = true;
     show("send");
@@ -293,7 +369,7 @@ document.addEventListener("click", (e) => {
 async function openInvite(token) {
   show("invite");
   const box = deck.querySelector("[data-invite-view]");
-  const session = await import("./session.js?v=40");
+  const session = await import("./session.js?v=41");
   let info;
   try {
     info = await session.inviteInfo(token);
@@ -405,6 +481,14 @@ setInterval(() => {
 
 drawSpacesLink();
 for (const el of document.querySelectorAll("[data-icon]")) el.innerHTML = icon(el.dataset.icon, 20);
+
+// Connecté : "Mes espaces" à jour depuis le serveur (autres appareils)
+if (accountEmail()) {
+  import("./session.js?v=41").then((m) => m.syncSpaces()).then(() => {
+    drawSpacesLink();
+    if (tab === "spaces") show("spaces");
+  }).catch(() => {});
+}
 
 const params = new URLSearchParams(location.search);
 const inviteToken = (params.get("i") || "").toLowerCase();

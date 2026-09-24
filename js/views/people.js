@@ -1,9 +1,9 @@
 // Feuille "Participants" : qui est là, inviter, réglages du host.
 
-import { listParticipants, updateSpace, deleteSpace, inviteByEmail, listInvites, deleteInvite } from "../api.js?v=40";
-import { icon } from "../icons.js?v=40";
-import { esc, h, openSheet, avatar, shareLink, copyText, toast, errorText, formatDate, confirmSheet, canShare, promptSheet } from "../ui.js?v=40";
-import { leaveSpace, knownSpaces, switchTo, forgetSpace, renameMe } from "../session.js?v=40";
+import { listParticipants, updateSpace, deleteSpace, inviteByEmail, listInvites, deleteInvite } from "../api.js?v=41";
+import { icon } from "../icons.js?v=41";
+import { esc, h, openSheet, avatar, shareLink, copyText, toast, errorText, formatDate, confirmSheet, canShare, promptSheet } from "../ui.js?v=41";
+import { leaveSpace, knownSpaces, switchTo, forgetSpace, renameMe, accountEmail, logout } from "../session.js?v=41";
 
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
@@ -44,6 +44,11 @@ export async function openPeopleSheet(ctx) {
       '<ul class="people-list" data-list><li class="muted">Chargement...</li></ul>' +
       (s.isHost ? '<div class="section-head"><h2>Réglages (host)</h2></div><div data-host></div>' : "") +
       '<div class="section-head"><h2>Mes espaces</h2></div>' +
+      (accountEmail()
+        ? '<div class="setting"><div><strong>Compte</strong><div class="muted">' + esc(accountEmail()) + " · tes espaces te suivent sur tous tes appareils</div></div>" +
+            '<button class="btn btn-sm" data-logout>Se déconnecter</button></div>'
+        : '<div class="setting"><div><strong>Pas connecté</strong><div class="muted">Connecte-toi avec ton email pour retrouver tes espaces partout.</div></div>' +
+            '<a class="btn btn-sm" href="index.html">Se connecter</a></div>') +
       '<div class="space-list" data-spaces></div>' +
       '<button class="btn btn-ghost btn-block" data-leave>' + icon("logout", 18) + " Quitter cet espace sur cet appareil</button>" +
     "</div>"
@@ -136,6 +141,17 @@ export async function openPeopleSheet(ctx) {
       text: "Rejoins l'espace " + s.name + " (code " + s.code + ")",
       url
     });
+  }
+
+  const logoutBtn = body.querySelector("[data-logout]");
+  if (logoutBtn) {
+    logoutBtn.onclick = async () => {
+      const ok = await confirmSheet("Rien n'est supprimé : tu retrouveras tout en te reconnectant avec ton email.",
+        { ok: "Se déconnecter", title: "Se déconnecter de cet appareil" });
+      if (!ok) return;
+      await logout();
+      location.href = "index.html";
+    };
   }
 
   body.querySelector("[data-leave]").onclick = async () => {

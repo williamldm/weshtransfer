@@ -15,6 +15,7 @@ import { admin, callerId } from "../_shared/supabase.ts";
 import { json, preflight, readJson } from "../_shared/http.ts";
 import { inviteMail, isVerified, mailConfig, sendEmails } from "../_shared/email.ts";
 import { confirmCode, requestCode, sha256 } from "../_shared/codes.ts";
+import { loginAccount } from "../_shared/account.ts";
 
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 const INVITE_DAYS = 30;
@@ -148,15 +149,25 @@ Deno.serve(async (req) => {
     const check = await confirmCode(db, uid, invite.email, body.code);
     if (!check.ok) return json({ error: check.error }, check.status);
 
+    // L'adresse invitée est prouvée : c'est son compte qui entre (créé au
+    // besoin ; l'appareil anonyme y apporte ses autres espaces).
+    let login;
+    try {
+      login = await loginAccount(db, uid, invite.email);
+    } catch (err) {
+      return json({ error: "CONNEXION_ECHEC", detail: (err as Error).message.slice(0, 200) }, 500);
+    }
+    const owner = login.accountId;
+
     let participant: { id: string; pseudo: string } | null = null;
     const { data: already } = await db.from("participants").select("id, pseudo")
-      .eq("space_id", space.id).eq("user_id", uid).maybeSingle();
+      .eq("space_id", space.id).eq("user_id", owner).maybeSingle();
     if (already) {
       participant = already;
     } else if (invite.accepted_participant) {
-      // même personne (adresse vérifiée), nouvel appareil : elle reprend sa place
+      // déjà entrée(e) depuis un autre appareil : on reprend sa place
       const { data: moved } = await db.from("participants")
-        .update({ user_id: uid, last_seen_at: new Date().toISOString() })
+        .update({ user_id: owner, last_seen_at: new Date().toISOString() })
         .eq("id", invite.accepted_participant).select("id, pseudo").maybeSingle();
       participant = moved;
     }
@@ -166,7 +177,7 @@ Deno.serve(async (req) => {
       const { count } = await db.from("participants").select("id", { count: "exact", head: true }).eq("space_id", space.id);
       if ((count ?? 0) >= 200) return json({ error: "ESPACE_PLEIN" }, 409);
       const { data: created, error } = await db.from("participants")
-        .insert({ space_id: space.id, user_id: uid, pseudo, is_host: false })
+        .insert({ space_id: space.id, user_id: owner, pseudo, is_host: false })
         .select("id, pseudo").single();
       if (error) return json({ error: error.code === "23505" ? "PSEUDO_PRIS" : "ERREUR_BASE", detail: error.message }, 409);
       participant = created;
@@ -179,6 +190,7 @@ Deno.serve(async (req) => {
       space_id: space.id, participant_id: participant!.id, name: space.name, code: space.code,
       mode: space.mode, access: space.access, expires_at: space.expires_at, is_locked: space.is_locked,
       max_file_bytes: space.max_file_bytes, is_host: false, pseudo: participant!.pseudo,
+      account: { email: invite.email, token_hash: login.token },
     });
   }
 

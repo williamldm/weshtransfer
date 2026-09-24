@@ -1,7 +1,7 @@
 // Briques d'interface partagées : DOM, messages, formatage, feuilles.
 
-import { icon } from "./icons.js?v=40";
-import { CATEGORY, categoryOf, extOf } from "./files.js?v=40";
+import { icon } from "./icons.js?v=41";
+import { CATEGORY, categoryOf, extOf } from "./files.js?v=41";
 
 // ------------------------------------------------------------------ DOM
 
@@ -36,6 +36,7 @@ export function toast(message, kind) {
 // Traduit les codes d'erreur du back en français lisible.
 const ERRORS = {
   CODE_INVALIDE: "Ce code ne correspond à aucun espace.",
+  CONNEXION_ECHEC: "La connexion à ton compte a échoué. Réessaie.",
   INVITATION_REQUISE: "Cet espace est sur invitation : demande à l'hôte de t'inviter par email.",
   INVITATION_INCONNUE: "Cette invitation n'existe pas, ou a été remplacée par une plus récente.",
   INVITATION_EXPIREE: "Cette invitation a expiré. Demande à l'hôte de t'en renvoyer une.",

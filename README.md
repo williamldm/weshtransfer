@@ -81,7 +81,7 @@ Réglages du bucket (posés par l'API `b2_update_bucket`) :
 3. **Auth** : Authentication > Sign In / Providers > Anonymous sign-ins : ON.
 4. **Edge Functions** (toutes en `--no-verify-jwt`, elles vérifient elles-mêmes) :
 
-       supabase functions deploy storage send-transfer transfer-open verify-email contacts invite review-digest purge-spaces --no-verify-jwt --use-api
+       supabase functions deploy storage send-transfer transfer-open verify-email contacts invite review-digest account purge-spaces --no-verify-jwt --use-api
 
 5. **Emails** (facultatif, sinon mode lien). Deux voies, essayées dans cet
    ordre, chaque message refusé par la première repartant par la seconde :
@@ -167,6 +167,18 @@ Netlify (`netlify.toml`) reste possible pour une copie de test : même
 `_deploy`, mêmes en-têtes.
 
 ## Sécurité
+
+### Comptes par email, sans mot de passe
+
+Tout se rattache au compte d'une adresse email : espaces, envois,
+carnet, blazes, droits d'hôte. On s'y connecte avec un code à 6 chiffres
+reçu à cette adresse (une fois par appareil) ; l'Edge Function `account`
+ouvre alors la session du compte sur l'appareil (lien magique généré côté
+serveur, échangé par `verifyOtp`, jamais envoyé par email). Un appareil
+qui avait déjà des espaces sans compte les apporte au compte
+(`merge_users`). Créer ou rejoindre un espace demande l'email ; accepter
+une invitation connecte au compte de l'adresse invitée. "Mes espaces" est
+lu sur le serveur ; "Se déconnecter de cet appareil" ne supprime rien.
 
 ### Entrée sur invitation (salons et retours)
 

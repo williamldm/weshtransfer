@@ -1,7 +1,9 @@
-// Session anonyme + appartenance à un espace. Aucun compte : l'appareil
-// reçoit un utilisateur anonyme Supabase, puis rejoint un espace via son code.
+// Session + appartenance aux espaces. Tant qu'on ne s'est pas connecté,
+// l'appareil a un utilisateur anonyme Supabase. Connecté (email + code, sans
+// mot de passe), il partage le compte de cette adresse : les mêmes espaces,
+// envois et blazes sur tous ses appareils.
 
-import { sb, q, invoke, requireClient } from "./db.js?v=40";
+import { sb, q, invoke, requireClient } from "./db.js?v=41";
 
 const SPACE_KEY = "seminaire.space";      // espace actif
 const KNOWN_KEY = "seminaire.spaces";     // tous les espaces rejoints sur cet appareil
@@ -126,9 +128,76 @@ export function inviteSendCode(token) {
 
 export async function acceptInvite(token, code, pseudo) {
   const s = await invoke("invite", { action: "accept", token, code, pseudo });
+  // l'adresse invitée est prouvée : l'appareil passe sur son compte
+  await openAccountSession(s.account && s.account.token_hash);
   const space = toSpace(s, s.pseudo);
   setSpace(space);
+  await syncSpaces();
   return space;
+}
+
+// ------------------------------------------------------------- compte
+
+// Adresse du compte connecté sur cet appareil, lue dans la session gardée
+// par Supabase (sans charger quoi que ce soit). null = pas connecté.
+export function accountEmail() {
+  try {
+    const s = JSON.parse(localStorage.getItem("seminaire.auth") || "null");
+    return (s && s.user && s.user.email) || null;
+  } catch (err) {
+    return null;
+  }
+}
+
+async function openAccountSession(tokenHash) {
+  if (tokenHash) {
+    const { error } = await sb.auth.verifyOtp({ token_hash: tokenHash, type: "email" });
+    if (error) throw new Error("CONNEXION_ECHEC");
+  } else {
+    // l'appareil est devenu le compte : on relit la session (adresse posée)
+    await sb.auth.refreshSession();
+  }
+}
+
+// Se connecter au compte de `email` (vérifiée sur cet appareil, ou avec le
+// code reçu). Les espaces de l'appareil rejoignent le compte.
+export async function login(email, code) {
+  await ensureAuth();
+  const r = await invoke("account", { action: "login", email, code: code || null });
+  await openAccountSession(r.token_hash);
+  await syncSpaces();
+  return r.email;
+}
+
+// Se déconnecter de CET appareil : rien n'est supprimé, tout revient en se
+// reconnectant.
+export async function logout() {
+  await sb.auth.signOut();
+  write(KNOWN_KEY, []);
+  try { localStorage.removeItem(SPACE_KEY); } catch (err) { /* privé */ }
+}
+
+// "Mes espaces" = ceux du compte, lus sur le serveur (l'ordre local, les
+// plus récents d'abord, est conservé).
+export async function syncSpaces() {
+  if (!sb || !accountEmail()) return knownSpaces();
+  const uid = await currentUserId();
+  if (!uid) return knownSpaces();
+  const { data, error } = await sb.from("participants")
+    .select("id, pseudo, is_host, space:spaces(id, name, code, mode)")
+    .eq("user_id", uid);
+  if (error) return knownSpaces();
+  const order = knownSpaces().map((k) => k.id);
+  const rank = (id) => (order.indexOf(id) === -1 ? 999 : order.indexOf(id));
+  const list = (data || []).filter((p) => p.space)
+    .map((p) => ({ id: p.space.id, name: p.space.name, code: p.space.code, mode: p.space.mode, isHost: !!p.is_host }))
+    .sort((a, b) => rank(a.id) - rank(b.id));
+  write(KNOWN_KEY, list.slice(0, 50));
+  const current = getSpace();
+  if (current && !list.some((s) => s.id === current.id)) {
+    try { localStorage.removeItem(SPACE_KEY); } catch (err) { /* privé */ }
+  }
+  return list;
 }
 
 // ----------------------------------------------------- changer de blaze
