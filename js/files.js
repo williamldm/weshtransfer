@@ -41,6 +41,9 @@ const MIME = {
   zip: "application/zip", mid: "audio/midi", midi: "audio/midi"
 };
 
+// 2 Go par fichier, partout (le serveur applique la même limite)
+export const FILE_MAX = 2 * 1024 * 1024 * 1024;
+
 export function extOf(name) {
   const m = /\.([a-z0-9]{1,10})$/i.exec(name || "");
   return m ? m[1].toLowerCase() : "";

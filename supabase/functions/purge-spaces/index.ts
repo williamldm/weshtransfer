@@ -59,8 +59,26 @@ Deno.serve(async (req) => {
     }
   }
 
+  // Versions remplacées : la base a déjà retiré leurs fiches, il reste les
+  // fichiers stockés (file d'attente storage_trash).
+  const { data: trash } = await db.from("storage_trash").select("id, storage_path, backend").order("id").limit(500);
+  let trashed = 0;
+  for (const item of (trash ?? []) as { id: number; storage_path: string; backend: string }[]) {
+    try {
+      if (item.backend === "b2") {
+        if (!b2) throw new Error("B2 non configuré");
+        await deletePrefix(b2, item.storage_path);
+      } else {
+        await db.storage.from("seminar").remove([item.storage_path]);
+      }
+      await db.from("storage_trash").delete().eq("id", item.id);
+      trashed++;
+    } catch { /* retenté à l'heure suivante */ }
+  }
+
   return json({
     purged: report.filter((r) => r.ok).length, report,
     jam: { files: jamFiles, errors: jamErr ? [jamErr.message] : jamErrors },
+    versions: trashed,
   });
 });

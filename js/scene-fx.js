@@ -11,7 +11,7 @@
 // Rien ne tourne quand rien ne bouge (la boucle s'arrête d'elle-même), rien
 // du tout avec "réduire les animations", ni onglet caché.
 
-import { WALLPAPERS } from "./wallpapers.js?v=72";
+import { WALLPAPERS } from "./wallpapers.js?v=74";
 
 const MAX_PARTICLES = 240;
 const SHIFT_X = 16;   // px, amplitude de la profondeur
@@ -336,6 +336,17 @@ export function startSceneFx(el, rotation) {
   bindPointer();
   bindTouch();
   document.addEventListener("visibilitychange", () => { if (!document.hidden) wake(); });
+}
+
+// Une bouffée à un point de l'écran (le grand titre qui fume, par ex.) :
+// n particules de la matière du décor, qui montent doucement.
+export function emitAt(clientX, clientY, n) {
+  if (!scene) return;
+  const r = scene.getBoundingClientRect();
+  const x = clientX - r.left;
+  const y = clientY - r.top;
+  if (x < 0 || y < 0 || x > r.width || y > r.height) return;
+  spawn(x, y, 0, -0.4, n || 1);
 }
 
 // Pour les tests : fait avancer la boucle sans attendre l'écran.

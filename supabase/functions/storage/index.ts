@@ -23,7 +23,8 @@ import {
 } from "../_shared/b2.ts";
 import { wipeSpace } from "../_shared/wipe.ts";
 
-const PART_SIZE = 16 * 1024 * 1024;   // compromis 4G : une partie ratée coûte peu à renvoyer
+const PART_SIZE = 16 * 1024 * 1024;
+const FILE_MAX = 2 * 1024 ** 3;   // 2 Go par fichier, quel que soit l'espace   // compromis 4G : une partie ratée coûte peu à renvoyer
 const GET_TTL = 6 * 3600;
 const PUT_TTL = 2 * 3600;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -114,8 +115,9 @@ Deno.serve(async (req) => {
           .select("id, space_id, space:spaces(max_file_bytes)")
           .eq("id", projectId).maybeSingle();
         if (!project) return json({ error: "NON_MEMBRE" }, 403);
-        const max = (project as unknown as { space: { max_file_bytes: number } }).space?.max_file_bytes ?? 0;
-        if (max && size > max) return json({ error: "TROP_LOURD" }, 413);
+        const spaceMax = (project as unknown as { space: { max_file_bytes: number } }).space?.max_file_bytes ?? 0;
+        const max = spaceMax ? Math.min(spaceMax, FILE_MAX) : FILE_MAX;
+        if (size > max) return json({ error: "TROP_LOURD" }, 413);
 
         // Un identifiant déjà pris = tentative d'écraser le son de quelqu'un.
         const { data: taken } = await db.from("files").select("id").eq("id", fileId).maybeSingle();

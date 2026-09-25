@@ -1,11 +1,11 @@
 // Feuille "Ajouter des sons" : choix du morceau, du type, détails optionnels.
 // L'upload démarre dès validation ; on peut naviguer pendant qu'il tourne.
 
-import { enqueue, checkFile, guessKind, guessBpm, titleFromName } from "../upload.js?v=72";
-import { listProjects, createProject } from "../api.js?v=72";
-import { icon } from "../icons.js?v=72";
-import { CATEGORY, categoryOf, isAudio } from "../files.js?v=72";
-import { esc, h, openSheet, toast, errorText, formatBytes, KINDS } from "../ui.js?v=72";
+import { enqueue, checkFile, guessKind, guessBpm, titleFromName } from "../upload.js?v=74";
+import { listProjects, createProject } from "../api.js?v=74";
+import { icon } from "../icons.js?v=74";
+import { CATEGORY, categoryOf, isAudio } from "../files.js?v=74";
+import { esc, h, openSheet, toast, errorText, formatBytes, KINDS } from "../ui.js?v=74";
 
 // opts : { projectId, newTitle, tag, onQueued(jobs, projectId) }
 export async function openUploadSheet(ctx, fileList, opts) {
@@ -39,6 +39,10 @@ export async function openUploadSheet(ctx, fileList, opts) {
       '<div class="field" data-newtitle><span class="label">Titre du nouveau morceau</span>' +
         '<input class="input" name="title" maxlength="80" value="' + esc(suggested) + '">' +
       "</div>" +
+      // morceau existant : la nouvelle version remplace l'ancienne (qui est
+      // effacée ; les retours et les transferts passent sur la nouvelle)
+      '<label class="check-line" data-replace hidden><input type="checkbox" name="replace" checked>' +
+        "<span>Remplacer la version précédente<small>Elle est supprimée pour faire de la place. Les retours et les liens déjà envoyés passent sur la nouvelle.</small></span></label>" +
 
       '<div class="field"' + (ok.some((f) => isAudio(f.name, f.type)) ? "" : " hidden") + '><span class="label">Type</span><div class="chips" role="radiogroup">' +
         KINDS.map(([k, label]) =>
@@ -65,7 +69,11 @@ export async function openUploadSheet(ctx, fileList, opts) {
   const select = body.querySelector("[name=project]");
   const titleField = body.querySelector("[data-newtitle]");
 
-  const syncTitle = () => { titleField.hidden = select.value !== "__new"; };
+  const replaceField = body.querySelector("[data-replace]");
+  const syncTitle = () => {
+    titleField.hidden = select.value !== "__new";
+    replaceField.hidden = select.value === "__new";
+  };
   select.addEventListener("change", syncTitle);
 
   // Liste des morceaux existants, chargée pendant qu'on regarde la feuille.
@@ -110,7 +118,8 @@ export async function openUploadSheet(ctx, fileList, opts) {
         label: String(form.get("label") || "").trim() || null,
         bpm: bpmValue >= 40 && bpmValue <= 300 ? bpmValue : null,
         musicalKey: String(form.get("key") || "").trim() || null,
-        tag: o.tag || null
+        tag: o.tag || null,
+        replaces: select.value !== "__new" && !!form.get("replace")
       });
 
       sheet.close();

@@ -5,12 +5,12 @@
 // va couper. TUS reprend là où ça s'est arrêté au lieu de tout recommencer.
 
 import { Upload } from "https://cdn.jsdelivr.net/npm/tus-js-client@4.3.1/+esm";
-import { sb, BUCKET } from "./db.js?v=72";
-import { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, PEAKS_MAX_BYTES } from "./config.js?v=72";
-import { extOf as fileExt, isBlocked, isAudio, mimeOf } from "./files.js?v=72";
-import { computePeaks } from "./peaks.js?v=72";
-import { insertFile, storageCall, storageConfig } from "./api.js?v=72";
-import { errorText } from "./ui.js?v=72";
+import { sb, BUCKET } from "./db.js?v=74";
+import { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, PEAKS_MAX_BYTES } from "./config.js?v=74";
+import { extOf as fileExt, isBlocked, isAudio, mimeOf, FILE_MAX } from "./files.js?v=74";
+import { computePeaks } from "./peaks.js?v=74";
+import { insertFile, storageCall, storageConfig } from "./api.js?v=74";
+import { errorText } from "./ui.js?v=74";
 
 // Hôte de stockage direct : recommandé par Supabase pour les gros fichiers.
 const ENDPOINT = SUPABASE_URL.replace(".supabase.co", ".storage.supabase.co") + "/storage/v1/upload/resumable";
@@ -46,9 +46,11 @@ export function activeCount() {
 
 export const extOf = fileExt;
 
+export { FILE_MAX };
+
 export function checkFile(file, maxBytes) {
   if (isBlocked(file.name)) return "Les programmes (." + extOf(file.name) + ") ne sont pas acceptés";
-  if (maxBytes && file.size > maxBytes) return "Trop lourd pour cet espace";
+  if (file.size > Math.min(maxBytes || FILE_MAX, FILE_MAX)) return "Trop lourd : 2 Go max par fichier";
   if (!file.size) return "Fichier vide";
   return null;
 }
@@ -91,7 +93,12 @@ export function titleFromName(name) {
 // ------------------------------------------------------------------ file
 
 // meta : { spaceId, projectId, projectTitle, kind, label, bpm, musicalKey, tag }
+// meta.replaces : ce dépôt est une nouvelle version qui remplace les
+// précédentes du morceau (la base les efface, retours conservés). Les
+// fichiers d'un même appel forment un lot (batch) : ils ne s'effacent pas
+// entre eux (stems déposés ensemble).
 export function enqueue(files, meta) {
+  if (meta && meta.replaces && !meta.batch) meta.batch = crypto.randomUUID();
   const added = [];
   // Les numéros de version suivent l'ordre de sélection, pas l'ordre
   // d'arrivée : chaque fichier attend que le précédent du lot soit
@@ -225,7 +232,9 @@ async function run(job) {
       label: meta.label || null,
       bpm: meta.bpm || guessBpm(file.name),
       musical_key: meta.musicalKey || null,
-      status: "ready"
+      status: "ready",
+      replaces: !!meta.replaces,
+      batch: meta.batch || null
     });
     job.state = "done";
     job.file = null;   // libère la mémoire
@@ -447,7 +456,7 @@ function cancelB2(job) {
 
 function explain(err) {
   const code = String((err && err.message) || "");
-  if (/TROP_LOURD/.test(code)) return "Trop lourd pour cet espace.";
+  if (/TROP_LOURD/.test(code)) return "Trop lourd : 2 Go max par fichier.";
   if (/QUOTA_|TROP_D_UPLOADS|TAILLE_INCOHERENTE|UPLOAD_INCONNU|ESPACE_PLEIN|TROP_RAPIDE/.test(code)) return errorText(err);
   if (/FICHIER_EXISTANT/.test(code)) return "Conflit d'identifiant, réessaie.";
   if (/NON_MEMBRE|NON_AUTHENTIFIE/.test(code)) return "Accès refusé : reconnecte-toi à l'espace.";

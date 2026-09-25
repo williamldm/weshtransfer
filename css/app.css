@@ -1,5 +1,5 @@
-@import url("fonts.css?v=72");
-@import url("tokens.css?v=72");
+@import url("fonts.css?v=74");
+@import url("tokens.css?v=74");
 
 /* ================================================================= base */
 *, *::before, *::after { box-sizing: border-box; }
@@ -1286,3 +1286,36 @@ body.admin { min-height: 100vh; background: var(--bg); }
 .adm-selbar { position: fixed; left: 50%; bottom: calc(var(--sp-4) + var(--safe-bottom)); z-index: 50; display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3); max-width: calc(100% - 32px); padding: var(--sp-2) var(--sp-2) var(--sp-2) var(--sp-4); border: 1px solid var(--line-strong); border-radius: 99px; background: var(--surface-2); box-shadow: 0 20px 50px rgba(0, 0, 0, .5); transform: translateX(-50%); font-size: var(--fs-sm); }
 .adm-selbar b { color: var(--text); }
 @media (max-width: 559px) { .adm-selbar { border-radius: var(--r-md); } .adm-file-row .adm-nums { display: none; } }
+
+/* ================================= grand titre vivant (js/claim-fx.js) */
+.claim .cw { display: inline-block; white-space: nowrap; }
+.claim .cl { display: inline-block; }
+/* découpé mais pas encore lancé : caché, pour ne pas voir le texte sauter */
+.claim[data-fx]:not(.is-live) .cw { opacity: 0; }
+/* arrivée : les mots montent un par un, comme sortis de la fumée */
+.claim.is-live .cw { animation: cw-in .85s cubic-bezier(.2, .9, .3, 1.15) both; animation-delay: calc(var(--i) * 80ms); }
+@keyframes cw-in {
+  from { opacity: 0; transform: translateY(.45em) rotate(3deg); filter: blur(8px); }
+  to { opacity: 1; transform: none; filter: none; }
+}
+/* "le moins écoresponsable" brûle : air chaud + vague de feu */
+.claim.is-live em .cl {
+  animation: claim-heat 2.8s ease-in-out infinite, claim-burn 5s linear infinite;
+  animation-delay: calc(var(--j) * -120ms), calc(var(--j) * 90ms + 1.4s);
+}
+@keyframes claim-heat { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-.05em); } }
+@keyframes claim-burn {
+  0%, 72%, 100% { color: var(--accent-bright); text-shadow: none; }
+  80% { color: #ffc46b; text-shadow: 0 0 .35em rgba(255, 122, 47, .6); }
+  88% { color: #ff8a3d; text-shadow: 0 0 .2em rgba(255, 122, 47, .35); }
+}
+/* lettre survolée (ou vague au tap) : elle saute */
+.claim .cl.is-hop { animation: claim-hop .55s cubic-bezier(.3, 1.6, .5, 1) !important; }
+@keyframes claim-hop {
+  0% { transform: none; }
+  40% { transform: translateY(-.28em) rotate(-8deg) scale(1.12); color: #ffc46b; }
+  100% { transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .claim .cw, .claim .cl { animation: none !important; opacity: 1 !important; }
+}

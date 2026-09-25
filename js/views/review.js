@@ -15,11 +15,11 @@
 import {
   listCommentsOf, addComment, deleteComment, setCommentResolved, setCommentVerified,
   setFileApproved, updateFile, reviewFlush
-} from "../api.js?v=72";
-import { formatTime } from "../waveform.js?v=72";
-import { icon } from "../icons.js?v=72";
-import { esc, h, timeAgo, toast, errorText, plural, confirmSheet, openSheet, copyText, triggerDownload, formatBytes } from "../ui.js?v=72";
-import { enqueue, onUploads, checkFile } from "../upload.js?v=72";
+} from "../api.js?v=74";
+import { formatTime } from "../waveform.js?v=74";
+import { icon } from "../icons.js?v=74";
+import { esc, h, timeAgo, toast, errorText, plural, confirmSheet, openSheet, copyText, triggerDownload, formatBytes } from "../ui.js?v=74";
+import { enqueue, onUploads, checkFile } from "../upload.js?v=74";
 
 export const TAGS = [
   ["voix", "Voix"], ["instru", "Instru"], ["basse", "Basse"], ["batterie", "Batterie"],
@@ -458,7 +458,8 @@ export function createReview(o) {
 
       const [job] = enqueue([picked], {
         spaceId: ctx.space.id, projectId: file.project_id, projectTitle: file.project ? file.project.title : "",
-        kind: "mix", label: null, bpm: null, musicalKey: null, tag: "rv-update-" + file.id
+        kind: "mix", label: null, bpm: null, musicalKey: null, tag: "rv-update-" + file.id,
+        replaces: true   // la vN remplace la précédente (retours conservés)
       });
       const from = location.hash;
       let finished = false;
