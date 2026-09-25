@@ -1,14 +1,15 @@
 // Accueil de l'espace : gros boutons d'action, uploads en cours, morceaux
 // triés par activité récente.
 
-import { listProjects, createProject, listReviewComments, deleteProject, deleteFile, reviewNotifyStatus, reviewSubscribe, reviewUnsubscribe } from "../api.js?v=42";
-import { ensureVerified } from "../verify.js?v=42";
-import { stateOf, isEngineerOf } from "./review.js?v=42";
-import { mountUploads } from "./uploads.js?v=42";
-import { openUploadSheet } from "./upload-sheet.js?v=42";
-import { openPeopleSheet } from "./people.js?v=42";
-import { icon } from "../icons.js?v=42";
-import { esc, h, kindBadge, timeAgo, plural, promptSheet, toast, errorText, daysLeft, formatDate, actionSheet, confirmSheet } from "../ui.js?v=42";
+import { listProjects, createProject, listReviewComments, deleteProject, deleteFile, reviewNotifyStatus, reviewSubscribe, reviewUnsubscribe } from "../api.js?v=45";
+import { ensureVerified } from "../verify.js?v=45";
+import { mountReviewHome } from "./review-home.js?v=45";
+import { stateOf, isEngineerOf } from "./review.js?v=45";
+import { mountUploads } from "./uploads.js?v=45";
+import { openUploadSheet } from "./upload-sheet.js?v=45";
+import { openPeopleSheet } from "./people.js?v=45";
+import { icon } from "../icons.js?v=45";
+import { esc, h, kindBadge, timeAgo, plural, promptSheet, toast, errorText, daysLeft, formatDate, actionSheet, confirmSheet } from "../ui.js?v=45";
 
 export const title = (ctx) => ctx.space.name;
 
@@ -70,6 +71,8 @@ export function renderProjects(projects, stats, canEdit, space) {
 }
 
 export async function mount(root, ctx) {
+  // retours de mix : présentation "album" à part
+  if (ctx.space.mode === "revue") return mountReviewHome(root, ctx);
   const s = ctx.space;
   const review = s.mode === "revue";
   root.innerHTML =

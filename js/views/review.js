@@ -15,11 +15,11 @@
 import {
   listCommentsOf, addComment, deleteComment, setCommentResolved, setCommentVerified,
   setFileApproved, updateFile, reviewFlush
-} from "../api.js?v=42";
-import { formatTime } from "../waveform.js?v=42";
-import { icon } from "../icons.js?v=42";
-import { esc, h, timeAgo, toast, errorText, plural, confirmSheet, openSheet, copyText, triggerDownload, formatBytes } from "../ui.js?v=42";
-import { enqueue, onUploads, checkFile } from "../upload.js?v=42";
+} from "../api.js?v=45";
+import { formatTime } from "../waveform.js?v=45";
+import { icon } from "../icons.js?v=45";
+import { esc, h, timeAgo, toast, errorText, plural, confirmSheet, openSheet, copyText, triggerDownload, formatBytes } from "../ui.js?v=45";
+import { enqueue, onUploads, checkFile } from "../upload.js?v=45";
 
 export const TAGS = [
   ["voix", "Voix"], ["instru", "Instru"], ["basse", "Basse"], ["batterie", "Batterie"],
@@ -90,7 +90,6 @@ export function renderReviewShell(engineer) {
           TAGS.map(([k, label]) => '<button type="button" class="chip" data-tag="' + k + '">' + label + "</button>").join("") +
         "</div>" +
         '<div class="row"><span class="hint">' +
-          (engineer ? "" : "Pas besoin de vocabulaire technique. Mets en pause au bon endroit, l'horodatage suit.") +
           '</span><span class="spacer"></span><button class="btn btn-primary btn-sm" type="submit">Publier</button></div>' +
       "</form>" +
       (engineer ? "" : '<button type="button" class="btn btn-block rv-flush" data-rv-flush hidden>' + icon("send", 18) + "<span>J'ai fini mes retours : prévenir l'ingé</span></button>") +
@@ -290,8 +289,8 @@ export function createReview(o) {
   function emptyText(counts) {
     if (!top().length) {
       return engineer
-        ? "Pas encore de retour. Invite l'artiste : il écoute, met en pause, écrit, et ça s'accroche à la seconde près."
-        : "Pas encore de retour. Écoute, mets en pause là où quelque chose cloche, et écris.";
+        ? "Pas encore de retour de l'artiste."
+        : "Pas encore de retour.";
     }
     if (filter === "open") return counts.verify ? "Rien à corriger. Des corrections attendent d'être vérifiées." : "Rien à corriger.";
     if (filter === "verify") return engineer ? "Aucune correction en attente de l'artiste." : "Aucune correction à vérifier.";
@@ -302,51 +301,26 @@ export function createReview(o) {
   function drawNews(counts, fixedHere) {
     const box = q("[data-rv-news]");
     const v = "v" + file.version_no;
-    const canWrite = engineer && (file.uploaded_by === ctx.space.participantId || ctx.space.isHost);
     if (engineer) {
+      // Un seul bouton : la note de version s'écrit au moment de l'envoi.
+      const todo = counts && counts.open;
       box.innerHTML =
-        '<div class="rv-card rv-inge">' +
-          '<div class="rv-card-head"><span class="eyebrow">Côté ingé</span>' +
-            '<span class="rv-summary">' +
-              (counts.open ? '<span class="st st-open">' + plural(counts.open, "à corriger", "à corriger") + "</span>" : "") +
-              (counts.verify ? '<span class="st">' + counts.verify + " chez l'artiste</span>" : "") +
-              (counts.done ? '<span class="st st-ok">' + plural(counts.done, "réglé", "réglés") + "</span>" : "") +
-            "</span></div>" +
-          '<label class="btn btn-primary btn-block rv-update">' + icon("upload", 18) +
-            "<span>Envoyer la v" + nextVersion() + " corrigée</span>" +
+        '<div class="rv-inge">' +
+          '<label class="btn btn-block rv-update' + (todo ? " btn-primary" : "") + '">' + icon("upload", 18) +
+            "<span>Envoyer la v" + nextVersion() + (todo ? " corrigée" : "") + "</span>" +
             '<input type="file" hidden data-rv-update></label>' +
-          '<p class="hint rv-update-hint">Ou glisse le fichier sur la page. Tu coches ce qui est corrigé, puis ça part.</p>' +
-          (canWrite
-            ? '<label class="field rv-changelog"><span class="label">Ce qui change dans la ' + v + ", pour l'artiste</span>" +
-                '<textarea class="input" rows="2" maxlength="2000" data-changelog placeholder="Ex : voix remontée, basse moins envahissante au refrain, fin raccourcie">' + esc(file.changelog || "") + "</textarea>" +
-                '<span class="hint" data-changelog-state>' + (file.changelog ? "L'artiste le lit en premier en ouvrant la " + v + "." : "Coche aussi, dans la liste, les retours corrigés dans cette version.") + "</span></label>"
-            : (file.changelog ? '<p class="rv-changelog-text">' + esc(file.changelog) + "</p>" : "")) +
+          (file.changelog ? '<p class="rv-changelog-text">' + esc(file.changelog) + "</p>" : "") +
         "</div>";
       box.querySelector("[data-rv-update]").onchange = (e) => {
         openUpdate(e.target.files);
         e.target.value = "";
       };
-      const ta = box.querySelector("[data-changelog]");
-      if (ta) {
-        let saved = file.changelog || "";
-        const save = async () => {
-          const val = ta.value.trim();
-          if (val === saved) return;
-          try {
-            await updateFile(file.id, { changelog: val || null });
-            saved = val;
-            file.changelog = val;
-            box.querySelector("[data-changelog-state]").textContent = "Enregistré. L'artiste le lit en premier en ouvrant la " + v + ".";
-          } catch (err) { toast(errorText(err), "err"); }
-        };
-        ta.addEventListener("blur", save);
-      }
       return;
     }
     const latest = versions.length && versions[versions.length - 1].id === file.id;
     if (!file.changelog && !fixedHere.length) {
       box.innerHTML = !top().length && latest
-        ? '<p class="review-hint">' + icon("comment", 18) + "<span>Écoute le mix. Là où quelque chose te gêne, mets en pause et écris ce que tu entends : le retour s'accroche à la seconde près, l'ingé le retrouve direct.</span></p>"
+        ? '<p class="review-hint">' + icon("comment", 18) + "<span>Là où quelque chose te gêne, écris-le : le retour s'accroche à la seconde près.</span></p>"
         : "";
       return;
     }
@@ -546,6 +520,7 @@ export function createReview(o) {
   function bind() {
     const form = q("[data-rv-form]");
     const ta = form.querySelector("textarea");
+    ta.addEventListener("focus", () => { if (o.pause) o.pause(); });
 
     q("[data-rv-time]").onclick = () => { useTime = !useTime; syncTime(); };
     q("[data-rv-tags]").addEventListener("click", (e) => {

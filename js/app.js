@@ -1,21 +1,21 @@
 // Coquille de l'appli : démarrage, routeur à hash, en-tête, bus
 // d'événements, temps réel. Chaque vue est un module avec mount().
 
-import { restore, getSpace, leaveSpace } from "./session.js?v=42";
-import { connectSpace } from "./realtime.js?v=42";
-import { bindPlayerBar } from "./player.js?v=42";
-import { activeCount, onUploads } from "./upload.js?v=42";
-import { openPeopleSheet } from "./views/people.js?v=42";
-import { openUploadSheet } from "./views/upload-sheet.js?v=42";
-import { icon } from "./icons.js?v=42";
-import { monogram } from "./brand.js?v=42";
-import { toast, errorText, esc } from "./ui.js?v=42";
+import { restore, getSpace, leaveSpace } from "./session.js?v=45";
+import { connectSpace } from "./realtime.js?v=45";
+import { bindPlayerBar } from "./player.js?v=45";
+import { activeCount, onUploads } from "./upload.js?v=45";
+import { openPeopleSheet } from "./views/people.js?v=45";
+import { openUploadSheet } from "./views/upload-sheet.js?v=45";
+import { icon } from "./icons.js?v=45";
+import { monogram } from "./brand.js?v=45";
+import { toast, errorText, esc } from "./ui.js?v=45";
 
-import * as home from "./views/home.js?v=42";
-import * as project from "./views/project.js?v=42";
-import * as file from "./views/file.js?v=42";
-import * as send from "./views/send.js?v=42";
-import * as transfers from "./views/transfers.js?v=42";
+import * as home from "./views/home.js?v=45";
+import * as project from "./views/project.js?v=45";
+import * as file from "./views/file.js?v=45";
+import * as send from "./views/send.js?v=45";
+import * as transfers from "./views/transfers.js?v=45";
 
 // L'accueil dépend du mode de l'espace : morceaux (séminaire) ou
 // directement le composeur d'envoi (espace dédié aux envois).
@@ -72,7 +72,7 @@ function drawHeader(isRoot) {
       : '<button class="btn btn-ghost btn-icon" data-back aria-label="Retour">' + icon("back") + "</button>") +
     '<div class="title" data-title></div>' +
     '<span class="up-pill" data-up hidden></span>' +
-    (ctx.space.mode === "envoi" ? "" : '<a class="btn btn-ghost btn-icon" href="#/send" aria-label="Envoyer">' + icon("send") + "</a>") +
+    (ctx.space.mode === "envoi" || ctx.space.mode === "revue" ? "" : '<a class="btn btn-ghost btn-icon" href="#/send" aria-label="Envoyer">' + icon("send") + "</a>") +
     '<button class="btn btn-ghost btn-icon people-btn" data-people aria-label="Participants">' + icon("users") +
       '<span class="badge" data-online></span></button>';
 
@@ -267,7 +267,7 @@ async function boot() {
   window.addEventListener("hashchange", routeSmoothly);
 
   // compte : "Mes espaces" à jour depuis le serveur (autres appareils)
-  import("./session.js?v=42").then((m) => m.syncSpaces()).catch(() => {});
+  import("./session.js?v=45").then((m) => m.syncSpaces()).catch(() => {});
 
   // message laissé par l'accueil (ex. réglage refusé à la création)
   try {

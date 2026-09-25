@@ -2,14 +2,17 @@
 // navigation entre les vues. Les vues l'écoutent pour animer leurs
 // waveforms, la barre du bas l'affiche en permanence.
 
-import { cachedUrl, signFiles } from "./api.js?v=42";
-import { icon } from "./icons.js?v=42";
-import { formatDuration, toast } from "./ui.js?v=42";
+import { cachedUrl, signFiles } from "./api.js?v=45";
+import { icon } from "./icons.js?v=45";
+import { formatDuration, toast } from "./ui.js?v=45";
 
 const audio = new Audio();
 audio.preload = "metadata";
 
 let track = null;   // { fileId, path, title, subtitle, duration, mime }
+// File d'écoute : les morceaux s'enchaînent (fin d'un titre = suivant).
+let queue = [];
+let qIndex = -1;
 const listeners = new Set();
 let raf = 0;
 
@@ -34,6 +37,32 @@ export function state() {
   };
 }
 
+export function queueInfo() {
+  return { length: queue.length, index: qIndex, hasNext: qIndex >= 0 && qIndex < queue.length - 1, hasPrev: qIndex > 0 };
+}
+
+// Lance une file (album, liste de mix) à partir de `index`. Les URLs sont
+// signées d'avance : le suivant part sans attendre le réseau.
+export function playQueue(tracks, index) {
+  queue = (tracks || []).slice();
+  qIndex = Math.max(0, Math.min(index || 0, queue.length - 1));
+  signFiles(queue.map((t) => t.fileId)).catch(() => {});
+  return play(queue[qIndex], { keepQueue: true, at: 0 });
+}
+
+export function next() {
+  if (qIndex < 0 || qIndex >= queue.length - 1) return;
+  qIndex++;
+  play(queue[qIndex], { keepQueue: true, at: 0 });
+}
+
+export function prev() {
+  // comme partout : au-delà de 3 s, on revient au début du titre
+  if ((audio.currentTime || 0) > 3 || qIndex <= 0) { seekSeconds(0); return; }
+  qIndex--;
+  play(queue[qIndex], { keepQueue: true, at: 0 });
+}
+
 export function isCurrent(fileId) {
   return !!track && track.fileId === fileId;
 }
@@ -42,12 +71,17 @@ export function isCurrent(fileId) {
 // n'autorise la lecture que dans la continuité directe du tap.
 export function play(next, options) {
   const opts = options || {};
+  // lecture isolée d'un titre hors de la file : la file s'arrête là
+  if (!opts.keepQueue) {
+    const i = queue.findIndex((t) => t.fileId === next.fileId);
+    if (i === -1) { queue = []; qIndex = -1; } else qIndex = i;
+  }
   if (!track || track.fileId !== next.fileId) {
     const url = next.url || cachedUrl(next.fileId);
     if (!url) {
       return signFiles([next.fileId]).then((urls) => {
         if (!urls[next.fileId]) throw new Error("URL indisponible");
-        return play(Object.assign({}, next, { url: urls[next.fileId] }), opts);
+        return play(Object.assign({}, next, { url: urls[next.fileId] }), Object.assign({}, opts, { keepQueue: true }));
       }).catch((err) => toast("Lecture impossible : " + err.message, "err"));
     }
     track = next;
@@ -100,6 +134,8 @@ export function close() {
   audio.removeAttribute("src");
   audio.load();
   track = null;
+  queue = [];
+  qIndex = -1;
   emit("track");
 }
 
@@ -115,7 +151,10 @@ audio.addEventListener("play", () => {
   if (!raf) raf = requestAnimationFrame(tick);
 });
 audio.addEventListener("pause", () => { emit("state"); updatePosition(); });
-audio.addEventListener("ended", () => emit("state"));
+audio.addEventListener("ended", () => {
+  if (qIndex >= 0 && qIndex < queue.length - 1) next();
+  else emit("state");
+});
 audio.addEventListener("loadedmetadata", () => { emit("time"); updatePosition(); });
 audio.addEventListener("seeked", updatePosition);
 audio.addEventListener("error", () => {
@@ -163,6 +202,8 @@ if ("mediaSession" in navigator) {
   set("seekforward", () => skip(10));
   set("seekto", (d) => seekSeconds(d.seekTime));
   set("stop", close);
+  set("nexttrack", () => next());
+  set("previoustrack", () => prev());
 }
 
 // --------------------------------------------------------- barre du bas
@@ -173,7 +214,9 @@ export function bindPlayerBar(navigate) {
 
   bar.innerHTML =
     '<div class="player-progress"><i></i></div>' +
+    '<button class="btn btn-ghost btn-icon player-skip" data-prev aria-label="Précédent" hidden>' + icon("prev", 20) + "</button>" +
     '<button class="player-play" data-toggle aria-label="Lecture">' + icon("play", 22) + "</button>" +
+    '<button class="btn btn-ghost btn-icon player-skip" data-next aria-label="Suivant" hidden>' + icon("next", 20) + "</button>" +
     '<button class="player-info" data-open>' +
       '<span class="t" data-title></span>' +
       '<span class="s"><span data-sub></span> <span class="mono" data-time>0:00</span></span>' +
@@ -187,6 +230,10 @@ export function bindPlayerBar(navigate) {
   const timeEl = bar.querySelector("[data-time]");
 
   toggleBtn.onclick = toggle;
+  const prevBtn = bar.querySelector("[data-prev]");
+  const nextBtn = bar.querySelector("[data-next]");
+  prevBtn.onclick = prev;
+  nextBtn.onclick = next;
   bar.querySelector("[data-close]").onclick = close;
   bar.querySelector("[data-open]").onclick = () => { if (track) navigate("#/f/" + track.fileId); };
 
@@ -202,6 +249,10 @@ export function bindPlayerBar(navigate) {
       document.body.classList.toggle("has-player", !!s.track);
       titleEl.textContent = s.track ? s.track.title : "";
       subEl.textContent = s.track ? (s.track.subtitle || "") : "";
+      const qi = queueInfo();
+      prevBtn.hidden = qi.length < 2;
+      nextBtn.hidden = qi.length < 2;
+      nextBtn.disabled = !qi.hasNext;
     }
     if (type === "state" || type === "track") {
       toggleBtn.innerHTML = icon(s.playing ? "pause" : "play", 22);

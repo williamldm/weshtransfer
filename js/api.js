@@ -1,7 +1,7 @@
 // Accès aux données. Toutes les requêtes de l'appli passent par ici : les
 // vues ne connaissent ni PostgREST ni le Storage.
 
-import { sb, q, invoke, requireClient } from "./db.js?v=42";
+import { sb, q, invoke, requireClient } from "./db.js?v=45";
 
 // Toute requête passe par ici : sans config, message clair plutôt
 // qu'un "Cannot read properties of null".
@@ -11,7 +11,7 @@ const db = () => requireClient();
 
 export function listProjects(spaceId) {
   return q(db().from("projects")
-    .select("id, title, bpm, musical_key, last_activity_at, created_at, created_by, creator:participants(pseudo), files(id, kind, status, version_no, approved_at, original_name, mime_type, uploaded_by)")
+    .select("id, title, bpm, musical_key, last_activity_at, created_at, created_by, creator:participants(pseudo), files(id, kind, status, version_no, approved_at, original_name, mime_type, uploaded_by, duration_sec, label)")
     .eq("space_id", spaceId)
     .eq("archived", false)
     .order("last_activity_at", { ascending: false }));

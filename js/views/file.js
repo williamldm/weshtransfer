@@ -1,16 +1,16 @@
 // Écoute d'une version : grande waveform, transport, commentaires
 // horodatés façon SoundCloud ("à 1:23, la voix sature").
 
-import { getFile, listComments, addComment, deleteComment, signFiles, cachedUrl, cachedDownload, deleteFile, updateFile } from "../api.js?v=42";
-import { createReview } from "./review.js?v=42";
-import { Waveform, formatTime } from "../waveform.js?v=42";
-import { play, toggle, isCurrent, onPlayer, seekRatio, seekSeconds, skip, state as playerState, trackFromFile } from "../player.js?v=42";
-import { icon } from "../icons.js?v=42";
-import { isAudio, canPreview, categoryOf } from "../files.js?v=42";
+import { getFile, listComments, addComment, deleteComment, signFiles, cachedUrl, cachedDownload, deleteFile, updateFile } from "../api.js?v=45";
+import { createReview } from "./review.js?v=45";
+import { Waveform, formatTime } from "../waveform.js?v=45";
+import { play, toggle, isCurrent, onPlayer, seekRatio, seekSeconds, skip, state as playerState, trackFromFile } from "../player.js?v=45";
+import { icon } from "../icons.js?v=45";
+import { isAudio, canPreview, categoryOf } from "../files.js?v=45";
 import {
   esc, h, fileBadge, fileTile, timeAgo, formatBytes, avatar, toast, errorText, triggerDownload, plural,
   confirmSheet, actionSheet, KINDS, openSheet
-} from "../ui.js?v=42";
+} from "../ui.js?v=45";
 
 export const title = () => "Écoute";
 
@@ -54,6 +54,8 @@ export function renderFileShell(file, space) {
   const media = !audio && canPreview(file.original_name, file.mime_type) && (cat === "image" || cat === "video");
   const review = space.mode === "revue";
 
+  if (review) return renderReviewShell(file, versions, audio, media, cat, mine, space);
+
   return (
     '<header class="page-head">' +
       (file.project ? '<a class="eyebrow link" href="#/p/' + file.project.id + '">' + icon("back", 14) + " " + esc(file.project.title) + "</a>" : "") +
@@ -87,7 +89,6 @@ export function renderFileShell(file, space) {
             '<button class="btn btn-ghost btn-icon" data-fwd aria-label="Avancer de 10 secondes">' + icon("fwd10", 22) + "</button>" +
             '<span class="mono t-dur" data-dur>' + formatTime(Number(file.duration_sec) || 0) + "</span>" +
           "</div>" +
-          (review ? '<button class="btn btn-block rv-note-here" data-note-here>' + icon("comment", 18) + ' <span>Noter un retour à <b data-note-at>0:00</b></span></button>' : "") +
         "</section>") +
     '<div class="actions-row">' +
       '<button class="btn" data-dl>' + icon("download", 18) + "<span>Télécharger</span></button>" +
@@ -109,6 +110,43 @@ export function renderFileShell(file, space) {
           "</form>" +
           '<ul class="comment-list" data-comments></ul>' +
         "</section>")
+  );
+}
+
+// Retours de mix : l'essentiel seulement. Le morceau et sa version en
+// titre, les versions pour comparer, le lecteur, puis les retours.
+function renderReviewShell(file, versions, audio, media, cat, mine, space) {
+  const title = file.project ? file.project.title : file.original_name;
+  return (
+    '<header class="rv-top">' +
+      '<span class="cover" style="--hue:' + (Math.abs([...title].reduce((h, c) => (h * 31 + c.charCodeAt(0)) | 0, 0)) % 360) + '" aria-hidden="true">' +
+        esc(title.trim().slice(0, 2).toUpperCase()) + "</span>" +
+      '<div class="rv-top-text"><h1>' + esc(title) + "</h1>" +
+        '<p class="muted">v' + file.version_no + (file.uploader ? " · " + esc(file.uploader.pseudo) : "") + " · " + timeAgo(file.created_at) + "</p></div>" +
+      '<button class="btn btn-ghost btn-icon" data-dl aria-label="Télécharger">' + icon("download", 20) + "</button>" +
+      (mine || space.isHost ? '<button class="btn btn-ghost btn-icon" data-more aria-label="Plus">' + icon("more") + "</button>" : "") +
+    "</header>" +
+    (versions.length > 1
+      ? '<nav class="version-switch" aria-label="Versions" title="Pendant la lecture, changer de version garde la position (comparaison A/B)">' + versions.map((v) =>
+          '<a class="chip' + (v.id === file.id ? " is-on" : "") + '" data-version="' + v.id + '" href="#/f/' + v.id + '">' +
+          (v.approved_at ? icon("check", 13) + " " : "") + "v" + v.version_no + "</a>").join("") + "</nav>"
+      : "") +
+    (!audio
+      ? (media
+          ? '<div class="player-card media-card">' +
+              (cat === "image" ? '<img alt="" data-media>' : '<video controls playsinline preload="metadata" data-media></video>') + "</div>"
+          : '<div class="player-card zip-card">' + fileTile(file.original_name, file.mime_type) + "<p>Pas d'aperçu pour ce type de fichier : télécharge-le.</p></div>")
+      : '<section class="player-card">' +
+          '<div class="wave wave-lg has-pins"><canvas></canvas></div>' +
+          '<div class="transport">' +
+            '<span class="mono t-time" data-time>0:00</span>' +
+            '<button class="btn btn-ghost btn-icon" data-back aria-label="Reculer de 10 secondes">' + icon("back10", 22) + "</button>" +
+            '<button class="big-play" data-toggle aria-label="Lecture">' + icon("play", 30) + "</button>" +
+            '<button class="btn btn-ghost btn-icon" data-fwd aria-label="Avancer de 10 secondes">' + icon("fwd10", 22) + "</button>" +
+            '<span class="mono t-dur" data-dur>' + formatTime(Number(file.duration_sec) || 0) + "</span>" +
+          "</div>" +
+        "</section>") +
+    '<div data-review-root></div>'
   );
 }
 
@@ -167,6 +205,8 @@ export async function mount(root, ctx, params) {
         ctx,
         currentMs,
         playAt,
+        // on écrit sur ce moment-là : le son s'arrête, l'horodatage aussi
+        pause: () => { if (isCurrent(file.id) && playerState().playing) toggle(); },
         setMarkers: (list) => { markers = list; applyMarkers(); }
       });
       rv.setFile(file);
@@ -371,7 +411,9 @@ export async function mount(root, ctx, params) {
     drawComments();
     if (rv) await rv.reload().catch((err) => toast(errorText(err), "err"));
     ctx.setTitle(file.project ? file.project.title : "Écoute");
-    if (file.project) ctx.setBack("#/p/" + file.project.id);
+    // retours : retour à la liste des morceaux (on n'est pas passé par les versions)
+    if (review) ctx.setBack("#/projects");
+    else if (file.project) ctx.setBack("#/p/" + file.project.id);
   }
 
   const offPlayer = onPlayer((type, s) => {

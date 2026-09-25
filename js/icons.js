@@ -4,6 +4,8 @@ const P = {
   play: '<path d="M7 4.6v14.8a.6.6 0 0 0 .9.5l11.8-7.4a.6.6 0 0 0 0-1L7.9 4.1a.6.6 0 0 0-.9.5z" fill="currentColor" stroke="none"/>',
   pause: '<rect x="6" y="4.5" width="4" height="15" rx="1.2" fill="currentColor" stroke="none"/><rect x="14" y="4.5" width="4" height="15" rx="1.2" fill="currentColor" stroke="none"/>',
   plus: '<path d="M12 5v14M5 12h14"/>',
+  next: '<path d="M5 5.6v12.8a.6.6 0 0 0 .9.5l9.4-6.4a.6.6 0 0 0 0-1L5.9 5.1a.6.6 0 0 0-.9.5z" fill="currentColor" stroke="none"/><rect x="16.5" y="5" width="2.6" height="14" rx="1" fill="currentColor" stroke="none"/>',
+  prev: '<path d="M19 5.6v12.8a.6.6 0 0 1-.9.5l-9.4-6.4a.6.6 0 0 1 0-1l9.4-6.4a.6.6 0 0 1 .9.5z" fill="currentColor" stroke="none"/><rect x="4.9" y="5" width="2.6" height="14" rx="1" fill="currentColor" stroke="none"/>',
   back: '<path d="M19 12H5M12 19l-7-7 7-7"/>',
   send: '<path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4z"/>',
   download: '<path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/>',
