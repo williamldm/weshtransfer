@@ -1,7 +1,7 @@
 // Accès aux données. Toutes les requêtes de l'appli passent par ici : les
 // vues ne connaissent ni PostgREST ni le Storage.
 
-import { sb, q, invoke, requireClient } from "./db.js?v=45";
+import { sb, q, invoke, requireClient } from "./db.js?v=47";
 
 // Toute requête passe par ici : sans config, message clair plutôt
 // qu'un "Cannot read properties of null".
@@ -110,6 +110,18 @@ export function reviewUnsubscribe(spaceId) {
 }
 export function reviewFlush(spaceId) {
   return invoke("review-digest", { action: "flush", space_id: spaceId });
+}
+
+// Pochette d'un espace de retours (data URL JPEG, une ligne par espace)
+export function getCover(spaceId) {
+  return q(db().from("space_covers").select("image").eq("space_id", spaceId).maybeSingle())
+    .then((r) => (r ? r.image : null));
+}
+export function saveCover(spaceId, image) {
+  return q(db().from("space_covers").upsert({ space_id: spaceId, image, updated_at: new Date().toISOString() }));
+}
+export function removeCover(spaceId) {
+  return q(db().from("space_covers").delete().eq("space_id", spaceId));
 }
 
 export function isEngineer(projectId) {

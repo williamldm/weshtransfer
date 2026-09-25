@@ -1,15 +1,15 @@
 // Accueil de l'espace : gros boutons d'action, uploads en cours, morceaux
 // triés par activité récente.
 
-import { listProjects, createProject, listReviewComments, deleteProject, deleteFile, reviewNotifyStatus, reviewSubscribe, reviewUnsubscribe } from "../api.js?v=45";
-import { ensureVerified } from "../verify.js?v=45";
-import { mountReviewHome } from "./review-home.js?v=45";
-import { stateOf, isEngineerOf } from "./review.js?v=45";
-import { mountUploads } from "./uploads.js?v=45";
-import { openUploadSheet } from "./upload-sheet.js?v=45";
-import { openPeopleSheet } from "./people.js?v=45";
-import { icon } from "../icons.js?v=45";
-import { esc, h, kindBadge, timeAgo, plural, promptSheet, toast, errorText, daysLeft, formatDate, actionSheet, confirmSheet } from "../ui.js?v=45";
+import { listProjects, createProject, listReviewComments, deleteProject, deleteFile, reviewNotifyStatus, reviewSubscribe, reviewUnsubscribe } from "../api.js?v=47";
+import { ensureVerified } from "../verify.js?v=47";
+import { mountReviewHome } from "./review-home.js?v=47";
+import { stateOf, isEngineerOf } from "./review.js?v=47";
+import { mountUploads } from "./uploads.js?v=47";
+import { openUploadSheet } from "./upload-sheet.js?v=47";
+import { openPeopleSheet } from "./people.js?v=47";
+import { icon } from "../icons.js?v=47";
+import { esc, h, kindBadge, timeAgo, plural, promptSheet, toast, errorText, daysLeft, formatDate, actionSheet, confirmSheet } from "../ui.js?v=47";
 
 export const title = (ctx) => ctx.space.name;
 

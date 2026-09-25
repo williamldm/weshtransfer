@@ -6,15 +6,16 @@
 import {
   listProjects, listReviewComments, deleteProject, deleteFile,
   reviewNotifyStatus, reviewSubscribe, reviewUnsubscribe
-} from "../api.js?v=45";
-import { mountUploads } from "./uploads.js?v=45";
-import { openUploadSheet } from "./upload-sheet.js?v=45";
-import { stateOf, isEngineerOf } from "./review.js?v=45";
-import { ensureVerified } from "../verify.js?v=45";
-import { accountEmail } from "../session.js?v=45";
-import { playQueue, onPlayer, isCurrent, state as playerState, toggle, trackFromFile } from "../player.js?v=45";
-import { icon } from "../icons.js?v=45";
-import { esc, plural, toast, errorText, formatDuration, actionSheet, confirmSheet, promptSheet } from "../ui.js?v=45";
+} from "../api.js?v=47";
+import { mountUploads } from "./uploads.js?v=47";
+import { openUploadSheet } from "./upload-sheet.js?v=47";
+import { stateOf, isEngineerOf } from "./review.js?v=47";
+import { ensureVerified } from "../verify.js?v=47";
+import { accountEmail } from "../session.js?v=47";
+import { coverOf, onCover, setCover, clearCover } from "../cover.js?v=47";
+import { playQueue, onPlayer, isCurrent, state as playerState, toggle, trackFromFile } from "../player.js?v=47";
+import { icon } from "../icons.js?v=47";
+import { esc, plural, toast, errorText, formatDuration, actionSheet, confirmSheet, promptSheet } from "../ui.js?v=47";
 
 // Pochette générée : un aplat dont la teinte dépend du nom, les initiales
 // en grand. Pas de dégradé (identité sobre).
@@ -27,30 +28,38 @@ function initials(text) {
   const words = String(text || "?").replace(/[^\p{L}\p{N} ]/gu, " ").trim().split(/\s+/).filter(Boolean);
   return ((words[0] || "?").charAt(0) + (words[1] ? words[1].charAt(0) : (words[0] || "").charAt(1) || "")).toUpperCase();
 }
-export function cover(text, cls) {
+// `image` : la pochette déposée (data URL), sinon les initiales.
+export function cover(text, cls, image) {
+  if (image) return '<span class="cover has-img ' + (cls || "") + '" aria-hidden="true"><img src="' + esc(image) + '" alt=""></span>';
   return '<span class="cover ' + (cls || "") + '" style="--hue:' + hueOf(text) + '" aria-hidden="true">' + esc(initials(text)) + "</span>";
 }
 
 const latestOf = (p) => (p.files || []).filter((f) => f.status === "ready").sort((a, b) => b.version_no - a.version_no)[0] || null;
 
-// Un seul statut par morceau, vu par l'ingé ou par l'artiste.
+// Une phrase par morceau, en italique sous le titre : ce qu'il reste à
+// faire, vu par l'ingé ou par l'artiste.
 function statusOf(p, stats, engineer) {
   const latest = latestOf(p);
   if (!latest) return { text: "", cls: "" };
-  if (latest.approved_at) return { text: "Validé", cls: "is-ok" };
+  if (latest.approved_at) return { text: "Validé, plus rien à modifier", cls: "is-ok" };
   let open = 0, verify = 0, any = 0;
   for (const f of p.files || []) {
     const s = stats.get(f.id);
     if (s) { open += s.open; verify += s.verify; any += s.all; }
   }
   if (engineer) {
-    if (open) return { text: plural(open, "à corriger", "à corriger"), cls: "is-todo" };
-    if (verify) return { text: "Chez l'artiste", cls: "is-verify" };
-    return { text: any ? "À valider" : "", cls: "" };
+    if (open) return { text: plural(open, "modif à faire", "modifs à faire"), cls: "is-todo" };
+    if (verify) return { text: "Corrigé, l'artiste vérifie", cls: "is-verify" };
+    return { text: any ? "Rien à modifier, attend la validation" : "Pas encore de retour de l'artiste", cls: "" };
   }
-  if (verify) return { text: plural(verify, "à vérifier", "à vérifier"), cls: "is-verify" };
-  if (open) return { text: "Chez l'ingé", cls: "" };
-  return { text: any ? "À valider" : "Nouveau", cls: "is-new" };
+  if (verify) return { text: plural(verify, "correction à vérifier", "corrections à vérifier"), cls: "is-verify" };
+  if (open) return { text: plural(open, "modif demandée", "modifs demandées") + ", l'ingé s'en occupe", cls: "" };
+  return { text: any ? "Plus rien à modifier ? Valide-le" : "Des modifs à demander ? Ouvre-le", cls: "is-new" };
+}
+
+const HELP_KEY = "weshtransfer.reviewHelp";
+function helpClosed() {
+  try { return localStorage.getItem(HELP_KEY) === "closed"; } catch (err) { return false; }
 }
 
 export async function mountReviewHome(root, ctx) {
@@ -58,10 +67,13 @@ export async function mountReviewHome(root, ctx) {
   let projects = [];
   let stats = new Map();
   let engineer = !!s.isHost;
+  let coverImg = null;
+  let loaded = false;
 
   root.innerHTML =
     '<section class="rh-hero">' +
-      cover(s.name, "cover-xl") +
+      '<div class="rh-cover" data-cover-box></div>' +
+      '<input type="file" accept="image/*" hidden data-cover-pick>' +
       '<div class="rh-info">' +
         '<p class="eyebrow">Retours de mix</p>' +
         "<h1>" + esc(s.name) + "</h1>" +
@@ -72,6 +84,7 @@ export async function mountReviewHome(root, ctx) {
         "</div>" +
       "</div>" +
     "</section>" +
+    '<div data-help></div>' +
     '<div data-uploads hidden></div>' +
     '<ol class="tracklist" data-list><li class="skeleton"></li><li class="skeleton"></li></ol>';
 
@@ -79,6 +92,64 @@ export async function mountReviewHome(root, ctx) {
   const meta = root.querySelector("[data-meta]");
   const playAll = root.querySelector("[data-play-all]");
   const engActions = root.querySelector("[data-engineer-actions]");
+  const coverBox = root.querySelector("[data-cover-box]");
+  const coverPick = root.querySelector("[data-cover-pick]");
+  const helpBox = root.querySelector("[data-help]");
+
+  // Pochette : proposée à l'artiste tant qu'il n'y en a pas ; l'ingé
+  // peut aussi la mettre. Toucher la pochette = la changer.
+  function drawCover() {
+    const empty = !coverImg;
+    coverBox.innerHTML =
+      '<button type="button" class="rh-cover-btn' + (empty && !engineer ? " is-empty" : "") + '" data-cover aria-label="' + (empty ? "Ajouter une cover" : "Changer la cover") + '">' +
+        (empty && !engineer
+          ? '<span class="cover cover-xl cover-add">' + icon("image", 28) + "<span>Ajoute la cover du projet</span></span>"
+          : cover(s.name, "cover-xl", coverImg) + '<span class="rh-cover-edit" aria-hidden="true">' + icon(empty ? "image" : "edit", 16) + "</span>") +
+      "</button>";
+  }
+
+  coverBox.addEventListener("click", (e) => {
+    if (!e.target.closest("[data-cover]")) return;
+    if (!coverImg) { coverPick.click(); return; }
+    actionSheet("Cover", [
+      { label: "Changer la cover", icon: "image", run: () => coverPick.click() },
+      {
+        label: "Retirer la cover", icon: "trash", danger: true,
+        run: async () => {
+          try { await clearCover(s.id); toast("Cover retirée", "ok"); } catch (err) { toast(errorText(err), "err"); }
+        }
+      }
+    ]);
+  });
+
+  coverPick.addEventListener("change", async (e) => {
+    const file = e.target.files && e.target.files[0];
+    e.target.value = "";
+    if (!file) return;
+    coverBox.classList.add("is-busy");
+    try { await setCover(s.id, file); toast("Cover ajoutée", "ok"); }
+    catch (err) { toast(errorText(err), "err"); }
+    coverBox.classList.remove("is-busy");
+  });
+
+  // Mode d'emploi pour l'artiste : ouvert tant qu'il ne l'a pas refermé.
+  function drawHelp() {
+    if (engineer) { helpBox.innerHTML = ""; return; }
+    helpBox.innerHTML =
+      '<details class="rh-help"' + (helpClosed() ? "" : " open") + ">" +
+        "<summary>" + icon("comment", 18) + "<span>Comment ça marche ?</span></summary>" +
+        "<ol>" +
+          "<li><b>Écoute.</b> Touche un morceau pour l'ouvrir.</li>" +
+          "<li><b>Demande tes modifs.</b> Là où quelque chose te gêne, écris-le avec tes mots : voix trop loin, basse trop forte, fin trop longue... Le retour s'accroche à la seconde près.</li>" +
+          "<li><b>Vérifie.</b> L'ingé corrige et renvoie une nouvelle version. Tu confirmes chaque correction, puis tu valides le morceau.</li>" +
+        "</ol>" +
+        "<p>Pas besoin de vocabulaire technique, et tu peux demander autant de modifications que tu veux.</p>" +
+      "</details>";
+    const d = helpBox.querySelector("details");
+    d.addEventListener("toggle", () => {
+      try { localStorage.setItem(HELP_KEY, d.open ? "open" : "closed"); } catch (err) { /* navigation privée */ }
+    });
+  }
 
   // Actions de l'ingé : déposer un mix, emails (inviter : icône du haut). Une icône chacune.
   let notifyEmail = null;
@@ -120,7 +191,11 @@ export async function mountReviewHome(root, ctx) {
   function tracks() {
     return projects.map((p) => {
       const f = latestOf(p);
-      return f ? trackFromFile(Object.assign({}, f, { uploader: null }), p.title) : null;
+      if (!f) return null;
+      const tr = trackFromFile(Object.assign({}, f, { uploader: null }), p.title);
+      tr.album = s.name;
+      if (coverImg) tr.artwork = coverImg;
+      return tr;
     }).filter(Boolean);
   }
 
@@ -148,14 +223,14 @@ export async function mountReviewHome(root, ctx) {
       const playing = f && isCurrent(f.id);
       return '<li class="track' + (playing ? " is-current" : "") + (playing && playerState().playing ? " is-playing" : "") + '" data-id="' + p.id + '">' +
         '<button class="track-art" data-play="' + i + '" aria-label="Écouter ' + esc(p.title) + '"' + (f ? "" : " disabled") + ">" +
-          cover(p.title) + '<span class="track-play">' + icon(playing && playerState().playing ? "pause" : "play", 18) + "</span>" +
+          cover(p.title, "", coverImg) + '<span class="track-play">' + icon(playing && playerState().playing ? "pause" : "play", 18) + "</span>" +
           '<span class="eq" aria-hidden="true"><i></i><i></i><i></i></span>' +
         "</button>" +
         '<a class="track-main" href="' + (f ? "#/f/" + f.id : "#/p/" + p.id) + '">' +
           '<span class="track-title">' + esc(p.title) + "</span>" +
-          '<span class="track-sub">' + (f ? "v" + f.version_no : "pas encore de version") + "</span>" +
+          '<span class="track-sub">' + (f ? "v" + f.version_no : "pas encore de version") +
+            (st.text ? ' · <em class="track-note ' + st.cls + '">' + esc(st.text) + "</em>" : "") + "</span>" +
         "</a>" +
-        (st.text ? '<span class="track-status ' + st.cls + '">' + esc(st.text) + "</span>" : "") +
         '<span class="track-dur mono">' + (f && f.duration_sec ? formatDuration(Number(f.duration_sec)) : "") + "</span>" +
         (canEdit(p) ? '<button class="btn btn-ghost btn-icon btn-sm" data-menu aria-label="Options">' + icon("more", 18) + "</button>" : "") +
       "</li>";
@@ -221,7 +296,8 @@ export async function mountReviewHome(root, ctx) {
       }
       const was = engineer;
       engineer = s.isHost || isEngineerOf(s, projects.flatMap((p) => p.files || []));
-      if (engineer !== was) drawEngineerActions();
+      if (engineer !== was) { drawEngineerActions(); drawCover(); drawHelp(); }
+      loaded = true;
       draw();
     } catch (err) {
       list.innerHTML = '<li class="tracklist-empty">' + esc(errorText(err)) + "</li>";
@@ -231,6 +307,10 @@ export async function mountReviewHome(root, ctx) {
   }
 
   drawEngineerActions();
+  drawCover();
+  drawHelp();
+  coverOf(s.id).then((img) => { coverImg = img; drawCover(); if (loaded) draw(); });
+  const offCover = onCover((id, img) => { if (id === s.id) { coverImg = img; drawCover(); if (loaded) draw(); } });
   if (engineer) reviewNotifyStatus(s.id).then((r) => { notifyEmail = r && r.email; drawEngineerActions(); }).catch(() => {});
 
   const offUploads = mountUploads(root.querySelector("[data-uploads]"));
@@ -242,5 +322,5 @@ export async function mountReviewHome(root, ctx) {
   ctx.setDrop((files) => { if (engineer) openUploadSheet(ctx, files); });
 
   await load();
-  return () => { offUploads(); offDb(); offPlayer(); };
+  return () => { offUploads(); offDb(); offPlayer(); offCover(); };
 }
