@@ -5,19 +5,20 @@
 import {
   getProject, getFilesByIds, createTransfer, sendTransfer, emailEnabled,
   getTransfer, transferUrl, createProject, signFiles, cachedUrl,
-  knownVerified, listContacts, forgetContact
-} from "../api.js?v=57";
-import { ensureVerified } from "../verify.js?v=57";
-import { openUploadSheet } from "./upload-sheet.js?v=57";
-import { mountUploads } from "./uploads.js?v=57";
-import { onUploads, enqueue, checkFile } from "../upload.js?v=57";
-import { categoryOf, canPreview } from "../files.js?v=57";
-import { takePending } from "../pending.js?v=57";
-import { icon } from "../icons.js?v=57";
+  knownVerified, listContacts, forgetContact, rememberContactsLocal
+} from "../api.js?v=58";
+import { accountEmail } from "../session.js?v=58";
+import { ensureVerified } from "../verify.js?v=58";
+import { openUploadSheet } from "./upload-sheet.js?v=58";
+import { mountUploads } from "./uploads.js?v=58";
+import { onUploads, enqueue, checkFile } from "../upload.js?v=58";
+import { categoryOf, canPreview } from "../files.js?v=58";
+import { takePending } from "../pending.js?v=58";
+import { icon } from "../icons.js?v=58";
 import {
   esc, h, formatBytes, formatDuration, plural, toast, errorText, openSheet, copyText, shareLink,
   canShare, formatDate, daysLeft, fileBadge, fileTile
-} from "../ui.js?v=57";
+} from "../ui.js?v=58";
 
 // Dans un espace "envoi", ce composeur EST l'accueil.
 export const title = (ctx) => (ctx && ctx.space.mode === "envoi" ? ctx.space.name : "Envoyer");
@@ -26,7 +27,10 @@ const REPLY_KEY = "seminaire.replyTo";
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 const DURATIONS = [1, 3, 7, 14];
 
+// Ton email : celui du compte connecté, sinon le dernier utilisé ici.
 function remembered() {
+  const account = accountEmail();
+  if (account) return account;
   try { return localStorage.getItem(REPLY_KEY) || ""; } catch (err) { return ""; }
 }
 
@@ -215,11 +219,12 @@ export async function mount(root, ctx, params) {
   }
   replyInput.addEventListener("input", drawReplyHint);
 
-  // Le carnet suit l'email d'expédition : chargé dès que l'adresse est
-  // vérifiée sur cet appareil (le serveur refuse sinon).
+  // Le carnet suit l'email d'expédition : chargé dès qu'une adresse valable
+  // est là (le serveur ne l'ouvre qu'à qui l'a prouvée ; sinon, la copie
+  // locale de cet appareil).
   async function loadContacts() {
     const sender = replyInput.value.trim().toLowerCase();
-    if (!emailOn || !EMAIL_RE.test(sender) || !knownVerified(sender)) {
+    if (!emailOn || !EMAIL_RE.test(sender)) {
       if (state.contactsOf) { state.contacts = []; state.contactsOf = ""; drawRecents(); }
       return;
     }
@@ -230,6 +235,7 @@ export async function mount(root, ctx, params) {
       state.contacts = list;
       state.contactsOf = sender;
       drawRecents();
+      drawReplyHint();
     } catch (err) { /* sans carnet, on tape les adresses à la main */ }
   }
   let contactsTimer = null;
@@ -364,6 +370,7 @@ export async function mount(root, ctx, params) {
       state.contacts = state.contacts.filter((r) => r.email !== email);
       drawRecents();
       forgetContact(state.contactsOf, email).catch((err) => toast(errorText(err), "err"));
+      if (!state.contacts.length) drawRecents();
     }
   });
 
@@ -511,6 +518,8 @@ export async function mount(root, ctx, params) {
       return toast("Donne ton email : tes destinataires doivent savoir qui leur écrit", "err");
     }
     try { localStorage.setItem(REPLY_KEY, replyTo); } catch (err) { /* privé */ }
+    // les adresses tapées rejoignent le carnet de cet email, tout de suite
+    rememberContactsLocal(replyTo, state.emails.filter((e) => EMAIL_RE.test(e)));
 
     state.sending = true;
     drawSubmit();

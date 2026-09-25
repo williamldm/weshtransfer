@@ -1,7 +1,7 @@
 // Accès aux données. Toutes les requêtes de l'appli passent par ici : les
 // vues ne connaissent ni PostgREST ni le Storage.
 
-import { sb, q, invoke, requireClient } from "./db.js?v=57";
+import { sb, q, invoke, requireClient } from "./db.js?v=58";
 
 // Toute requête passe par ici : sans config, message clair plutôt
 // qu'un "Cannot read properties of null".
@@ -306,14 +306,54 @@ export async function confirmEmailCode(email, code) {
   return !!(r && r.verified);
 }
 
-// Carnet des destinataires, rattaché à l'email d'expédition vérifié
+// Carnet des destinataires, rattaché à l'email d'expédition. Le serveur
+// fait foi (il suit l'adresse d'un appareil à l'autre) et n'ouvre le
+// carnet qu'à qui a prouvé l'adresse ; une copie locale, par adresse
+// d'expédition, garde aussi ce qui a été tapé ici même si l'email n'est
+// pas (encore) vérifié ou si l'envoi a échoué.
+const BOOK_KEY = "seminaire.contacts";
+
+function localBook() {
+  try { return JSON.parse(localStorage.getItem(BOOK_KEY) || "{}") || {}; } catch (err) { return {}; }
+}
+function saveBook(book) {
+  try { localStorage.setItem(BOOK_KEY, JSON.stringify(book)); } catch (err) { /* privé */ }
+}
+
+export function rememberContactsLocal(sender, emails) {
+  if (!sender || !emails.length) return;
+  const book = localBook();
+  const now = new Date().toISOString();
+  const list = (book[sender] || []).filter((r) => !emails.includes(r.email));
+  book[sender] = emails.filter((e) => e !== sender).map((email) => ({ email, last_at: now })).concat(list).slice(0, 60);
+  saveBook(book);
+}
+
 export async function listContacts(sender) {
-  const r = await invoke("contacts", { action: "list", sender });
-  return (r && r.contacts) || [];
+  const local = localBook()[sender] || [];
+  let remote = [];
+  try {
+    const r = await invoke("contacts", { action: "list", sender });
+    remote = (r && r.contacts) || [];
+    rememberVerified(sender);   // le serveur a ouvert le carnet : adresse prouvée
+  } catch (err) {
+    if (!/EMAIL_NON_VERIFIE/.test(String(err && err.message))) throw err;
+  }
+  // fusion : la date la plus récente l'emporte
+  const byEmail = new Map();
+  for (const r of remote.concat(local)) {
+    const prev = byEmail.get(r.email);
+    if (!prev || String(r.last_at) > String(prev.last_at)) byEmail.set(r.email, { email: r.email, last_at: r.last_at });
+  }
+  return [...byEmail.values()].sort((a, b) => (a.last_at < b.last_at ? 1 : -1));
 }
 
 export function forgetContact(sender, email) {
-  return invoke("contacts", { action: "forget", sender, email });
+  const book = localBook();
+  if (book[sender]) { book[sender] = book[sender].filter((r) => r.email !== email); saveBook(book); }
+  return invoke("contacts", { action: "forget", sender, email }).catch((err) => {
+    if (!/EMAIL_NON_VERIFIE/.test(String(err && err.message))) throw err;
+  });
 }
 
 let emailCheck = null;
