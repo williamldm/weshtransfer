@@ -2,15 +2,16 @@
 // Pas de supabase-js ici : un simple appel à l'Edge Function transfer-open,
 // qui vérifie le lien et renvoie des URLs signées. Page légère, rapide en 4G.
 
-import { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from "./config.js?v=75";
-import { Waveform, formatTime } from "./waveform.js?v=75";
-import { saveZip, canStreamToDisk, MEMORY_LIMIT } from "./zip.js?v=75";
-import { icon } from "./icons.js?v=75";
-import { esc, formatBytes, formatDuration, formatDate, plural, toast, triggerDownload, avatar, fileBadge, fileTile } from "./ui.js?v=75";
-import { categoryOf, canPreview } from "./files.js?v=75";
+import { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from "./config.js?v=76";
+import { Waveform, formatTime } from "./waveform.js?v=76";
+import { saveZip, canStreamToDisk, MEMORY_LIMIT } from "./zip.js?v=76";
+import { icon } from "./icons.js?v=76";
+import { esc, formatBytes, formatDuration, formatDate, plural, toast, triggerDownload, avatar, fileBadge, fileTile } from "./ui.js?v=76";
+import { categoryOf, canPreview } from "./files.js?v=76";
 
 const root = document.getElementById("tp");
-const k = new URLSearchParams(location.search).get("k") || "";
+// le jeton : lien court /t/<jeton>, ou ancien t.html?k=<jeton>
+const k = (location.pathname.match(/^\/t\/([A-Za-z0-9]+)\/?$/) || [])[1] || new URLSearchParams(location.search).get("k") || "";
 const ENDPOINT = SUPABASE_URL + "/functions/v1/transfer-open";
 
 // Session de l'appli sur cet appareil, s'il y en a une : sert seulement à
@@ -325,7 +326,7 @@ async function onClick(e) {
 // ---------------------------------------------------------- chargement
 
 async function load() {
-  if (!/^[0-9a-f]{32}$/.test(k)) {
+  if (!/^(?:[0-9a-f]{32}|[A-Za-z0-9]{12})$/.test(k)) {
     fail("Lien incomplet", "Le lien semble tronqué. Réessaie depuis l'email ou le message reçu.");
     return;
   }

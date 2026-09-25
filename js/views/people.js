@@ -1,14 +1,14 @@
 // Feuille "Participants" : qui est là, inviter, réglages du host.
 
-import { listParticipants, updateSpace, deleteSpace, inviteByEmail, listInvites, deleteInvite } from "../api.js?v=75";
-import { icon } from "../icons.js?v=75";
-import { esc, h, openSheet, avatar, shareLink, copyText, toast, errorText, formatDate, confirmSheet, canShare, promptSheet } from "../ui.js?v=75";
-import { leaveSpace, knownSpaces, switchTo, forgetSpace, renameMe, accountEmail, logout } from "../session.js?v=75";
+import { listParticipants, updateSpace, deleteSpace, inviteByEmail, listInvites, deleteInvite } from "../api.js?v=76";
+import { icon } from "../icons.js?v=76";
+import { esc, h, openSheet, avatar, shareLink, copyText, toast, errorText, formatDate, confirmSheet, canShare, promptSheet } from "../ui.js?v=76";
+import { leaveSpace, knownSpaces, switchTo, forgetSpace, renameMe, accountEmail, logout } from "../session.js?v=76";
 
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
 export function inviteUrl(code) {
-  return new URL("index.html?c=" + encodeURIComponent(code), location.href).href;
+  return location.origin + "/c/" + encodeURIComponent(code);
 }
 
 export async function openPeopleSheet(ctx) {
@@ -166,7 +166,7 @@ export async function openPeopleSheet(ctx) {
       : "Tu pourras revenir avec le code " + s.code + ".") + " Tes fichiers restent dans l'espace.", { ok: "Quitter" });
     if (!ok) return;
     leaveSpace();
-    location.href = byInvite ? "index.html" : "index.html?c=" + encodeURIComponent(s.code);
+    location.href = byInvite ? "/" : "/c/" + encodeURIComponent(s.code);
   };
 
   // Passer d'un espace à l'autre sans ressaisir de code

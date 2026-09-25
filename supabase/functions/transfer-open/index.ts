@@ -1,4 +1,4 @@
-// Page publique d'un envoi (t.html?k=...). Aucune session requise : le
+// Page publique d'un envoi (/t/<jeton>, ou t.html?k=...). Aucune session requise : le
 // token EST l'autorisation. Deployee avec --no-verify-jwt.
 //
 // POST { k }                               -> contenu de l'envoi + URLs signees
@@ -47,7 +47,8 @@ Deno.serve(async (req) => {
 
   const body = await readJson(req);
   const k = typeof body.k === "string" ? body.k : "";
-  if (!/^[0-9a-f]{32}$/.test(k)) return json({ error: "LIEN_INCONNU" }, 404);
+  // jetons courts (12 caractères) ou anciens (32 hexadécimaux)
+  if (!/^(?:[0-9a-f]{32}|[A-Za-z0-9]{12})$/.test(k)) return json({ error: "LIEN_INCONNU" }, 404);
 
   const db = admin();
 

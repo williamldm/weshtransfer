@@ -3,7 +3,7 @@
 // mot de passe), il partage le compte de cette adresse : les mêmes espaces,
 // envois et blazes sur tous ses appareils.
 
-import { sb, q, invoke, requireClient } from "./db.js?v=75";
+import { sb, q, invoke, requireClient } from "./db.js?v=76";
 
 const SPACE_KEY = "seminaire.space";      // espace actif
 const KNOWN_KEY = "seminaire.spaces";     // tous les espaces rejoints sur cet appareil
@@ -114,7 +114,7 @@ export async function joinSpace(code, pseudo) {
 }
 
 // ------------------------------------------------ invitations par email
-// Le lien d'invitation (index.html?i=...) ne suffit pas : il faut aussi le
+// Le lien d'invitation (/i/<jeton>) ne suffit pas : il faut aussi le
 // code reçu à l'adresse invitée, sauf sur un appareil qui l'a déjà vérifiée.
 
 export async function inviteInfo(token) {

@@ -1,7 +1,7 @@
 // Accès aux données. Toutes les requêtes de l'appli passent par ici : les
 // vues ne connaissent ni PostgREST ni le Storage.
 
-import { sb, q, invoke, requireClient } from "./db.js?v=75";
+import { sb, q, invoke, requireClient } from "./db.js?v=76";
 
 // Toute requête passe par ici : sans config, message clair plutôt
 // qu'un "Cannot read properties of null".
@@ -398,6 +398,7 @@ export function deleteTransfer(id) {
 
 // Lien public, construit à partir de l'adresse courante : fonctionne aussi
 // si le site est hébergé dans un sous-dossier.
+// lien court : weshtransfer.fr/t/<jeton>
 export function transferUrl(token) {
-  return new URL("t.html?k=" + token, location.href).href;
+  return location.origin + "/t/" + token;
 }

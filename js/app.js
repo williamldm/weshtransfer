@@ -1,22 +1,22 @@
 // Coquille de l'appli : démarrage, routeur à hash, en-tête, bus
 // d'événements, temps réel. Chaque vue est un module avec mount().
 
-import { restore, getSpace, leaveSpace } from "./session.js?v=75";
-import { connectSpace } from "./realtime.js?v=75";
-import { startJam } from "./jam.js?v=75";
-import { bindPlayerBar } from "./player.js?v=75";
-import { activeCount, onUploads } from "./upload.js?v=75";
-import { openPeopleSheet } from "./views/people.js?v=75";
-import { openUploadSheet } from "./views/upload-sheet.js?v=75";
-import { icon } from "./icons.js?v=75";
-import { monogram } from "./brand.js?v=75";
-import { toast, errorText, esc } from "./ui.js?v=75";
+import { restore, getSpace, leaveSpace } from "./session.js?v=76";
+import { connectSpace } from "./realtime.js?v=76";
+import { startJam } from "./jam.js?v=76";
+import { bindPlayerBar } from "./player.js?v=76";
+import { activeCount, onUploads } from "./upload.js?v=76";
+import { openPeopleSheet } from "./views/people.js?v=76";
+import { openUploadSheet } from "./views/upload-sheet.js?v=76";
+import { icon } from "./icons.js?v=76";
+import { monogram } from "./brand.js?v=76";
+import { toast, errorText, esc } from "./ui.js?v=76";
 
-import * as home from "./views/home.js?v=75";
-import * as project from "./views/project.js?v=75";
-import * as file from "./views/file.js?v=75";
-import * as send from "./views/send.js?v=75";
-import * as transfers from "./views/transfers.js?v=75";
+import * as home from "./views/home.js?v=76";
+import * as project from "./views/project.js?v=76";
+import * as file from "./views/file.js?v=76";
+import * as send from "./views/send.js?v=76";
+import * as transfers from "./views/transfers.js?v=76";
 
 // L'accueil dépend du mode de l'espace : morceaux (séminaire) ou
 // directement le composeur d'envoi (espace dédié aux envois).
@@ -219,7 +219,7 @@ async function boot() {
     // espace disparu (purgé) ou session perdue : on l'oublie sur cet
     // appareil ; s'il existe encore, le code pré-rempli permet d'y revenir
     leaveSpace();
-    location.replace("index.html" + (saved && saved.code ? "?c=" + encodeURIComponent(saved.code) : ""));
+    location.replace(saved && saved.code ? "/c/" + encodeURIComponent(saved.code) : "index.html");
     return;
   }
 
@@ -271,7 +271,7 @@ async function boot() {
   window.addEventListener("hashchange", routeSmoothly);
 
   // compte : "Mes espaces" à jour depuis le serveur (autres appareils)
-  import("./session.js?v=75").then((m) => m.syncSpaces()).catch(() => {});
+  import("./session.js?v=76").then((m) => m.syncSpaces()).catch(() => {});
 
   // message laissé par l'accueil (ex. réglage refusé à la création)
   try {

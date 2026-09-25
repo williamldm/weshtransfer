@@ -34,8 +34,12 @@ export function mailConfig(): MailConfig | null {
   return { from, site: site.replace(/\/+$/, ""), brevo, smtp };
 }
 
+// Liens courts (weshtransfer.fr/t/<jeton>) dès que le site les connaît :
+// secret SHORT_LINKS=1, posé après le déploiement des règles Apache.
+export const shortLinks = () => Deno.env.get("SHORT_LINKS") === "1";
+
 export function transferLink(site: string, token: string): string {
-  return `${site}/t.html?k=${token}`;
+  return shortLinks() ? `${site}/t/${token}` : `${site}/t.html?k=${token}`;
 }
 
 export type OutgoingEmail = {

@@ -3,12 +3,12 @@
 // les espaces déjà ouverts sur cet appareil (ouvrir, oublier, supprimer).
 // session.js / api.js ne sont chargés qu'au moment d'agir.
 
-import { icon } from "./icons.js?v=75";
-import { esc, h, errorText, formatBytes, plural, actionSheet, confirmSheet, toast } from "./ui.js?v=75";
-import { isBlocked, FILE_MAX } from "./files.js?v=75";
-import { putPending, MAX_BYTES } from "./pending.js?v=75";
-import { mountWallpaperNote } from "./wallpapers.js?v=75";
-import { mountClaim } from "./claim-fx.js?v=75";
+import { icon } from "./icons.js?v=76";
+import { esc, h, errorText, formatBytes, plural, actionSheet, confirmSheet, toast } from "./ui.js?v=76";
+import { isBlocked, FILE_MAX } from "./files.js?v=76";
+import { putPending, MAX_BYTES } from "./pending.js?v=76";
+import { mountWallpaperNote } from "./wallpapers.js?v=76";
+import { mountClaim } from "./claim-fx.js?v=76";
 
 const PSEUDO_KEY = "seminaire.pseudo";
 const MODE_LABEL = { envoi: "Envois", seminaire: "Séminaire", revue: "Verdict" };
@@ -62,9 +62,9 @@ async function ensureAccount(form, fail) {
     fail("Ton email sert de compte (sans mot de passe) : on en a besoin.");
     return false;
   }
-  const session = await import("./session.js?v=75");
+  const session = await import("./session.js?v=76");
   await session.ensureAuth();
-  const { ensureVerified } = await import("./verify.js?v=75");
+  const { ensureVerified } = await import("./verify.js?v=76");
   if (await ensureVerified(email, { optional: false }) !== "ok") return false;
   await session.login(email);
   try { localStorage.setItem("seminaire.replyTo", email); } catch (err) { /* privé */ }
@@ -236,7 +236,7 @@ function spaceMenu(k) {
     {
       label: "Oublier sur cet appareil", icon: "logout",
       run: async () => {
-        const session = await import("./session.js?v=75");
+        const session = await import("./session.js?v=76");
         session.forgetSpace(k.id);
         toast("\"" + k.name + "\" n'apparaît plus ici. Rien n'a été supprimé.", "ok");
         drawSpacesLink();
@@ -251,9 +251,9 @@ function spaceMenu(k) {
           { ok: "Tout supprimer", danger: true, title: "Supprimer l'espace" });
         if (!ok) return;
         try {
-          const session = await import("./session.js?v=75");
+          const session = await import("./session.js?v=76");
           await session.ensureAuth();
-          const api = await import("./api.js?v=75");
+          const api = await import("./api.js?v=76");
           await api.deleteSpace(k.id);
           session.forgetSpace(k.id);
           toast("\"" + k.name + "\" a été supprimé.", "ok");
@@ -312,7 +312,7 @@ deck.addEventListener("submit", async (e) => {
     if (mine) {
       // nouveau blaze : dans l'espace d'envoi, et dans son nom "Envois de ..."
       if (renaming && pseudo !== pseudoBefore) {
-        const session = await import("./session.js?v=75");
+        const session = await import("./session.js?v=76");
         await session.renameMe(mine.id, pseudo);
         if (/^Envois de /.test(mine.name)) await session.renameSpace(mine.id, "Envois de " + pseudo).catch(() => {});
       }
@@ -321,13 +321,13 @@ deck.addEventListener("submit", async (e) => {
       return;
     }
 
-    const session = await import("./session.js?v=75");
+    const session = await import("./session.js?v=76");
     if (kind === "join") await session.joinSpace(val("code"), pseudo);
     else if (kind === "salon") await session.createSpace(val("name"), "seminaire", pseudo);
     else if (kind === "revue") {
       const created = await session.createSpace(val("project"), "revue", pseudo);
       if (form.querySelector("[name=keep]").checked) {
-        const api = await import("./api.js?v=75");
+        const api = await import("./api.js?v=76");
         await api.updateSpace(created.id, { purge_at: null }).catch((err) => {
           try { sessionStorage.setItem("seminaire.flash", errorText(err)); } catch (e3) { /* privé */ }
         });
@@ -350,7 +350,7 @@ document.addEventListener("click", async (e) => {
     const ok = await confirmSheet("Rien n'est supprimé : tu retrouveras tout en te reconnectant avec ton email.",
       { ok: "Se déconnecter", title: "Se déconnecter de cet appareil" });
     if (!ok) return;
-    const session = await import("./session.js?v=75");
+    const session = await import("./session.js?v=76");
     await session.logout();
     drawSpacesLink();
     show("send");
@@ -365,14 +365,14 @@ document.addEventListener("click", async (e) => {
 });
 
 // ------------------------------------------------ invitation par email
-// index.html?i=<jeton> : l'invité choisit son blaze, reçoit un code à
+// /i/<jeton> (ou index.html?i=) : l'invité choisit son blaze, reçoit un code à
 // l'adresse invitée, le tape, et entre. Appareil déjà vérifié : il entre
 // directement.
 
 async function openInvite(token) {
   show("invite");
   const box = deck.querySelector("[data-invite-view]");
-  const session = await import("./session.js?v=75");
+  const session = await import("./session.js?v=76");
   let info;
   try {
     info = await session.inviteInfo(token);
@@ -522,16 +522,19 @@ for (const el of document.querySelectorAll("[data-icon]")) el.innerHTML = icon(e
 
 // Connecté : "Mes espaces" à jour depuis le serveur (autres appareils)
 if (accountEmail()) {
-  import("./session.js?v=75").then((m) => m.syncSpaces()).then(() => {
+  import("./session.js?v=76").then((m) => m.syncSpaces()).then(() => {
     drawSpacesLink();
     if (tab === "spaces") show("spaces");
   }).catch(() => {});
 }
 
+// liens courts /i/<jeton> et /c/<code>, ou anciens ?i= et ?c=
 const params = new URLSearchParams(location.search);
-const inviteToken = (params.get("i") || "").toLowerCase();
-const invited = (params.get("c") || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
-if (/^[0-9a-f]{32}$/.test(inviteToken)) openInvite(inviteToken);
+const short = location.pathname.match(/^\/(i|c)\/([A-Za-z0-9]+)\/?$/) || [];
+const rawInvite = short[1] === "i" ? short[2] : (params.get("i") || "");
+const inviteToken = /^[0-9a-fA-F]{32}$/.test(rawInvite) ? rawInvite.toLowerCase() : rawInvite;
+const invited = ((short[1] === "c" ? short[2] : params.get("c")) || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+if (/^(?:[0-9a-f]{32}|[A-Za-z0-9]{12})$/.test(inviteToken)) openInvite(inviteToken);
 else if (invited) show("join", invited.slice(0, 8));
 else show("send");
 

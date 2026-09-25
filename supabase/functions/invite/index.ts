@@ -13,7 +13,7 @@
 
 import { admin, callerId } from "../_shared/supabase.ts";
 import { json, preflight, readJson } from "../_shared/http.ts";
-import { inviteMail, isVerified, mailConfig, mailDayMax, mailsToday, sendEmails } from "../_shared/email.ts";
+import { inviteMail, isVerified, mailConfig, mailDayMax, mailsToday, sendEmails, shortLinks } from "../_shared/email.ts";
 import { clientIp, confirmCode, requestCode, sha256 } from "../_shared/codes.ts";
 import { loginAccount } from "../_shared/account.ts";
 
@@ -34,11 +34,24 @@ type Space = {
   expires_at: string; purge_at: string | null; is_locked: boolean; max_file_bytes: number;
 };
 
+// Jeton court (12 caractères parmi 57, ~70 bits) ; l'ancien format (32
+// hexadécimaux) reste accepté. Seul son sha256 est stocké.
+const ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
 function newToken(): string {
-  const a = new Uint8Array(16);
-  crypto.getRandomValues(a);
-  return [...a].map((b) => b.toString(16).padStart(2, "0")).join("");
+  if (!shortLinks()) {
+    const a = new Uint8Array(16);
+    crypto.getRandomValues(a);
+    return [...a].map((b) => b.toString(16).padStart(2, "0")).join("");
+  }
+  let out = "";
+  while (out.length < 12) {
+    const a = new Uint8Array(24);
+    crypto.getRandomValues(a);
+    for (const b of a) if (b < 228 && out.length < 12) out += ALPHABET[b % 57];
+  }
+  return out;
 }
+const TOKEN_RE = /^(?:[0-9a-f]{32}|[A-Za-z0-9]{12})$/;
 
 function mask(email: string): string {
   const [user, domain] = email.split("@");
@@ -109,7 +122,7 @@ Deno.serve(async (req) => {
       if (error) return json({ error: "ERREUR_BASE", detail: error.message }, 500);
       const mail = inviteMail({
         site: cfg.site, email, host: me.pseudo, spaceName: space.name, mode: space.mode,
-        link: `${cfg.site}/index.html?i=${token}`, expiresAt: expires,
+        link: shortLinks() ? `${cfg.site}/i/${token}` : `${cfg.site}/index.html?i=${token}`, expiresAt: expires,
       });
       outgoing.push({ to: email, subject: mail.subject, html: mail.html, text: mail.text });
     }
@@ -121,7 +134,7 @@ Deno.serve(async (req) => {
 
   // -------------------------------------------- côté invité : le lien
   const token = String(body.token ?? "");
-  if (!/^[0-9a-f]{32}$/.test(token)) return json({ error: "INVITATION_INCONNUE" }, 404);
+  if (!TOKEN_RE.test(token)) return json({ error: "INVITATION_INCONNUE" }, 404);
   const { data: invite } = await db.from("space_invites")
     .select("id, space_id, email, expires_at, accepted_participant, invited_by")
     .eq("token_hash", await sha256(token)).maybeSingle<Invite>();

@@ -30,6 +30,11 @@ DirectoryIndex index.html
   # Liste blanche
   RewriteRule ^$ - [L]
   RewriteRule ^(index|app|t|admin)\.html$ - [L]
+  # liens courts : weshtransfer.fr/t/<jeton> (envoi), /i/<jeton> (invitation),
+  # /c/<code> (rejoindre) ; la page lit le jeton dans l'adresse
+  RewriteRule ^t/[A-Za-z0-9]{8,40}/?$ t.html [L]
+  RewriteRule ^i/[A-Za-z0-9]{8,40}/?$ index.html [L]
+  RewriteRule ^c/[A-Za-z0-9]{4,12}/?$ index.html [L]
   RewriteRule ^robots\.txt$ - [L]
   RewriteRule ^(css|js|fonts|img)/[A-Za-z0-9_./-]+\.(css|js|woff2|svg|png|jpg|txt)$ - [L]
   RewriteRule ^ - [R=404,L]
