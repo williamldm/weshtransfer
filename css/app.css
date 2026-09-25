@@ -1,5 +1,5 @@
-@import url("fonts.css?v=67");
-@import url("tokens.css?v=67");
+@import url("fonts.css?v=69");
+@import url("tokens.css?v=69");
 
 /* ================================================================= base */
 *, *::before, *::after { box-sizing: border-box; }
@@ -1273,3 +1273,16 @@ body.admin { min-height: 100vh; background: var(--bg); }
 
 .sx .send-pending .section-head { display: none; }
 .sx-joke { display: block; margin-top: var(--sp-2); font-style: italic; }
+
+/* admin : suppression de fichiers */
+.adm-file-row { display: flex; align-items: flex-start; }
+.adm-file-row > details { flex: 1; min-width: 0; }
+.adm-file-row.is-selected { background: var(--accent-soft); }
+.adm-check { display: flex; flex: none; align-items: center; justify-content: center; width: 36px; min-height: 58px; cursor: pointer; }
+.adm-check input, .adm-check-all input { width: 17px; height: 17px; accent-color: var(--accent); cursor: pointer; }
+.adm-check-all { display: flex; align-items: center; gap: var(--sp-2); padding-left: 10px; cursor: pointer; }
+.adm-trash { flex: none; margin: 12px 4px 0 0; color: var(--text-faint); }
+.adm-trash:hover { color: var(--danger); }
+.adm-selbar { position: fixed; left: 50%; bottom: calc(var(--sp-4) + var(--safe-bottom)); z-index: 50; display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3); max-width: calc(100% - 32px); padding: var(--sp-2) var(--sp-2) var(--sp-2) var(--sp-4); border: 1px solid var(--line-strong); border-radius: 99px; background: var(--surface-2); box-shadow: 0 20px 50px rgba(0, 0, 0, .5); transform: translateX(-50%); font-size: var(--fs-sm); }
+.adm-selbar b { color: var(--text); }
+@media (max-width: 559px) { .adm-selbar { border-radius: var(--r-md); } .adm-file-row .adm-nums { display: none; } }

@@ -3,12 +3,12 @@
 // c'est la fonction "admin" qui vérifie que le compte connecté fait partie
 // des administrateurs, et qui renvoie les données.
 
-import { invoke } from "./db.js?v=67";
-import { accountEmail, login, logout } from "./session.js?v=67";
-import { ensureVerified } from "./verify.js?v=67";
-import { icon } from "./icons.js?v=67";
-import { esc, toast, errorText, formatBytes, formatDate, timeAgo, plural, fileBadge, confirmSheet } from "./ui.js?v=67";
-import { isAudio, categoryOf } from "./files.js?v=67";
+import { invoke } from "./db.js?v=69";
+import { accountEmail, login, logout } from "./session.js?v=69";
+import { ensureVerified } from "./verify.js?v=69";
+import { icon } from "./icons.js?v=69";
+import { esc, toast, errorText, formatBytes, formatDate, timeAgo, plural, fileBadge, confirmSheet } from "./ui.js?v=69";
+import { isAudio, categoryOf } from "./files.js?v=69";
 
 const root = document.getElementById("adm");
 const who = document.getElementById("who");
@@ -21,6 +21,7 @@ let tab = "transfers";
 let query = "";
 let fileSort = "recent";
 let storage = null;      // résultat de la vérification B2
+const selected = new Set();   // fichiers cochés (suppression groupée)
 
 function drawWho() {
   const email = accountEmail();
@@ -105,6 +106,10 @@ function drawTransfers() {
             (r.error ? ' <span class="adm-pill is-err">' + esc(r.error) + "</span>" : "") + "</li>").join("") : "<li>Lien seul, sans email</li>") + "</ul>" +
         "<h4>Fichiers</h4><ul>" + t.files.map((f) => "<li>" + esc(f.name) + ' <span class="muted">' + esc(formatBytes(f.size)) + "</span></li>").join("") + "</ul>" +
         '<p class="muted small">Espace : ' + esc(t.space || "?") + " · expire " + esc(formatDate(t.expires_at, true)) + " · " + got + " destinataire(s) ont téléchargé</p>" +
+        '<p class="adm-links">' +
+          '<button class="btn btn-sm btn-danger" data-del-transfer="' + esc(t.id) + '" data-with-files="1">' + icon("trash", 16) + "<span>Supprimer le transfert et ses fichiers</span></button>" +
+          '<button class="btn btn-sm" data-del-transfer="' + esc(t.id) + '" data-with-files="0">' + icon("link", 16) + "<span>Couper le lien seulement</span></button>" +
+        "</p>" +
       "</div>" +
     "</details>";
   }).join("");
@@ -166,33 +171,107 @@ function drawStorage() {
       '<li><span class="mono">' + esc(o.key) + "</span> · " + esc(formatBytes(o.size)) + (o.modified ? " · " + esc(timeAgo(o.modified)) : "") + "</li>").join("") + "</ul>" : "") +
     (s.missing.length ? "<h4>Fiches sans fichier sur B2</h4><ul>" + s.missing.map((m) =>
       "<li>" + esc(m.name) + ' · <span class="mono">' + esc(m.path) + "</span></li>").join("") + "</ul>" : "") +
-    '<button class="btn btn-ghost btn-sm" data-storage>' + icon("retry", 16) + "<span>Revérifier</span></button>" +
+    '<p class="adm-links">' +
+      (s.orphan_count || s.unfinished_uploads
+        ? '<button class="btn btn-sm btn-danger" data-clean-orphans>' + icon("trash", 16) + "<span>Nettoyer : " +
+            plural(s.orphan_count, "orphelin", "orphelins") + (s.unfinished_uploads ? " + " + plural(s.unfinished_uploads, "envoi abandonné", "envois abandonnés") : "") + "</span></button>"
+        : "") +
+      '<button class="btn btn-ghost btn-sm" data-storage>' + icon("retry", 16) + "<span>Revérifier</span></button>" +
+    "</p>" +
   "</div>";
 }
 
-function drawFiles() {
+function visibleFiles() {
   let list = data.files.filter(matches);
   if (fileSort === "size") list = list.slice().sort((a, b) => b.size - a.size);
+  return list;
+}
+
+function drawFiles() {
+  const list = visibleFiles();
   const total = list.reduce((n, f) => n + f.size, 0);
+  const allOn = list.length && list.every((f) => selected.has(f.id));
   return drawStorage() +
-    '<div class="adm-subbar"><span class="muted small">' + plural(list.length, "fichier", "fichiers") + " · " + esc(formatBytes(total)) + "</span>" +
+    '<div class="adm-subbar">' +
+      '<label class="adm-check-all"><input type="checkbox" data-sel-all' + (allOn ? " checked" : "") + (list.length ? "" : " disabled") + ">" +
+        '<span class="muted small">' + plural(list.length, "fichier", "fichiers") + " · " + esc(formatBytes(total)) + "</span></label>" +
       '<select class="input adm-sort" data-sort><option value="recent"' + (fileSort === "recent" ? " selected" : "") + '>Plus récents</option>' +
         '<option value="size"' + (fileSort === "size" ? " selected" : "") + ">Plus lourds</option></select></div>" +
     (list.length ? list.map((f) =>
-      '<details class="adm-row" data-file="' + esc(f.id) + '">' +
-        "<summary>" +
-          '<span class="adm-file-badge">' + fileBadge(f.name, f.mime, f.kind) + "</span>" +
-          '<span class="adm-main"><b>' + esc(f.name) + "</b>" +
-            "<small>" + esc(f.space || "?") + (f.mode ? " (" + esc(MODES[f.mode] || f.mode) + ")" : "") +
-              (f.project ? " · " + esc(f.project) + (f.version > 1 ? " v" + f.version : "") : "") +
-              " · " + esc(f.uploader || "?") + " · " + when(f.created_at) + "</small></span>" +
-          '<span class="adm-nums"><span>' + esc(formatBytes(f.size)) + "</span>" +
-            "<small>" + (FILE_STATUS[f.status] ? '<span class="adm-pill is-err">' + esc(FILE_STATUS[f.status]) + "</span> " : "") +
-              (f.transfer ? "transfert · " : "") +
-              (f.expires ? "effacé " + esc(formatDate(f.expires)) : "conservé") + "</small></span>" +
-        "</summary>" +
-        '<div class="adm-detail" data-preview><p class="muted small">Chargement...</p></div>' +
-      "</details>").join("") : '<p class="adm-empty">Aucun fichier.</p>');
+      '<div class="adm-row adm-file-row' + (selected.has(f.id) ? " is-selected" : "") + '">' +
+        '<label class="adm-check" aria-label="Sélectionner ' + esc(f.name) + '"><input type="checkbox" data-sel="' + esc(f.id) + '"' + (selected.has(f.id) ? " checked" : "") + "></label>" +
+        '<details data-file="' + esc(f.id) + '">' +
+          "<summary>" +
+            '<span class="adm-file-badge">' + fileBadge(f.name, f.mime, f.kind) + "</span>" +
+            '<span class="adm-main"><b>' + esc(f.name) + "</b>" +
+              "<small>" + esc(f.space || "?") + (f.mode ? " (" + esc(MODES[f.mode] || f.mode) + ")" : "") +
+                (f.project ? " · " + esc(f.project) + (f.version > 1 ? " v" + f.version : "") : "") +
+                " · " + esc(f.uploader || "?") + " · " + when(f.created_at) + "</small></span>" +
+            '<span class="adm-nums"><span>' + esc(formatBytes(f.size)) + "</span>" +
+              "<small>" + (FILE_STATUS[f.status] ? '<span class="adm-pill is-err">' + esc(FILE_STATUS[f.status]) + "</span> " : "") +
+                (f.transfer ? "transfert · " : "") +
+                (f.expires ? "effacé " + esc(formatDate(f.expires)) : "conservé") + "</small></span>" +
+          "</summary>" +
+          '<div class="adm-detail" data-preview><p class="muted small">Chargement...</p></div>' +
+        "</details>" +
+        '<button class="btn btn-ghost btn-icon btn-sm adm-trash" data-del-file="' + esc(f.id) + '" aria-label="Supprimer ' + esc(f.name) + '" title="Supprimer">' + icon("trash", 16) + "</button>" +
+      "</div>").join("") : '<p class="adm-empty">Aucun fichier.</p>');
+}
+
+// Barre du bas quand des fichiers sont cochés
+function drawSelection() {
+  let bar = document.querySelector("[data-selbar]");
+  const picked = data ? data.files.filter((f) => selected.has(f.id)) : [];
+  if (tab !== "files" || !picked.length) { if (bar) bar.remove(); return; }
+  if (!bar) {
+    bar = document.createElement("div");
+    bar.className = "adm-selbar";
+    bar.setAttribute("data-selbar", "");
+    document.body.appendChild(bar);
+    bar.addEventListener("click", (e) => {
+      if (e.target.closest("[data-sel-none]")) { selected.clear(); drawList(); drawSelection(); }
+      if (e.target.closest("[data-sel-delete]")) deleteFiles([...selected]);
+    });
+  }
+  const bytes = picked.reduce((n, f) => n + f.size, 0);
+  bar.innerHTML = "<span><b>" + plural(picked.length, "fichier sélectionné", "fichiers sélectionnés") + "</b> · " + esc(formatBytes(bytes)) + "</span>" +
+    '<button class="btn btn-ghost btn-sm" data-sel-none>Tout désélectionner</button>' +
+    '<button class="btn btn-sm btn-danger" data-sel-delete>' + icon("trash", 16) + "<span>Supprimer</span></button>";
+}
+
+// Suppression (un ou plusieurs fichiers) : confirmée, définitive, B2 compris.
+async function deleteFiles(ids) {
+  const picked = data.files.filter((f) => ids.includes(f.id));
+  if (!picked.length) return;
+  const bytes = picked.reduce((n, f) => n + f.size, 0);
+  const ok = await confirmSheet(
+    (picked.length === 1 ? picked[0].name + " sera effacé du stockage et de son espace"
+      : plural(picked.length, "fichier sera effacé", "fichiers seront effacés") + " du stockage et de leur espace") +
+      " (" + formatBytes(bytes) + "). Définitif.",
+    { ok: "Supprimer", danger: true, title: picked.length === 1 ? "Supprimer ce fichier" : "Supprimer " + picked.length + " fichiers" });
+  if (!ok) return;
+  let deleted = [];
+  let failed = [];
+  try {
+    // par paquets de 100 (limite de la fonction)
+    for (let i = 0; i < ids.length; i += 100) {
+      const r = await invoke("admin", { action: "delete-files", file_ids: ids.slice(i, i + 100) });
+      deleted = deleted.concat(r.deleted || []);
+      failed = failed.concat(r.failed || []);
+    }
+  } catch (err) {
+    toast(errorText(err), "err");
+  }
+  // la liste se met à jour sans tout recharger
+  const gone = new Set(deleted);
+  data.files = data.files.filter((f) => !gone.has(f.id));
+  for (const id of gone) selected.delete(id);
+  data.stats.files -= gone.size;
+  data.stats.bytes -= picked.filter((f) => gone.has(f.id)).reduce((n, f) => n + f.size, 0);
+  if (deleted.length) toast(plural(deleted.length, "fichier supprimé", "fichiers supprimés"), "ok");
+  if (failed.length) toast(plural(failed.length, "échec", "échecs") + " : " + failed[0].error, "err");
+  draw();
+  drawSelection();
 }
 
 // Aperçu à l'ouverture d'une ligne : lecteur, image ou vidéo, et lien de
@@ -215,7 +294,8 @@ async function openPreview(row) {
         '<button class="btn btn-sm btn-danger" data-del-file="' + esc(f.id) + '">' + icon("trash", 16) + "<span>Supprimer</span></button>" +
         '<span class="muted small">Lien valable 10 minutes · <span class="mono">' + esc(f.id) + "</span> · " + esc(f.backend || "") + "</span></p>";
   } catch (err) {
-    box.innerHTML = '<p class="muted small">' + esc(errorText(err)) + "</p>";
+    box.innerHTML = '<p class="muted small">Aperçu impossible : ' + esc(errorText(err)) + "</p>" +
+      '<p class="adm-links"><button class="btn btn-sm btn-danger" data-del-file="' + esc(f.id) + '">' + icon("trash", 16) + "<span>Supprimer</span></button></p>";
     delete box.dataset.done;
   }
 }
@@ -263,6 +343,7 @@ function drawList() {
   const el = root.querySelector("[data-list]");
   if (!el) return;
   el.innerHTML = tab === "users" ? drawUsers() : tab === "spaces" ? drawSpaces() : tab === "files" ? drawFiles() : drawTransfers();
+  drawSelection();
 }
 
 // ------------------------------------------------------------ événements
@@ -286,15 +367,7 @@ root.addEventListener("click", async (e) => {
   const ds = e.target.closest("[data-del-space]");
   if (!df && !ds) return;
   e.preventDefault();
-  if (df) {
-    const f = data.files.find((x) => x.id === df.dataset.delFile);
-    const ok = await confirmSheet((f ? f.name : "Ce fichier") + " sera effacé du stockage et de l'espace. Définitif.",
-      { ok: "Supprimer", danger: true, title: "Retirer ce fichier" });
-    if (!ok) return;
-    try { await invoke("admin", { action: "delete-file", file_id: df.dataset.delFile }); toast("Fichier supprimé", "ok"); load(); }
-    catch (err) { toast(errorText(err), "err"); }
-    return;
-  }
+  if (df) { deleteFiles([df.dataset.delFile]); return; }
   const s = data.spaces.find((x) => x.id === ds.dataset.delSpace);
   const ok = await confirmSheet("L'espace " + (s ? s.name : "") + " sera effacé pour tous ses membres : fichiers, transferts, commentaires. Définitif.",
     { ok: "Tout supprimer", danger: true, title: "Supprimer l'espace" });
@@ -306,6 +379,55 @@ root.addEventListener("click", async (e) => {
 root.addEventListener("toggle", (e) => {
   if (e.target.matches && e.target.matches("[data-file]") && e.target.open) openPreview(e.target);
 }, true);
+// cases à cocher des fichiers
+root.addEventListener("change", (e) => {
+  const one = e.target.closest("[data-sel]");
+  if (one) {
+    if (one.checked) selected.add(one.dataset.sel); else selected.delete(one.dataset.sel);
+    one.closest(".adm-file-row").classList.toggle("is-selected", one.checked);
+    const all = root.querySelector("[data-sel-all]");
+    if (all) all.checked = visibleFiles().every((f) => selected.has(f.id));
+    drawSelection();
+    return;
+  }
+  if (e.target.matches("[data-sel-all]")) {
+    for (const f of visibleFiles()) { if (e.target.checked) selected.add(f.id); else selected.delete(f.id); }
+    drawList();
+  }
+});
+
+// transferts : supprimer (avec ou sans ses fichiers)
+root.addEventListener("click", async (e) => {
+  const b = e.target.closest("[data-del-transfer]");
+  if (!b) return;
+  const t = data.transfers.find((x) => x.id === b.dataset.delTransfer);
+  const withFiles = b.dataset.withFiles === "1";
+  const ok = await confirmSheet(withFiles
+    ? "Le transfert " + (t ? "\"" + t.title + "\" " : "") + "et ses " + plural(t ? t.files.length : 0, "fichier", "fichiers") + " seront effacés. Le lien ne marchera plus. Définitif."
+    : "Le lien du transfert ne marchera plus. Les fichiers restent dans leur espace.",
+    { ok: withFiles ? "Tout supprimer" : "Couper le lien", danger: true, title: "Supprimer le transfert" });
+  if (!ok) return;
+  try {
+    const r = await invoke("admin", { action: "delete-transfer", transfer_id: b.dataset.delTransfer, with_files: withFiles });
+    toast("Transfert supprimé" + (withFiles ? " (" + plural(r.files || 0, "fichier", "fichiers") + ")" : ""), r.ok ? "ok" : "err");
+    load();
+  } catch (err) { toast(errorText(err), "err"); }
+});
+
+// stockage : nettoyage des orphelins et des envois abandonnés
+root.addEventListener("click", async (e) => {
+  if (!e.target.closest("[data-clean-orphans]")) return;
+  const ok = await confirmSheet("Les fichiers présents sur B2 sans fiche dans la base (depuis plus d'une heure) et les envois abandonnés depuis plus d'un jour seront effacés. Définitif.",
+    { ok: "Nettoyer", danger: true, title: "Nettoyer le stockage" });
+  if (!ok) return;
+  try {
+    const r = await invoke("admin", { action: "delete-orphans" });
+    toast(plural(r.orphans, "orphelin effacé", "orphelins effacés") + " (" + formatBytes(r.bytes) + ")" +
+      (r.aborted ? ", " + plural(r.aborted, "envoi annulé", "envois annulés") : ""), "ok");
+    checkStorage();
+  } catch (err) { toast(errorText(err), "err"); }
+});
+
 root.addEventListener("change", (e) => {
   if (!e.target.matches("[data-sort]")) return;
   fileSort = e.target.value;

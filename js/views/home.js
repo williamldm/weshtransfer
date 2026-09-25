@@ -1,16 +1,16 @@
 // Accueil de l'espace : gros boutons d'action, uploads en cours, morceaux
 // triés par activité récente.
 
-import { listProjects, createProject, listReviewComments, deleteProject, deleteFile, reviewNotifyStatus, reviewSubscribe, reviewUnsubscribe } from "../api.js?v=67";
-import { ensureVerified } from "../verify.js?v=67";
-import { mountReviewHome } from "./review-home.js?v=67";
-import { mountJam } from "./jam.js?v=67";
-import { stateOf, isEngineerOf } from "./review.js?v=67";
-import { mountUploads } from "./uploads.js?v=67";
-import { openUploadSheet } from "./upload-sheet.js?v=67";
-import { openPeopleSheet } from "./people.js?v=67";
-import { icon } from "../icons.js?v=67";
-import { esc, h, kindBadge, timeAgo, plural, promptSheet, toast, errorText, daysLeft, formatDate, actionSheet, confirmSheet } from "../ui.js?v=67";
+import { listProjects, createProject, listReviewComments, deleteProject, deleteFile, reviewNotifyStatus, reviewSubscribe, reviewUnsubscribe } from "../api.js?v=69";
+import { ensureVerified } from "../verify.js?v=69";
+import { mountReviewHome } from "./review-home.js?v=69";
+import { mountJam } from "./jam.js?v=69";
+import { stateOf, isEngineerOf } from "./review.js?v=69";
+import { mountUploads } from "./uploads.js?v=69";
+import { openUploadSheet } from "./upload-sheet.js?v=69";
+import { openPeopleSheet } from "./people.js?v=69";
+import { icon } from "../icons.js?v=69";
+import { esc, h, kindBadge, timeAgo, plural, promptSheet, toast, errorText, daysLeft, formatDate, actionSheet, confirmSheet } from "../ui.js?v=69";
 
 export const title = (ctx) => ctx.space.name;
 

@@ -205,7 +205,7 @@ async function listVersions(b2: B2, prefix: string): Promise<{ key: string; vers
   return out;
 }
 
-export async function listUploads(b2: B2, prefix: string): Promise<{ key: string; uploadId: string }[]> {
+export async function listUploads(b2: B2, prefix: string): Promise<{ key: string; uploadId: string; initiated: string }[]> {
   const url = new URL(b2.base);
   url.search = "uploads";
   url.searchParams.set("prefix", prefix);
@@ -213,6 +213,7 @@ export async function listUploads(b2: B2, prefix: string): Promise<{ key: string
   return tag(xml, "Upload").map((u) => ({
     key: unxml(tag(u, "Key")[0] ?? ""),
     uploadId: tag(u, "UploadId")[0] ?? "",
+    initiated: tag(u, "Initiated")[0] ?? "",
   })).filter((u) => u.key && u.uploadId);
 }
 

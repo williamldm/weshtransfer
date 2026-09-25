@@ -5,8 +5,10 @@
 // POST { action: "sign", file_id }     -> { url, download }   (10 min)
 // POST { action: "storage" }           -> ce que contient vraiment B2,
 //                                          comparé à la base
-// POST { action: "delete-file", file_id }   -> retrait (contenu illicite...)
-// POST { action: "delete-space", space_id } -> espace entier, fichiers compris
+// POST { action: "delete-files", file_ids }  -> retrait (contenu illicite, ménage)
+// POST { action: "delete-transfer", transfer_id, with_files }
+// POST { action: "delete-orphans" }          -> fichiers B2 sans fiche, envois abandonnés
+// POST { action: "delete-space", space_id }  -> espace entier, fichiers compris
 //
 // Réservé aux adresses du secret ADMIN_EMAILS (séparées par des virgules,
 // jamais écrites dans le dépôt, qui est public) : l'appelant doit être
@@ -15,7 +17,7 @@
 
 import { admin } from "../_shared/supabase.ts";
 import { json, preflight, readJson } from "../_shared/http.ts";
-import { b2Config, deletePrefix, listObjects, listUploads, presignGet } from "../_shared/b2.ts";
+import { abortMultipart, b2Config, deletePrefix, listObjects, listUploads, presignGet } from "../_shared/b2.ts";
 import { wipeSpace } from "../_shared/wipe.ts";
 
 type Row = Record<string, unknown>;
@@ -34,6 +36,36 @@ async function all(db: ReturnType<typeof admin>, table: string, cols: string, or
   const { data, error } = await q;
   if (error) throw new Error(`${table} : ${error.message}`);
   return (data ?? []) as Row[];
+}
+
+// Efface des fichiers : l'objet stocké d'abord (B2, toutes versions, ou
+// ancien Storage), la fiche ensuite (commentaires et liens de transfert
+// suivent en cascade ; un morceau de séminaire vide part avec).
+async function removeFiles(db: ReturnType<typeof admin>, ids: string[]) {
+  const { data: rows, error } = await db.from("files").select("id, storage_path, backend").in("id", ids);
+  if (error) throw new Error(error.message);
+  const b2 = b2Config();
+  const deleted: string[] = [];
+  const failed: { id: string; error: string }[] = [];
+  const list = (rows ?? []) as { id: string; storage_path: string; backend: string }[];
+  for (let i = 0; i < list.length; i += 5) {
+    await Promise.all(list.slice(i, i + 5).map(async (f) => {
+      try {
+        if (f.backend === "b2") {
+          if (!b2) throw new Error("B2 non configuré");
+          await deletePrefix(b2, f.storage_path);
+        } else {
+          await db.storage.from("seminar").remove([f.storage_path]);
+        }
+        const { error: delErr } = await db.from("files").delete().eq("id", f.id);
+        if (delErr) throw new Error(delErr.message);
+        deleted.push(f.id);
+      } catch (err) {
+        failed.push({ id: f.id, error: (err as Error).message.slice(0, 200) });
+      }
+    }));
+  }
+  return { deleted, failed };
 }
 
 Deno.serve(async (req) => {
@@ -78,25 +110,63 @@ Deno.serve(async (req) => {
   }
 
   // ------------------------------------------------ retraits (modération)
-  if (body.action === "delete-file") {
-    const fileId = String(body.file_id ?? "");
-    if (!UUID.test(fileId)) return json({ error: "REQUETE_INVALIDE" }, 400);
-    const { data: f } = await db.from("files").select("id, storage_path, backend").eq("id", fileId).maybeSingle();
-    if (!f) return json({ error: "INTROUVABLE" }, 404);
+  if (body.action === "delete-file" || body.action === "delete-files") {
+    const ids = (body.action === "delete-file" ? [body.file_id] : (Array.isArray(body.file_ids) ? body.file_ids : []))
+      .map(String).filter((id) => UUID.test(id)).slice(0, 200);
+    if (!ids.length) return json({ error: "REQUETE_INVALIDE" }, 400);
     try {
-      if (f.backend === "b2") {
-        const b2 = b2Config();
-        if (!b2) return json({ error: "B2_NON_CONFIGURE" }, 500);
-        await deletePrefix(b2, f.storage_path);
-      } else {
-        await db.storage.from("seminar").remove([f.storage_path]);
-      }
-      const { error } = await db.from("files").delete().eq("id", fileId);
-      if (error) throw new Error(error.message);
-      console.log(`admin ${email} : fichier ${fileId} supprimé`);
-      return json({ ok: true });
+      const r = await removeFiles(db, ids);
+      console.log(`admin ${email} : ${r.deleted.length} fichier(s) supprimé(s), ${r.failed.length} échec(s)`);
+      return json({ ok: !r.failed.length, ...r });
     } catch (err) {
       return json({ error: "ERREUR_STOCKAGE", detail: (err as Error).message.slice(0, 300) }, 502);
+    }
+  }
+
+  if (body.action === "delete-transfer") {
+    const transferId = String(body.transfer_id ?? "");
+    if (!UUID.test(transferId)) return json({ error: "REQUETE_INVALIDE" }, 400);
+    try {
+      let files = { deleted: [] as string[], failed: [] as { id: string; error: string }[] };
+      if (body.with_files) {
+        const { data: tf } = await db.from("transfer_files").select("file_id").eq("transfer_id", transferId);
+        const ids = (tf ?? []).map((r: { file_id: string }) => r.file_id);
+        if (ids.length) files = await removeFiles(db, ids);
+      }
+      const { error } = await db.from("transfers").delete().eq("id", transferId);
+      if (error) throw new Error(error.message);
+      console.log(`admin ${email} : transfert ${transferId} supprimé (${files.deleted.length} fichiers)`);
+      return json({ ok: !files.failed.length, files: files.deleted.length, failed: files.failed });
+    } catch (err) {
+      return json({ error: "ERREUR_STOCKAGE", detail: (err as Error).message.slice(0, 300) }, 502);
+    }
+  }
+
+  // Ménage du bucket : objets sans fiche depuis plus d'une heure (un envoi
+  // qui vient de finir n'a pas encore sa fiche), envois multipart
+  // abandonnés depuis plus d'un jour.
+  if (body.action === "delete-orphans") {
+    const b2 = b2Config();
+    if (!b2) return json({ error: "B2_NON_CONFIGURE" }, 500);
+    try {
+      const [objects, uploads, rows] = await Promise.all([
+        listObjects(b2), listUploads(b2, ""), all(db, "files", "storage_path, backend"),
+      ]);
+      const known = new Set(rows.filter((r) => r.backend === "b2").map((r) => r.storage_path as string));
+      const hourAgo = Date.now() - 3600e3;
+      const dayAgo = Date.now() - 86400e3;
+      const orphans = objects.filter((o) => !known.has(o.key) && (!o.modified || new Date(o.modified).getTime() < hourAgo));
+      let bytes = 0;
+      for (let i = 0; i < orphans.length; i += 8) {
+        await Promise.all(orphans.slice(i, i + 8).map(async (o) => { await deletePrefix(b2, o.key); bytes += o.size; }));
+      }
+      const stale = uploads.filter((u) => u.initiated && new Date(u.initiated).getTime() < dayAgo);
+      for (const u of stale) await abortMultipart(b2, u.key, u.uploadId).catch(() => {});
+      console.log(`admin ${email} : ${orphans.length} orphelin(s), ${stale.length} envoi(s) abandonné(s) effacés`);
+      return json({ ok: true, orphans: orphans.length, bytes, aborted: stale.length,
+        kept_recent: objects.filter((o) => !known.has(o.key)).length - orphans.length });
+    } catch (err) {
+      return json({ error: "ERREUR_B2", detail: (err as Error).message.slice(0, 300) }, 500);
     }
   }
   if (body.action === "delete-space") {
