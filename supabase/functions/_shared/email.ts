@@ -105,6 +105,22 @@ async function sendBrevo(cfg: MailConfig, e: OutgoingEmail): Promise<SendResult>
 
 // Adresse vérifiée par CET utilisateur (table sender_emails) ?
 // deno-lint-ignore no-explicit-any
+// Emails partis ou en partance sur 24 h, tout le site : codes, invitations,
+// transferts. Un seul plafond : le quota du fournisseur est commun, et
+// personne ne doit pouvoir l'épuiser pour bloquer les autres.
+export function mailDayMax(cfg: MailConfig): number {
+  return Number(Deno.env.get("MAIL_GLOBAL_DAY") || (cfg.smtp ? 800 : 280));
+}
+export async function mailsToday(db: any): Promise<number> {
+  const since = new Date(Date.now() - 86400e3).toISOString();
+  const [a, b, c] = await Promise.all([
+    db.from("email_codes").select("id", { count: "exact", head: true }).gte("created_at", since),
+    db.from("transfer_recipients").select("id", { count: "exact", head: true }).eq("status", "sent").gte("sent_at", since),
+    db.from("space_invites").select("id", { count: "exact", head: true }).gte("created_at", since),
+  ]);
+  return (a.count ?? 0) + (b.count ?? 0) + (c.count ?? 0);
+}
+
 export async function isVerified(db: any, userId: string, email: string | null): Promise<boolean> {
   if (!email) return false;
   const { data } = await db.from("sender_emails").select("email")

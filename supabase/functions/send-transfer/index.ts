@@ -12,7 +12,7 @@
 
 import { admin, callerId } from "../_shared/supabase.ts";
 import { json, preflight, readJson } from "../_shared/http.ts";
-import { isVerified, mailConfig, sendEmails, transferLink, transferMail, type OutgoingEmail } from "../_shared/email.ts";
+import { isVerified, mailConfig, mailDayMax, mailsToday, sendEmails, transferLink, transferMail, type OutgoingEmail } from "../_shared/email.ts";
 
 type TransferRow = {
   id: string;
@@ -62,19 +62,16 @@ Deno.serve(async (req) => {
   // à arroser), et pour tout le site (le quota du fournisseur d'envoi est
   // partagé, codes de vérification compris).
   const since = new Date(Date.now() - 86400e3).toISOString();
-  const [{ count: bySender }, { count: sentAll }, { count: codesAll }, { count: pending }] = await Promise.all([
+  const [{ count: bySender }, today, { count: pending }] = await Promise.all([
     db.from("transfer_recipients").select("id, transfers!inner(reply_to)", { count: "exact", head: true })
       .eq("status", "sent").gte("sent_at", since).eq("transfers.reply_to", transfer.reply_to),
-    db.from("transfer_recipients").select("id", { count: "exact", head: true })
-      .eq("status", "sent").gte("sent_at", since),
-    db.from("email_codes").select("id", { count: "exact", head: true }).gte("created_at", since),
+    mailsToday(db),
     db.from("transfer_recipients").select("id", { count: "exact", head: true })
       .eq("transfer_id", transfer.id).eq("status", "pending"),
   ]);
   const wanted = pending ?? 0;
   const senderMax = Number(Deno.env.get("MAIL_SENDER_DAY") || 60);
-  const globalMax = Number(Deno.env.get("MAIL_GLOBAL_DAY") || (cfg.smtp ? 800 : 280));
-  if ((bySender ?? 0) + wanted > senderMax || (sentAll ?? 0) + (codesAll ?? 0) + wanted > globalMax) {
+  if ((bySender ?? 0) + wanted > senderMax || today + wanted > mailDayMax(cfg)) {
     return json({ error: "QUOTA_EMAILS_JOUR" }, 429);
   }
 

@@ -8,7 +8,7 @@
 // ensuite, plus besoin de code sur cet appareil.
 
 // deno-lint-ignore-file no-explicit-any
-import { isVerified, sendEmails, verifyCodeMail, type MailConfig } from "./email.ts";
+import { isVerified, mailDayMax, mailsToday, sendEmails, verifyCodeMail, type MailConfig } from "./email.ts";
 
 export const CODE_MINUTES = 15;
 const MAX_ATTEMPTS = 5;
@@ -54,6 +54,7 @@ export async function requestCode(
   if ((mine ?? 0) >= 5 || (forEmail ?? 0) >= 8 || (fromIp ?? 0) >= 10 || (all ?? 0) >= 100) {
     return { ok: false, error: "TROP_DE_CODES", status: 429 };
   }
+  if (await mailsToday(db) >= mailDayMax(cfg)) return { ok: false, error: "QUOTA_EMAILS_JOUR", status: 429 };
 
   // ménage : les codes de plus d'un jour ne servent plus qu'aux limites
   await db.from("email_codes").delete().lt("created_at", dayAgo);

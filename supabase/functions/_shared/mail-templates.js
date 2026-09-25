@@ -23,6 +23,17 @@ const RQ = "\u00A0\u00BB";
 
 // ------------------------------------------------------------ formatage
 
+// Noms choisis par un inconnu (nom d'espace, blaze) dans un email : les
+// messageries transforment "arnaque.com" ou "http://..." en lien cliquable.
+// Une espace invisible après le point ou les deux-points l'empêche, sans
+// changer ce qui s'affiche.
+export function defang(value) {
+  return String(value ?? "")
+    .replace(/:\/\//g, ":/\u200B/")
+    .replace(/([A-Za-z0-9])\.([A-Za-z]{2,})/g, "$1.\u200B$2")
+    .replace(/@/g, "@\u200B");
+}
+
 export function esc(value) {
   return String(value == null ? "" : value).replace(/[&<>"']/g, (c) => ({
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
@@ -238,7 +249,7 @@ export function verifyCodeMail(input) {
   const site = input.site;
   const code = String(input.code);
   const subject = `${code} est ton code WeshTransfer`;
-  const why = input.purpose || "pour envoyer tes fichiers";
+  const why = defang(input.purpose || "pour envoyer tes fichiers");
   const preheader = `Valable ${input.minutes} minutes. À taper dans WeshTransfer ${why}.`;
 
   const body =
@@ -270,6 +281,8 @@ export function verifyCodeMail(input) {
 // input : { site, email, host, spaceName, mode ("seminaire" | "revue"), link, expiresAt }
 export function inviteMail(input) {
   const site = input.site;
+  // l'hôte n'a rien prouvé : nom d'espace et blaze sans lien possible
+  input = Object.assign({}, input, { host: defang(input.host), spaceName: defang(input.spaceName) });
   const revue = input.mode === "revue";
   const subject = revue
     ? `${input.host} attend ton verdict sur ${LQ}${input.spaceName}${RQ}`

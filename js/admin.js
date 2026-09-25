@@ -3,12 +3,12 @@
 // c'est la fonction "admin" qui vérifie que le compte connecté fait partie
 // des administrateurs, et qui renvoie les données.
 
-import { invoke } from "./db.js?v=55";
-import { accountEmail, login, logout } from "./session.js?v=55";
-import { ensureVerified } from "./verify.js?v=55";
-import { icon } from "./icons.js?v=55";
-import { esc, toast, errorText, formatBytes, formatDate, timeAgo, plural, fileBadge } from "./ui.js?v=55";
-import { isAudio, categoryOf } from "./files.js?v=55";
+import { invoke } from "./db.js?v=57";
+import { accountEmail, login, logout } from "./session.js?v=57";
+import { ensureVerified } from "./verify.js?v=57";
+import { icon } from "./icons.js?v=57";
+import { esc, toast, errorText, formatBytes, formatDate, timeAgo, plural, fileBadge, confirmSheet } from "./ui.js?v=57";
+import { isAudio, categoryOf } from "./files.js?v=57";
 
 const root = document.getElementById("adm");
 const who = document.getElementById("who");
@@ -141,6 +141,7 @@ function drawSpaces() {
           " · " + (s.purge_at ? "effacé le " + esc(formatDate(s.purge_at)) : "conservé") + "</small></span>" +
       '<span class="adm-nums"><span>' + plural(s.members, "membre", "membres") + "</span>" +
         "<small>" + plural(s.files, "fichier", "fichiers") + " · " + esc(formatBytes(s.bytes)) + "</small></span>" +
+      '<button class="btn btn-ghost btn-icon btn-sm" data-del-space="' + esc(s.id) + '" aria-label="Supprimer l\'espace" title="Supprimer l\'espace">' + icon("trash", 16) + "</button>" +
     "</div>").join("");
 }
 
@@ -211,6 +212,7 @@ async function openPreview(row) {
       : "";
     box.innerHTML = media +
       '<p class="adm-links"><a class="btn btn-sm" href="' + esc(r.download) + '" rel="noopener">' + icon("download", 16) + "<span>Télécharger</span></a>" +
+        '<button class="btn btn-sm btn-danger" data-del-file="' + esc(f.id) + '">' + icon("trash", 16) + "<span>Supprimer</span></button>" +
         '<span class="muted small">Lien valable 10 minutes · <span class="mono">' + esc(f.id) + "</span> · " + esc(f.backend || "") + "</span></p>";
   } catch (err) {
     box.innerHTML = '<p class="muted small">' + esc(errorText(err)) + "</p>";
@@ -276,6 +278,29 @@ root.addEventListener("click", (e) => {
 });
 root.addEventListener("click", (e) => {
   if (e.target.closest("[data-storage]")) checkStorage();
+});
+
+// Retraits (contenu illicite, abus) : définitifs, fichiers B2 compris.
+root.addEventListener("click", async (e) => {
+  const df = e.target.closest("[data-del-file]");
+  const ds = e.target.closest("[data-del-space]");
+  if (!df && !ds) return;
+  e.preventDefault();
+  if (df) {
+    const f = data.files.find((x) => x.id === df.dataset.delFile);
+    const ok = await confirmSheet((f ? f.name : "Ce fichier") + " sera effacé du stockage et de l'espace. Définitif.",
+      { ok: "Supprimer", danger: true, title: "Retirer ce fichier" });
+    if (!ok) return;
+    try { await invoke("admin", { action: "delete-file", file_id: df.dataset.delFile }); toast("Fichier supprimé", "ok"); load(); }
+    catch (err) { toast(errorText(err), "err"); }
+    return;
+  }
+  const s = data.spaces.find((x) => x.id === ds.dataset.delSpace);
+  const ok = await confirmSheet("L'espace " + (s ? s.name : "") + " sera effacé pour tous ses membres : fichiers, transferts, commentaires. Définitif.",
+    { ok: "Tout supprimer", danger: true, title: "Supprimer l'espace" });
+  if (!ok) return;
+  try { const r = await invoke("admin", { action: "delete-space", space_id: ds.dataset.delSpace }); toast("Espace supprimé (" + r.files + " fichiers)", "ok"); load(); }
+  catch (err) { toast(errorText(err), "err"); }
 });
 // "toggle" ne remonte pas : écouté en phase de capture
 root.addEventListener("toggle", (e) => {

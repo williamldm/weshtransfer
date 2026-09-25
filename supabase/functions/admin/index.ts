@@ -5,6 +5,8 @@
 // POST { action: "sign", file_id }     -> { url, download }   (10 min)
 // POST { action: "storage" }           -> ce que contient vraiment B2,
 //                                          comparé à la base
+// POST { action: "delete-file", file_id }   -> retrait (contenu illicite...)
+// POST { action: "delete-space", space_id } -> espace entier, fichiers compris
 //
 // Réservé aux adresses du secret ADMIN_EMAILS (séparées par des virgules,
 // jamais écrites dans le dépôt, qui est public) : l'appelant doit être
@@ -13,7 +15,8 @@
 
 import { admin } from "../_shared/supabase.ts";
 import { json, preflight, readJson } from "../_shared/http.ts";
-import { b2Config, listObjects, listUploads, presignGet } from "../_shared/b2.ts";
+import { b2Config, deletePrefix, listObjects, listUploads, presignGet } from "../_shared/b2.ts";
+import { wipeSpace } from "../_shared/wipe.ts";
 
 type Row = Record<string, unknown>;
 
@@ -72,6 +75,40 @@ Deno.serve(async (req) => {
     ]);
     if (a.error || b.error) return json({ error: "INTROUVABLE" }, 404);
     return json({ url: a.data.signedUrl, download: b.data.signedUrl });
+  }
+
+  // ------------------------------------------------ retraits (modération)
+  if (body.action === "delete-file") {
+    const fileId = String(body.file_id ?? "");
+    if (!UUID.test(fileId)) return json({ error: "REQUETE_INVALIDE" }, 400);
+    const { data: f } = await db.from("files").select("id, storage_path, backend").eq("id", fileId).maybeSingle();
+    if (!f) return json({ error: "INTROUVABLE" }, 404);
+    try {
+      if (f.backend === "b2") {
+        const b2 = b2Config();
+        if (!b2) return json({ error: "B2_NON_CONFIGURE" }, 500);
+        await deletePrefix(b2, f.storage_path);
+      } else {
+        await db.storage.from("seminar").remove([f.storage_path]);
+      }
+      const { error } = await db.from("files").delete().eq("id", fileId);
+      if (error) throw new Error(error.message);
+      console.log(`admin ${email} : fichier ${fileId} supprimé`);
+      return json({ ok: true });
+    } catch (err) {
+      return json({ error: "ERREUR_STOCKAGE", detail: (err as Error).message.slice(0, 300) }, 502);
+    }
+  }
+  if (body.action === "delete-space") {
+    const spaceId = String(body.space_id ?? "");
+    if (!UUID.test(spaceId)) return json({ error: "REQUETE_INVALIDE" }, 400);
+    try {
+      const files = await wipeSpace(db, spaceId);
+      console.log(`admin ${email} : espace ${spaceId} supprimé (${files} fichiers)`);
+      return json({ ok: true, files });
+    } catch (err) {
+      return json({ error: "ERREUR_STOCKAGE", detail: (err as Error).message.slice(0, 300) }, 502);
+    }
   }
 
   // --------------------------------- le bucket B2, comparé à la base

@@ -20,6 +20,8 @@ export async function loginAccount(db: any, uid: string, email: string): Promise
   const myEmail = (me?.user?.email || "").toLowerCase() || null;
   if (myEmail === email) return { accountId: uid, token: null };
 
+  // compte non confirmé posé sur l'adresse par quelqu'un d'autre : effacé
+  await db.rpc("drop_email_squatters", { p_email: email });
   const { data: existing } = await db.rpc("account_for_email", { p_email: email });
   let accountId = (existing as string | null) || null;
 

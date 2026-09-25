@@ -1,9 +1,9 @@
 // Feuille "Participants" : qui est là, inviter, réglages du host.
 
-import { listParticipants, updateSpace, deleteSpace, inviteByEmail, listInvites, deleteInvite } from "../api.js?v=55";
-import { icon } from "../icons.js?v=55";
-import { esc, h, openSheet, avatar, shareLink, copyText, toast, errorText, formatDate, confirmSheet, canShare, promptSheet } from "../ui.js?v=55";
-import { leaveSpace, knownSpaces, switchTo, forgetSpace, renameMe, accountEmail, logout } from "../session.js?v=55";
+import { listParticipants, updateSpace, deleteSpace, inviteByEmail, listInvites, deleteInvite } from "../api.js?v=57";
+import { icon } from "../icons.js?v=57";
+import { esc, h, openSheet, avatar, shareLink, copyText, toast, errorText, formatDate, confirmSheet, canShare, promptSheet } from "../ui.js?v=57";
+import { leaveSpace, knownSpaces, switchTo, forgetSpace, renameMe, accountEmail, logout } from "../session.js?v=57";
 
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
@@ -15,6 +15,9 @@ export async function openPeopleSheet(ctx) {
   const s = ctx.space;
   const url = inviteUrl(s.code);
   const byInvite = s.access === "invite" && s.mode !== "envoi";
+  // boîte d'envoi : personnelle (transferts, adresses des destinataires),
+  // son code ne fait entrer personne d'autre
+  const personal = s.mode === "envoi";
 
   const body = h(
     '<div class="people">' +
@@ -30,6 +33,9 @@ export async function openPeopleSheet(ctx) {
                 '<ul class="invites" data-invites></ul>'
               : '<p class="muted">' + icon("lock", 14) + " Cet espace est sur invitation. Demande à l'hôte d'inviter quelqu'un par email.</p>") +
           "</div>"
+        : personal
+        ? '<div class="invite"><p class="muted">' + icon("lock", 14) + " Ton espace d'envoi est personnel : personne d'autre n'y entre. " +
+            "Pour le retrouver sur un autre appareil, connecte-toi avec ton email.</p></div>"
         : '<div class="invite">' +
             '<div class="invite-code mono">' + esc(s.code) + "</div>" +
             '<p class="muted">Donne ce code ou le lien : chacun choisit juste un blaze.</p>' +

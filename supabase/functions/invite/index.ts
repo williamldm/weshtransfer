@@ -13,8 +13,8 @@
 
 import { admin, callerId } from "../_shared/supabase.ts";
 import { json, preflight, readJson } from "../_shared/http.ts";
-import { inviteMail, isVerified, mailConfig, sendEmails } from "../_shared/email.ts";
-import { confirmCode, requestCode, sha256 } from "../_shared/codes.ts";
+import { inviteMail, isVerified, mailConfig, mailDayMax, mailsToday, sendEmails } from "../_shared/email.ts";
+import { clientIp, confirmCode, requestCode, sha256 } from "../_shared/codes.ts";
 import { loginAccount } from "../_shared/account.ts";
 
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
@@ -22,6 +22,8 @@ const INVITE_DAYS = 30;
 const PER_CALL = 10;
 const PER_DAY = 30;      // invitations envoyées par espace sur 24 h
 const PER_SPACE = 200;   // invitations en tout par espace
+const PER_USER_DAY = 40; // par appareil / compte, tous espaces confondus
+const PER_IP_DAY = 60;   // par IP
 
 type Invite = {
   id: string; space_id: string; email: string; expires_at: string;
@@ -80,6 +82,18 @@ Deno.serve(async (req) => {
     if ((today ?? 0) + emails.length > PER_DAY || (total ?? 0) + emails.length > PER_SPACE) {
       return json({ error: "QUOTA_INVITATIONS" }, 429);
     }
+    // un espace se crée en un clic : les plafonds par espace ne suffisent
+    // pas contre quelqu'un qui en ouvre dix pour arroser
+    const ip = await sha256("wt:" + clientIp(req));
+    const [{ count: byUser }, { count: byIp }, sentToday] = await Promise.all([
+      db.from("space_invites").select("id", { count: "exact", head: true }).eq("invited_user", uid).gte("created_at", dayAgo),
+      db.from("space_invites").select("id", { count: "exact", head: true }).eq("ip_hash", ip).gte("created_at", dayAgo),
+      mailsToday(db),
+    ]);
+    if ((byUser ?? 0) + emails.length > PER_USER_DAY || (byIp ?? 0) + emails.length > PER_IP_DAY) {
+      return json({ error: "QUOTA_INVITATIONS" }, 429);
+    }
+    if (sentToday + emails.length > mailDayMax(cfg)) return json({ error: "QUOTA_EMAILS_JOUR" }, 429);
 
     // purge_at vide : espace de retours conservé sans limite
     const until = Date.now() + INVITE_DAYS * 86400e3;
@@ -89,7 +103,7 @@ Deno.serve(async (req) => {
       const token = newToken();
       // réinviter la même adresse : nouveau lien, l'ancien ne marche plus
       const { error } = await db.from("space_invites").upsert({
-        space_id: spaceId, email, token_hash: await sha256(token), invited_by: me.id,
+        space_id: spaceId, email, token_hash: await sha256(token), invited_by: me.id, invited_user: uid, ip_hash: ip,
         created_at: new Date().toISOString(), expires_at: expires,
       }, { onConflict: "space_id,email" });
       if (error) return json({ error: "ERREUR_BASE", detail: error.message }, 500);

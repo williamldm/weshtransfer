@@ -4,7 +4,7 @@
 // (qui fait tourner quoi, où en est la lecture) passent en broadcast :
 // rien n'est écrit en base.
 
-import { sb } from "./db.js?v=55";
+import { sb } from "./db.js?v=57";
 
 let live = null;
 
@@ -17,7 +17,9 @@ const TABLES = ["projects", "files", "comments", "participants", "transfers", "t
 
 export function connectSpace(space, bus) {
   const channel = sb.channel("space:" + space.id, {
-    config: { presence: { key: space.participantId }, broadcast: { self: false } }
+    // canal privé : la base vérifie que l'appelant est membre de l'espace
+    // (policies sur realtime.messages) avant de le laisser écouter ou parler
+    config: { private: true, presence: { key: space.participantId }, broadcast: { self: false } }
   });
   live = channel;
 
