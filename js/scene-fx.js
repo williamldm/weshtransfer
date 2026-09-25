@@ -11,7 +11,7 @@
 // Rien ne tourne quand rien ne bouge (la boucle s'arrête d'elle-même), rien
 // du tout avec "réduire les animations", ni onglet caché.
 
-import { WALLPAPERS } from "./wallpapers.js?v=70";
+import { WALLPAPERS } from "./wallpapers.js?v=72";
 
 const MAX_PARTICLES = 240;
 const SHIFT_X = 16;   // px, amplitude de la profondeur
@@ -107,7 +107,7 @@ let frozen = false; // tests : image figée (les particules ne vieillissent plus
 
 function setKind(index) {
   const w = WALLPAPERS[index];
-  kind = KINDS[(w && KIND_OF[w.file]) || "smoke"];
+  kind = KINDS[(w && KIND_OF[w.file.split("?")[0]]) || "smoke"];
 }
 
 function resize() {

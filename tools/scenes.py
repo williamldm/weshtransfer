@@ -294,18 +294,23 @@ def highway():
         b.append(windows(x + 6, 710 - h, int((w - 8) / 14), int(h / 18), 14, 18, x, 6, 6, .45))
         x += w + rnd.randint(0, 14)
     b.append('<rect y="700" width="1600" height="300" fill="%s"/>' % HILL)
-    # panneau publicitaire : WeshTransfer, forcément
-    b.append('<rect x="1180" y="480" width="8" height="220" fill="%s"/><rect x="1060" y="400" width="250" height="100" fill="%s"/>'
-             '<g class="board"><rect x="1068" y="408" width="234" height="84" fill="#1D1830"/>'
-             '<g transform="translate(1128 415) scale(.62)"><path d="M2.87 21.1A7 7 0 0 1 9.54 12L22.73 12A7 7 0 0 1 29.46 17.07L39.76 52.91A4 4 0 0 0 47.45 52.9L57.65 17.08A7 7 0 0 1 64.38 12L77.01 12A7 7 0 0 1 83.75 17.08L94.57 55.1A3.42 3.42 0 0 0 97.86 57.59L97.86 112L91.95 112A7.22 7.22 0 0 1 85.01 106.76L74.5 69.85A4 4 0 0 0 66.8 69.85L56.87 104.74A10 10 0 0 1 47.25 112L38.83 112A10 10 0 0 1 29.3 105Z" fill="%s"/>'
-             '<path d="M98.54 20.92A7 7 0 0 1 105.27 12L155.9 12A2.1 2.1 0 0 0 158 9.9L158 5.76A2.52 2.52 0 0 1 162.23 3.91L181.61 21.8A3 3 0 0 1 181.61 26.2L162.23 44.09A2.52 2.52 0 0 1 158 42.24L158 38.1A2.1 2.1 0 0 0 155.9 36L141.07 36A10 10 0 0 0 131.54 43L111.52 106.53A7.82 7.82 0 0 1 104.07 112L97.86 112L97.86 57.59A3.42 3.42 0 0 0 101.15 55.11L103.63 46.55A14 14 0 0 0 103.64 38.83Z" fill="%s"/></g></g>'
-             % (MASS, MASS, VIOLET, WHITE))
+    # panneau publicitaire : WeshTransfer, forcément. En bas à droite, au bord
+    # de la voie rapide : c'est la seule zone que le grand titre de l'accueil
+    # ne recouvre sur aucun écran (téléphone, tablette, ordinateur ; mesuré).
+    # Panneau éclairé, clair, logo sombre : jamais confondu avec le texte
+    # violet posé par-dessus le décor.
+    b.append('<rect x="1214" y="712" width="6" height="32" fill="%s"/><rect x="1158" y="652" width="120" height="64" rx="3" fill="%s"/>'
+             '<g class="board"><rect x="1162" y="656" width="112" height="56" rx="2" fill="#EDE7DC"/>'
+             '<g transform="translate(1180 660) scale(.42)"><path d="M2.87 21.1A7 7 0 0 1 9.54 12L22.73 12A7 7 0 0 1 29.46 17.07L39.76 52.91A4 4 0 0 0 47.45 52.9L57.65 17.08A7 7 0 0 1 64.38 12L77.01 12A7 7 0 0 1 83.75 17.08L94.57 55.1A3.42 3.42 0 0 0 97.86 57.59L97.86 112L91.95 112A7.22 7.22 0 0 1 85.01 106.76L74.5 69.85A4 4 0 0 0 66.8 69.85L56.87 104.74A10 10 0 0 1 47.25 112L38.83 112A10 10 0 0 1 29.3 105Z" fill="#2A2340"/>'
+             '<path d="M98.54 20.92A7 7 0 0 1 105.27 12L155.9 12A2.1 2.1 0 0 0 158 9.9L158 5.76A2.52 2.52 0 0 1 162.23 3.91L181.61 21.8A3 3 0 0 1 181.61 26.2L162.23 44.09A2.52 2.52 0 0 1 158 42.24L158 38.1A2.1 2.1 0 0 0 155.9 36L141.07 36A10 10 0 0 0 131.54 43L111.52 106.53A7.82 7.82 0 0 1 104.07 112L97.86 112L97.86 57.59A3.42 3.42 0 0 0 101.15 55.11L103.63 46.55A14 14 0 0 0 103.64 38.83Z" fill="#7B5CE6"/></g></g>'
+             '<rect x="1162" y="656" width="112" height="6" fill="#FFFFFF" opacity=".35"/>'
+             % (MASS, MASS))
     # viaduc
     b.append('<rect y="742" width="1600" height="30" fill="%s"/><rect y="742" width="1600" height="4" fill="%s"/>' % (MASS, EDGE))
     b.append("".join('<rect x="%d" y="772" width="30" height="60" fill="%s"/>' % (x, MASS2) for x in range(80, 1600, 260)))
     # lampadaires
     b.append("".join('<path d="M%d 742 V660 h24" stroke="%s" stroke-width="3" fill="none"/><rect x="%d" y="658" width="12" height="4" fill="%s" opacity=".7"/>'
-                     % (x, TRIM, x + 18, "#E2B55A") for x in range(40, 1600, 200)))
+                     % (x, TRIM, x + 18, "#E2B55A") for x in range(40, 1600, 200) if not 1140 <= x <= 1290))
     # bouchon : phares d'un côté, feux arrière de l'autre
     a = "".join('<rect x="%d" y="728" width="44" height="14" rx="4" fill="%s"/><circle cx="%d" cy="735" r="2.2" fill="%s"/><circle cx="%d" cy="735" r="2.2" fill="%s"/>'
                 % (x, MASS3, x + 44, WHITE, x + 44, WHITE) for x in range(-380, 1980, 70))
