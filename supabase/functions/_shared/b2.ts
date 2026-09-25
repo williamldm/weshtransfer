@@ -73,6 +73,32 @@ export async function presignGet(b2: B2, key: string, expires: number, downloadN
   return signed.url;
 }
 
+// Tout ce que contient le bucket (admin : comparaison avec la base).
+export type B2Object = { key: string; size: number; modified: string };
+export async function listObjects(b2: B2, prefix = "", max = 50000): Promise<B2Object[]> {
+  const out: B2Object[] = [];
+  let token = "";
+  for (;;) {
+    const url = new URL(b2.base);
+    url.searchParams.set("list-type", "2");
+    url.searchParams.set("max-keys", "1000");
+    if (prefix) url.searchParams.set("prefix", prefix);
+    if (token) url.searchParams.set("continuation-token", token);
+    const xml = await call(b2, url);
+    for (const c of tag(xml, "Contents")) {
+      out.push({
+        key: unxml(tag(c, "Key")[0] ?? ""),
+        size: Number(tag(c, "Size")[0] ?? 0),
+        modified: tag(c, "LastModified")[0] ?? "",
+      });
+    }
+    if (tag(xml, "IsTruncated")[0] !== "true" || out.length >= max) break;
+    token = unxml(tag(xml, "NextContinuationToken")[0] ?? "");
+    if (!token) break;
+  }
+  return out;
+}
+
 // -------------------------------------------------- upload multipart
 // Le navigateur envoie les parties directement à B2 (URL signées) : les
 // octets ne transitent jamais par l'Edge Function.
@@ -179,7 +205,7 @@ async function listVersions(b2: B2, prefix: string): Promise<{ key: string; vers
   return out;
 }
 
-async function listUploads(b2: B2, prefix: string): Promise<{ key: string; uploadId: string }[]> {
+export async function listUploads(b2: B2, prefix: string): Promise<{ key: string; uploadId: string }[]> {
   const url = new URL(b2.base);
   url.search = "uploads";
   url.searchParams.set("prefix", prefix);

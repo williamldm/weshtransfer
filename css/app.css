@@ -1,5 +1,5 @@
-@import url("fonts.css?v=53");
-@import url("tokens.css?v=53");
+@import url("fonts.css?v=55");
+@import url("tokens.css?v=55");
 
 /* ================================================================= base */
 *, *::before, *::after { box-sizing: border-box; }
@@ -1219,3 +1219,17 @@ body.admin { min-height: 100vh; background: var(--bg); }
   .adm-row summary, .adm-row.is-flat { flex-direction: column; align-items: stretch; gap: var(--sp-1); }
   .adm-nums { align-items: flex-start; text-align: left; }
 }
+.adm-storage { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3); margin: var(--sp-3) 0; padding: var(--sp-3) var(--sp-4); border: 1px dashed var(--line-strong); border-radius: var(--r-md); }
+.adm-storage > span { flex: 1; min-width: 220px; }
+.adm-storage.is-done { display: block; border-style: solid; background: var(--surface); }
+.adm-storage-nums { display: flex; flex-wrap: wrap; gap: var(--sp-2) var(--sp-5); margin-bottom: var(--sp-2); font-size: var(--fs-sm); color: var(--text-dim); }
+.adm-storage-nums b { color: var(--text); }
+.adm-storage-nums .is-warn, .adm-storage-nums .is-warn b { color: var(--warn); }
+.adm-storage h4 { margin: var(--sp-3) 0 var(--sp-1); color: var(--text-faint); font-family: var(--mono); font-size: 11px; font-weight: 500; letter-spacing: .1em; text-transform: uppercase; }
+.adm-storage ul { margin: 0 0 var(--sp-3); padding-left: 1.1em; color: var(--text-dim); font-size: var(--fs-xs); line-height: 1.7; word-break: break-all; }
+.adm-subbar { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-3); padding: var(--sp-2) 0; }
+.adm-sort { width: auto; min-height: 36px; padding: 0 var(--sp-3); }
+.adm-file-badge { flex: none; width: 62px; }
+.adm-detail audio { display: block; width: 100%; margin-top: var(--sp-2); }
+.adm-preview { display: block; max-width: 100%; max-height: 360px; margin-top: var(--sp-2); border-radius: var(--r-md); }
+.adm-links { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3); margin: var(--sp-3) 0 0; }
