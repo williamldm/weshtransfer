@@ -29,7 +29,7 @@ DirectoryIndex index.html
 
   # Liste blanche
   RewriteRule ^$ - [L]
-  RewriteRule ^(index|app|t)\.html$ - [L]
+  RewriteRule ^(index|app|t|admin)\.html$ - [L]
   RewriteRule ^robots\.txt$ - [L]
   RewriteRule ^(css|js|fonts|img)/[A-Za-z0-9_./-]+\.(css|js|woff2|svg|png|jpg|txt)$ - [L]
   RewriteRule ^ - [R=404,L]
@@ -58,5 +58,11 @@ DirectoryIndex index.html
   </Files>
   <Files "app.html">
     Header set X-Robots-Tag "noindex"
+  </Files>
+  # admin : cachée (liée nulle part), jamais indexée ; l'accès est vérifié
+  # côté serveur par la fonction admin
+  <Files "admin.html">
+    Header always set Referrer-Policy "no-referrer"
+    Header set X-Robots-Tag "noindex, nofollow"
   </Files>
 </IfModule>

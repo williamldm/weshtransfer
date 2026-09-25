@@ -6,5 +6,5 @@
 deployment:
   tasks:
     - export DEPLOYPATH=/home2/lowi3581/weshtransfer.fr/
-    - /bin/cp index.html app.html t.html robots.txt .htaccess $DEPLOYPATH
+    - /bin/cp index.html app.html t.html admin.html robots.txt .htaccess $DEPLOYPATH
     - /bin/cp -R css js fonts img $DEPLOYPATH
