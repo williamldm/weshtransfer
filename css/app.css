@@ -1,5 +1,5 @@
-@import url("fonts.css?v=62");
-@import url("tokens.css?v=62");
+@import url("fonts.css?v=63");
+@import url("tokens.css?v=63");
 
 /* ================================================================= base */
 *, *::before, *::after { box-sizing: border-box; }
@@ -1259,3 +1259,4 @@ body.admin { min-height: 100vh; background: var(--bg); }
 .sx-history { margin-top: var(--sp-3); }
 
 .sx .send-pending .section-head { display: none; }
+.sx-joke { display: block; margin-top: var(--sp-2); font-style: italic; }

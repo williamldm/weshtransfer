@@ -6,19 +6,19 @@ import {
   getProject, getFilesByIds, createTransfer, sendTransfer, emailEnabled,
   getTransfer, transferUrl, createProject, signFiles, cachedUrl,
   knownVerified, listContacts, forgetContact, rememberContactsLocal
-} from "../api.js?v=62";
-import { accountEmail } from "../session.js?v=62";
-import { ensureVerified } from "../verify.js?v=62";
-import { openUploadSheet } from "./upload-sheet.js?v=62";
-import { mountUploads } from "./uploads.js?v=62";
-import { onUploads, enqueue, checkFile } from "../upload.js?v=62";
-import { categoryOf, canPreview } from "../files.js?v=62";
-import { takePending } from "../pending.js?v=62";
-import { icon } from "../icons.js?v=62";
+} from "../api.js?v=63";
+import { accountEmail } from "../session.js?v=63";
+import { ensureVerified } from "../verify.js?v=63";
+import { openUploadSheet } from "./upload-sheet.js?v=63";
+import { mountUploads } from "./uploads.js?v=63";
+import { onUploads, enqueue, checkFile, getJobs } from "../upload.js?v=63";
+import { categoryOf, canPreview } from "../files.js?v=63";
+import { takePending } from "../pending.js?v=63";
+import { icon } from "../icons.js?v=63";
 import {
   esc, h, formatBytes, formatDuration, plural, toast, errorText, openSheet, copyText, shareLink,
   canShare, formatDate, daysLeft, fileBadge, fileTile
-} from "../ui.js?v=62";
+} from "../ui.js?v=63";
 
 // Dans un espace "envoi", ce composeur EST l'accueil.
 export const title = (ctx) => (ctx && ctx.space.mode === "envoi" ? ctx.space.name : "Envoyer");
@@ -26,6 +26,17 @@ export const title = (ctx) => (ctx && ctx.space.mode === "envoi" ? ctx.space.nam
 const REPLY_KEY = "seminaire.replyTo";
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 const DURATIONS = [1, 3, 7, 14];
+
+// Ce que coûte chaque durée à la planète (selon nos calculs, faux).
+const DAY_JOKES = {
+  1: "24 h : la centrale tourne à peine, on a presque honte.",
+  3: "3 jours : un plein de jet privé, sans le champagne.",
+  7: "7 jours : une semaine de serveurs au charbon. Classique.",
+  14: "14 jours : on rallume une deuxième centrale, rien que pour toi."
+};
+
+// Le nom d'un fichier sans son extension : "Nuit blanche - mix v3"
+const baseName = (name) => String(name || "").replace(/\.[a-z0-9]{1,10}$/i, "").trim() || String(name || "");
 
 // Ton email : celui du compte connecté, sinon le dernier utilisé ici.
 function remembered() {
@@ -141,7 +152,7 @@ export async function mount(root, ctx, params) {
         '<div class="field"><span class="label">Disponible pendant</span><div class="chips" data-days>' +
           DURATIONS.map((d) => '<button type="button" class="chip' + (d === state.days ? " is-on" : "") + '" data-d="' + d + '"' +
             (d > maxDays ? " disabled" : "") + ">" + plural(d, "jour", "jours") + "</button>").join("") +
-        "</div></div>" +
+        '</div><span class="hint sx-joke" data-day-joke></span></div>' +
       "</details>" +
 
       '<button class="btn btn-primary btn-block btn-xl" type="submit" data-submit></button>' +
@@ -177,10 +188,25 @@ export async function mount(root, ctx, params) {
       replyInput.select();
     };
   }
+  const dayJoke = root.querySelector("[data-day-joke]");
   function drawMoreSum() {
-    moreSum.textContent = "· " + plural(state.days, "jour", "jours") + (titleInput.value.trim() ? " · " + titleInput.value.trim() : "");
+    moreSum.textContent = "· " + plural(state.days, "jour", "jours") + " de charbon";
+    dayJoke.textContent = DAY_JOKES[state.days] || "";
   }
-  titleInput.addEventListener("input", drawMoreSum);
+
+  // Titre de l'envoi = nom du fichier (sans extension), "+ 2 autres" s'il
+  // y en a plusieurs. Tant qu'on ne l'a pas tapé soi-même, il suit les
+  // fichiers ajoutés ou retirés.
+  let titleTouched = false;
+  titleInput.addEventListener("input", () => { titleTouched = !!titleInput.value.trim(); });
+  function autoTitle() {
+    if (titleTouched) return;
+    const names = state.files.map((f) => f.original_name)
+      .concat(getJobs().filter((j) => j.meta.tag === tag && j.state !== "done" && j.state !== "error" && j.state !== "canceled").map((j) => j.name));
+    if (!names.length) return;
+    const more = names.length - 1;
+    titleInput.value = baseName(names[0]) + (more ? " + " + more + (more > 1 ? " autres" : " autre") : "");
+  }
   const shipNo = "WT-" + Math.random().toString(36).slice(2, 6).toUpperCase();
 
   // Bordereau d'expédition : le récapitulatif de l'envoi, en direct, façon
@@ -250,6 +276,7 @@ export async function mount(root, ctx, params) {
   const thumbRequested = new Set();
 
   function drawFiles() {
+    autoTitle();
     const toSign = state.files
       .filter((f) => categoryOf(f.original_name, f.mime_type) === "image" && canPreview(f.original_name, f.mime_type))
       .map((f) => f.id)
@@ -425,14 +452,14 @@ export async function mount(root, ctx, params) {
     try {
       if (!draft) {
         const stamp = new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }).format(new Date());
-        draft = await createProject(ctx.space.id, titleInput.value.trim() || "Envoi du " + stamp);
-        if (!titleInput.value.trim()) titleInput.value = draft.title;
+        draft = await createProject(ctx.space.id, (titleTouched && titleInput.value.trim()) || baseName(ok[0].name) || "Envoi du " + stamp);
       }
       const jobs = enqueue(ok, {
         spaceId: ctx.space.id, projectId: draft.id, projectTitle: draft.title,
         kind: null, label: null, bpm: null, musicalKey: null, tag
       });
       waiting += jobs.length;
+      autoTitle();
       drawPending();
     } catch (err) {
       toast(errorText(err), "err");
