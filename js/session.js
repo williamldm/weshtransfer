@@ -3,7 +3,7 @@
 // mot de passe), il partage le compte de cette adresse : les mêmes espaces,
 // envois et blazes sur tous ses appareils.
 
-import { sb, q, invoke, requireClient } from "./db.js?v=58";
+import { sb, q, invoke, requireClient } from "./db.js?v=62";
 
 const SPACE_KEY = "seminaire.space";      // espace actif
 const KNOWN_KEY = "seminaire.spaces";     // tous les espaces rejoints sur cet appareil

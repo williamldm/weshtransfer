@@ -6,19 +6,19 @@ import {
   getProject, getFilesByIds, createTransfer, sendTransfer, emailEnabled,
   getTransfer, transferUrl, createProject, signFiles, cachedUrl,
   knownVerified, listContacts, forgetContact, rememberContactsLocal
-} from "../api.js?v=58";
-import { accountEmail } from "../session.js?v=58";
-import { ensureVerified } from "../verify.js?v=58";
-import { openUploadSheet } from "./upload-sheet.js?v=58";
-import { mountUploads } from "./uploads.js?v=58";
-import { onUploads, enqueue, checkFile } from "../upload.js?v=58";
-import { categoryOf, canPreview } from "../files.js?v=58";
-import { takePending } from "../pending.js?v=58";
-import { icon } from "../icons.js?v=58";
+} from "../api.js?v=62";
+import { accountEmail } from "../session.js?v=62";
+import { ensureVerified } from "../verify.js?v=62";
+import { openUploadSheet } from "./upload-sheet.js?v=62";
+import { mountUploads } from "./uploads.js?v=62";
+import { onUploads, enqueue, checkFile } from "../upload.js?v=62";
+import { categoryOf, canPreview } from "../files.js?v=62";
+import { takePending } from "../pending.js?v=62";
+import { icon } from "../icons.js?v=62";
 import {
   esc, h, formatBytes, formatDuration, plural, toast, errorText, openSheet, copyText, shareLink,
   canShare, formatDate, daysLeft, fileBadge, fileTile
-} from "../ui.js?v=58";
+} from "../ui.js?v=62";
 
 // Dans un espace "envoi", ce composeur EST l'accueil.
 export const title = (ctx) => (ctx && ctx.space.mode === "envoi" ? ctx.space.name : "Envoyer");
@@ -92,81 +92,63 @@ export async function mount(root, ctx, params) {
   const emailOn = await emailEnabled();
 
   // ------------------------------------------------------ rendu
-  const stepHead = (n, title, aside) =>
-    '<div class="step-head"><span class="step-n">' + String(n).padStart(2, "0") + "</span><h2>" + title + "</h2>" + (aside || "") + "</div>";
-
+  // Façon WeTransfer : les fichiers, à qui, un mot, un bouton. Le reste
+  // (titre, durée) est replié dans "Options", l'expéditeur tient sur une
+  // ligne quand on le connaît déjà.
+  const knownFrom = !!state.replyTo;
   root.innerHTML =
-    (envoiMode
-      ? '<section class="send-hero">' +
-          '<div class="eyebrow">' + esc(ctx.space.name) + " · guichet d'expédition</div>" +
-          "<h1>Envoie tes fichiers.<br><em>On s'occupe du kérosène.</em></h1>" +
-          "<p>Sons, stems, clips, visuels, projets : jusqu'à " + formatBytes(ctx.space.maxFileBytes || 3221225472) +
-          " par fichier. Tes destinataires écoutent avant de télécharger. Pas de compte, ni pour toi ni pour eux.</p>" +
-        "</section>"
-      : '<header class="page-head">' +
-          '<div class="eyebrow">Guichet d\'expédition</div>' +
-          "<h1>Envoyer des fichiers</h1>" +
-          '<div class="meta">Tes destinataires reçoivent un lien pour écouter et télécharger. Pas de compte, pas de code, pas de compensation carbone.</div>' +
-        "</header>") +
+    '<form class="send-card sx" novalidate data-form>' +
+      '<h1 class="sx-title">' + (envoiMode ? "Nouvel envoi" : "Envoyer des fichiers") + "</h1>" +
 
-    '<form class="send-card" novalidate data-form>' +
-
-      '<section class="step">' +
-        stepHead(1, "Le colis", '<span class="muted small" data-total></span>') +
+      '<div class="sx-files">' +
         '<ul class="send-files" data-files></ul>' +
-        (envoiMode
-          ? '<label class="dropzone" data-dropzone>' + icon("upload", 28) +
-              "<strong>Charge la soute</strong><span>Touche ici, ou glisse tes fichiers n'importe où sur la page</span>" +
-              '<input type="file" multiple hidden data-upload></label>'
-          : "") +
-        (envoiMode
-          ? ""
-          : '<label class="btn btn-block">' + icon("upload", 18) + "<span>Ajouter des fichiers</span>" +
-              '<input type="file" multiple hidden data-upload-sheet></label>') +
         '<div class="send-pending" data-pending hidden></div>' +
-      "</section>" +
+        '<label class="sx-add" data-dropzone>' +
+          '<span class="sx-add-ic">' + icon("plus", 20) + "</span>" +
+          '<span class="sx-add-txt"><strong data-add-label>Ajoute tes fichiers</strong><small data-total>ou glisse-les ici · ' +
+            formatBytes(ctx.space.maxFileBytes || 3221225472) + " max</small></span>" +
+          (envoiMode ? '<input type="file" multiple hidden data-upload>' : '<input type="file" multiple hidden data-upload-sheet>') +
+        "</label>" +
+      "</div>" +
 
-      '<section class="step">' +
-        stepHead(2, "À qui ?", '<span class="muted small">facultatif</span>') +
+      '<div class="sx-row">' +
         '<div class="email-input" data-emailbox>' +
           '<span data-chips></span>' +
           // type="text" et non "email" : un champ email efface lui-même les
           // espaces de fin, le séparateur tapé serait invisible. inputmode
           // garde le clavier email sur mobile.
           '<input type="text" inputmode="email" autocomplete="email" autocapitalize="off" spellcheck="false" ' +
-            'placeholder="email@exemple.fr" data-email>' +
+            'placeholder="Envoyer à (email)" aria-label="Destinataires" data-email>' +
         "</div>" +
         '<div class="recents" data-recents hidden></div>' +
-        '<p class="hint">Plusieurs adresses : sépare-les par un espace. Sans adresse, tu récupères juste le lien.</p>' +
-      "</section>" +
+      "</div>" +
 
-      '<section class="step">' +
-        stepHead(3, "Le mot qui va avec") +
+      '<textarea class="input sx-msg" name="message" rows="2" maxlength="2000" placeholder="Un message ? (facultatif)" aria-label="Message"></textarea>' +
+
+      '<div class="sx-from" data-from>' +
+        (knownFrom
+          ? '<span class="sx-from-line">De <strong data-from-email>' + esc(state.replyTo) + '</strong> <button type="button" class="link-btn" data-change-from>changer</button></span>'
+          : "") +
+        '<input class="input" type="email" name="reply" inputmode="email" autocomplete="email" autocapitalize="off" value="' + esc(state.replyTo) +
+          '" placeholder="Ton email" aria-label="Ton email"' + (knownFrom ? " hidden" : "") + ">" +
+        '<span class="hint" data-reply-hint></span>' +
+      "</div>" +
+
+      '<details class="sx-more">' +
+        '<summary>Options <span class="muted" data-more-sum></span></summary>' +
         '<label class="field"><span class="label">Titre</span>' +
-          '<input class="input" name="title" maxlength="80" required placeholder="Ex : Nuit blanche, mix du jour 2" value="' + esc(state.title) + '"></label>' +
-        '<label class="field"><span class="label">Message</span>' +
-          '<textarea class="input" name="message" rows="3" maxlength="2000" placeholder="Dis-leur ce qu\'ils vont écouter"></textarea></label>' +
-        '<label class="field"><span class="label">Ton email</span>' +
-          '<input class="input" type="email" name="reply" inputmode="email" autocomplete="email" autocapitalize="off" value="' + esc(state.replyTo) + '" placeholder="pour les réponses">' +
-          '<span class="hint" data-reply-hint></span></label>' +
-        '<div class="field"><span class="label">Conservation</span><div class="chips" data-days>' +
+          '<input class="input" name="title" maxlength="80" placeholder="Ex : Nuit blanche, mix du jour 2" value="' + esc(state.title) + '"></label>' +
+        '<div class="field"><span class="label">Disponible pendant</span><div class="chips" data-days>' +
           DURATIONS.map((d) => '<button type="button" class="chip' + (d === state.days ? " is-on" : "") + '" data-d="' + d + '"' +
             (d > maxDays ? " disabled" : "") + ">" + plural(d, "jour", "jours") + "</button>").join("") +
-        "</div>" +
-        '<span class="hint">Après, tout est effacé pour faire de la place à la prochaine fournée de charbon.' +
-          (ctx.space.purgeAt ? " Au plus tard le " + esc(formatDate(ctx.space.purgeAt)) + ", date de suppression de l'espace." : "") + "</span>" +
-        "</div>" +
-      "</section>" +
+        "</div></div>" +
+      "</details>" +
 
-      '<div class="send-go">' +
-        '<div class="waybill" data-waybill aria-live="off"></div>' +
-        '<button class="btn btn-primary btn-block btn-xl" type="submit" data-submit></button>' +
-        (emailOn ? "" :
-          '<p class="hint center">' + icon("link", 14) + " Emails automatiques pas encore branchés : tu obtiens un lien à partager, et un lien personnel par destinataire.</p>") +
-      "</div>" +
+      '<button class="btn btn-primary btn-block btn-xl" type="submit" data-submit></button>' +
+      (emailOn ? "" : '<p class="hint center">' + icon("link", 14) + " Tu obtiens un lien à partager.</p>") +
     "</form>" +
     (envoiMode
-      ? '<a class="link-row" href="#/transfers">' + icon("mail", 18) + "<span>Mes envois : qui a ouvert, qui a téléchargé</span>" + icon("chevron", 18) + "</a>"
+      ? '<a class="link-row sx-history" href="#/transfers">' + icon("mail", 18) + "<span>Mes envois</span>" + icon("chevron", 18) + "</a>"
       : "");
 
   const form = root.querySelector("[data-form]");
@@ -181,12 +163,30 @@ export async function mount(root, ctx, params) {
   const submitEl = root.querySelector("[data-submit]");
   const pendingEl = root.querySelector("[data-pending]");
   const replyHint = root.querySelector("[data-reply-hint]");
-  const waybillEl = root.querySelector("[data-waybill]");
+  const waybillEl = null;   // bordereau retiré : la page reste simple
+  const moreSum = root.querySelector("[data-more-sum]");
+  const addLabel = root.querySelector("[data-add-label]");
+
+  // "De ... changer" : le champ réapparaît pour taper une autre adresse
+  const changeFrom = root.querySelector("[data-change-from]");
+  if (changeFrom) {
+    changeFrom.onclick = () => {
+      changeFrom.closest(".sx-from-line").hidden = true;
+      replyInput.hidden = false;
+      replyInput.focus();
+      replyInput.select();
+    };
+  }
+  function drawMoreSum() {
+    moreSum.textContent = "· " + plural(state.days, "jour", "jours") + (titleInput.value.trim() ? " · " + titleInput.value.trim() : "");
+  }
+  titleInput.addEventListener("input", drawMoreSum);
   const shipNo = "WT-" + Math.random().toString(36).slice(2, 6).toUpperCase();
 
   // Bordereau d'expédition : le récapitulatif de l'envoi, en direct, façon
   // ticket de fret. Le CO2 est une pure blague (la même que sur l'accueil).
   function drawWaybill() {
+    if (!waybillEl) return;
     const n = state.files.length;
     const bytes = state.files.reduce((s, f) => s + (f.size_bytes || 0), 0);
     const to = state.emails.filter((e) => EMAIL_RE.test(e)).length;
@@ -208,14 +208,11 @@ export async function mount(root, ctx, params) {
   // Sous "Ton email" : vérifiée ou pas, et pourquoi on la demande.
   function drawReplyHint() {
     const v = replyInput.value.trim().toLowerCase();
-    if (emailOn && v && knownVerified(v)) {
-      replyHint.innerHTML = '<span class="verified">' + icon("check", 14) + " Adresse vérifiée sur cet appareil</span>";
-    } else if (emailOn) {
-      replyHint.textContent = (state.emails.length ? "Obligatoire pour envoyer par email. " : "") +
-        "La première fois, on t'envoie un code pour vérifier que c'est bien toi. Ensuite, les réponses t'arrivent directement et tu sais quand c'est téléchargé.";
-    } else {
-      replyHint.textContent = "Les réponses t'arrivent directement, et tu sais quand c'est téléchargé.";
-    }
+    // une seule ligne, et seulement quand elle sert à quelque chose
+    if (!emailOn || (v && knownVerified(v))) replyHint.textContent = "";
+    else if (state.emails.length) replyHint.textContent = "La première fois, un code arrive à cette adresse pour vérifier que c'est toi.";
+    else replyHint.textContent = "";
+    replyHint.hidden = !replyHint.textContent;
   }
   replyInput.addEventListener("input", drawReplyHint);
 
@@ -278,7 +275,10 @@ export async function mount(root, ctx, params) {
     }).join("");
     filesEl.hidden = !state.files.length;
     const total = state.files.reduce((sum, f) => sum + (f.size_bytes || 0), 0);
-    totalEl.textContent = state.files.length ? plural(state.files.length, "fichier", "fichiers") + " · " + formatBytes(total) : "";
+    totalEl.textContent = state.files.length
+      ? plural(state.files.length, "fichier", "fichiers") + " · " + formatBytes(total)
+      : "ou glisse-les ici · " + formatBytes(ctx.space.maxFileBytes || 3221225472) + " max";
+    addLabel.textContent = state.files.length ? "Ajouter d'autres fichiers" : "Ajoute tes fichiers";
     drawSubmit();
   }
 
@@ -455,7 +455,8 @@ export async function mount(root, ctx, params) {
   });
 
   // Progression des fichiers de CET envoi, dans la carte "Fichiers"
-  const offJobs = mountUploads(pendingEl, (j) => j.meta.tag === tag);
+  // un fichier arrivé rejoint la liste : seuls restent ici ceux en route
+  const offJobs = mountUploads(pendingEl, (j) => j.meta.tag === tag && j.state !== "done");
 
   function drawPending() {
     drawWaybill();
@@ -494,6 +495,7 @@ export async function mount(root, ctx, params) {
     if (!b || b.disabled) return;
     state.days = Number(b.dataset.d);
     drawWaybill();
+    drawMoreSum();
     for (const x of root.querySelectorAll("[data-d]")) x.classList.toggle("is-on", x === b);
   });
 
@@ -507,8 +509,9 @@ export async function mount(root, ctx, params) {
     if (!state.files.length) return toast("Ajoute au moins un fichier", "err");
     if (waiting > 0) return toast("Attends la fin des uploads en cours", "err");
 
-    const title = titleInput.value.trim();
-    if (!title) { titleInput.focus(); return toast("Donne un titre à l'envoi", "err"); }
+    // sans titre : celui du morceau, sinon la date (rien à remplir en plus)
+    const stamp = new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }).format(new Date());
+    const title = titleInput.value.trim() || (draft && draft.title) || "Envoi du " + stamp;
 
     let replyTo = replyInput.value.trim().toLowerCase();
     const byMail = state.emails.length > 0 && emailOn;
@@ -571,6 +574,7 @@ export async function mount(root, ctx, params) {
 
   drawFiles();
   drawChips();
+  drawMoreSum();
   loadContacts();
 
   // Fichiers déposés sur l'accueil : l'upload démarre tout seul ici.
@@ -614,8 +618,7 @@ export async function showDone(root, ctx, created, info) {
       '<div class="done-icon">' + icon(failed && !sent && info.emailOn && recipients.length ? "alert" : "check", 40) + "</div>" +
       "<h1>" + esc(headline) + "</h1>" +
       '<p class="muted">' + esc(sub) + "</p>" +
-      '<p class="carbon">' + icon("sparkle", 14) + " Bilan carbone de cet envoi : l'équivalent de " +
-        plural(carbon, "aller-retour", "allers-retours") + " Paris-Dubaï en jet privé.<br><span>Estimation totalement fantaisiste.</span></p>" +
+      '<p class="carbon">' + icon("sparkle", 14) + " Bilan carbone : " + plural(carbon, "aller-retour", "allers-retours") + " Paris-Dubaï en jet privé.</p>" +
 
       '<div class="link-box">' +
         '<input class="input mono" readonly value="' + esc(url) + '" data-url>' +

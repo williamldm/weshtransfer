@@ -1,5 +1,5 @@
-@import url("fonts.css?v=58");
-@import url("tokens.css?v=58");
+@import url("fonts.css?v=62");
+@import url("tokens.css?v=62");
 
 /* ================================================================= base */
 *, *::before, *::after { box-sizing: border-box; }
@@ -1233,3 +1233,29 @@ body.admin { min-height: 100vh; background: var(--bg); }
 .adm-detail audio { display: block; width: 100%; margin-top: var(--sp-2); }
 .adm-preview { display: block; max-width: 100%; max-height: 360px; margin-top: var(--sp-2); border-radius: var(--r-md); }
 .adm-links { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3); margin: var(--sp-3) 0 0; }
+
+/* ===================================== envoi : formulaire court (sx) */
+.sx { display: flex; flex-direction: column; gap: var(--sp-3); padding: 0; border: none; background: none; }
+.sx-title { margin: 0 0 var(--sp-1); font-family: var(--display); font-size: 24px; font-weight: 700; letter-spacing: -0.02em; }
+.sx-files .send-files { margin: 0 0 var(--sp-2); }
+.sx-files .send-pending:not([hidden]) { margin-bottom: var(--sp-2); }
+.sx-add { display: flex; align-items: center; gap: var(--sp-3); padding: var(--sp-3); border: 1px dashed var(--line-strong); border-radius: var(--r-md); cursor: pointer; transition: border-color .15s, background .15s; }
+.sx-add:hover, .drop-active .sx-add { border-color: var(--accent-bright); background: var(--accent-soft); }
+.sx-add-ic { display: flex; flex: none; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 50%; background: var(--accent); color: #fff; }
+.sx-add-txt { display: flex; min-width: 0; flex-direction: column; }
+.sx-add-txt strong { font-weight: 600; }
+.sx-add-txt small { color: var(--text-faint); font-size: var(--fs-xs); }
+.sx-msg { min-height: 60px; resize: vertical; }
+.sx-from { display: flex; flex-direction: column; gap: var(--sp-1); color: var(--text-dim); font-size: var(--fs-sm); }
+.sx-from-line strong { color: var(--text); font-weight: 600; }
+.sx-from .hint { margin: 0; }
+.sx-more { color: var(--text-dim); font-size: var(--fs-sm); }
+.sx-more summary { display: inline-flex; align-items: center; gap: 6px; padding: var(--sp-1) 0; cursor: pointer; list-style: none; }
+.sx-more summary::-webkit-details-marker { display: none; }
+.sx-more summary::after { content: "›"; color: var(--text-faint); transition: transform .2s; }
+.sx-more[open] summary::after { transform: rotate(90deg); }
+.sx-more .field { margin-top: var(--sp-3); }
+.sx [type=submit] { margin-top: var(--sp-2); }
+.sx-history { margin-top: var(--sp-3); }
+
+.sx .send-pending .section-head { display: none; }
