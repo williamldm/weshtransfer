@@ -2,12 +2,12 @@
 // Pas de supabase-js ici : un simple appel à l'Edge Function transfer-open,
 // qui vérifie le lien et renvoie des URLs signées. Page légère, rapide en 4G.
 
-import { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from "./config.js?v=74";
-import { Waveform, formatTime } from "./waveform.js?v=74";
-import { saveZip, canStreamToDisk, MEMORY_LIMIT } from "./zip.js?v=74";
-import { icon } from "./icons.js?v=74";
-import { esc, formatBytes, formatDuration, formatDate, plural, toast, triggerDownload, avatar, fileBadge, fileTile } from "./ui.js?v=74";
-import { categoryOf, canPreview } from "./files.js?v=74";
+import { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from "./config.js?v=75";
+import { Waveform, formatTime } from "./waveform.js?v=75";
+import { saveZip, canStreamToDisk, MEMORY_LIMIT } from "./zip.js?v=75";
+import { icon } from "./icons.js?v=75";
+import { esc, formatBytes, formatDuration, formatDate, plural, toast, triggerDownload, avatar, fileBadge, fileTile } from "./ui.js?v=75";
+import { categoryOf, canPreview } from "./files.js?v=75";
 
 const root = document.getElementById("tp");
 const k = new URLSearchParams(location.search).get("k") || "";

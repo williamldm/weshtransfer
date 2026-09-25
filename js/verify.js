@@ -3,9 +3,9 @@
 // se connecter à son compte, recevoir les récapitulatifs de retours.
 // Module léger (pas d'upload, pas de lecteur) : l'accueil le charge aussi.
 
-import { emailVerified, knownVerified, requestEmailCode, confirmEmailCode } from "./api.js?v=74";
-import { icon } from "./icons.js?v=74";
-import { esc, h, toast, errorText, openSheet } from "./ui.js?v=74";
+import { emailVerified, knownVerified, requestEmailCode, confirmEmailCode } from "./api.js?v=75";
+import { icon } from "./icons.js?v=75";
+import { esc, h, toast, errorText, openSheet } from "./ui.js?v=75";
 
 
 // "ok" : adresse vérifiée ; "skip" : on continue sans (lien seul) ;

@@ -39,8 +39,8 @@ const KEY = /^spaces\/([0-9a-f-]{36})\/([0-9a-f-]{36})\/([0-9a-f-]{36})\.([a-z0-
 const GB = 1024 ** 3;
 const env = (name: string, fallback: number) => Number(Deno.env.get(name) || fallback) * GB;
 const LIMITS = {
-  userDay: env("UPLOAD_USER_DAY_GB", 20),      // par appareil, sur 24 h
-  ipDay: env("UPLOAD_IP_DAY_GB", 40),          // par IP, sur 24 h
+  userDay: env("UPLOAD_USER_DAY_GB", 3),       // par appareil, sur 24 h
+  ipDay: env("UPLOAD_IP_DAY_GB", 3),           // par IP, sur 24 h (3 Go)
   space: env("SPACE_MAX_GB", 50),              // par espace, au total
   globalDay: env("UPLOAD_GLOBAL_DAY_GB", 200), // tout le site, sur 24 h
   open: 12,                                    // uploads ouverts en même temps
@@ -110,6 +110,7 @@ Deno.serve(async (req) => {
         if (!UUID.test(projectId) || !UUID.test(fileId)) return json({ error: "REQUETE_INVALIDE" }, 400);
         if (BLOCKED.includes(ext)) return json({ error: "FORMAT_REFUSE" }, 400);
         if (!(size > 0)) return json({ error: "FICHIER_VIDE" }, 400);
+        if (!Number.isSafeInteger(size)) return json({ error: "REQUETE_INVALIDE" }, 400);
 
         const { data: project } = await db.from("projects")
           .select("id, space_id, space:spaces(max_file_bytes)")
@@ -132,7 +133,9 @@ Deno.serve(async (req) => {
         if (b.open >= LIMITS.open) return json({ error: "TROP_D_UPLOADS" }, 429);
         if (b.global_day + size > LIMITS.globalDay) return json({ error: "QUOTA_GLOBAL" }, 429);
         if (b.user_day + size > LIMITS.userDay || b.ip_day + size > LIMITS.ipDay) {
-          return json({ error: "QUOTA_UPLOAD_JOUR" }, 429);
+          // ce qu'il reste sur 24 h, pour un message précis
+          const left = Math.max(0, Math.min(LIMITS.userDay - b.user_day, LIMITS.ipDay - b.ip_day));
+          return json({ error: "QUOTA_UPLOAD_JOUR", left }, 429);
         }
         if (b.space + size > LIMITS.space) return json({ error: "QUOTA_ESPACE" }, 413);
 

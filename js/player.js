@@ -2,9 +2,9 @@
 // navigation entre les vues. Les vues l'écoutent pour animer leurs
 // waveforms, la barre du bas l'affiche en permanence.
 
-import { cachedUrl, signFiles } from "./api.js?v=74";
-import { icon } from "./icons.js?v=74";
-import { formatDuration, toast } from "./ui.js?v=74";
+import { cachedUrl, signFiles } from "./api.js?v=75";
+import { icon } from "./icons.js?v=75";
+import { formatDuration, toast } from "./ui.js?v=75";
 
 const audio = new Audio();
 audio.preload = "metadata";

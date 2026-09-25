@@ -5,12 +5,12 @@
 // suit la version du site : un décor retouché s'affiche tout de suite.
 
 export const WALLPAPERS = [
-  { file: "img/scenes/plateforme.svg?v=74", title: "Plateforme pétrolière, torchère allumée", joke: "Chaque envoi rallume la torchère." },
-  { file: "img/scenes/serveurs.svg?v=74", title: "Ferme de serveurs dans le désert", joke: "Refroidie à l'eau potable, évidemment." },
-  { file: "img/scene.svg?v=74", title: "Centrale thermique, la nuit", joke: "Ce fond d'écran consomme plus que ton frigo." },
-  { file: "img/scenes/aeroport.svg?v=74", title: "Aéroport, jets privés", joke: "Un jet par fichier. Deux pour les WAV." },
-  { file: "img/scenes/ski.svg?v=74", title: "Station de ski, en août", joke: "Neige artificielle, 24 degrés dehors." },
-  { file: "img/scenes/autoroute.svg?v=74", title: "Périphérique, 23 h", joke: "Tous en SUV, clim à fond, seul à bord." }
+  { file: "img/scenes/plateforme.svg?v=75", title: "Plateforme pétrolière, torchère allumée", joke: "Chaque envoi rallume la torchère." },
+  { file: "img/scenes/serveurs.svg?v=75", title: "Ferme de serveurs dans le désert", joke: "Refroidie à l'eau potable, évidemment." },
+  { file: "img/scene.svg?v=75", title: "Centrale thermique, la nuit", joke: "Ce fond d'écran consomme plus que ton frigo." },
+  { file: "img/scenes/aeroport.svg?v=75", title: "Aéroport, jets privés", joke: "Un jet par fichier. Deux pour les WAV." },
+  { file: "img/scenes/ski.svg?v=75", title: "Station de ski, en août", joke: "Neige artificielle, 24 degrés dehors." },
+  { file: "img/scenes/autoroute.svg?v=75", title: "Périphérique, 23 h", joke: "Tous en SUV, clim à fond, seul à bord." }
 ];
 
 const KEY = "seminaire.wallpaper";       // dernier décor vu (d'une visite à l'autre)
