@@ -3,14 +3,14 @@
 // les espaces déjà ouverts sur cet appareil (ouvrir, oublier, supprimer).
 // session.js / api.js ne sont chargés qu'au moment d'agir.
 
-import { icon } from "./icons.js?v=47";
-import { esc, h, errorText, formatBytes, plural, actionSheet, confirmSheet, toast } from "./ui.js?v=47";
-import { isBlocked } from "./files.js?v=47";
-import { putPending, MAX_BYTES } from "./pending.js?v=47";
-import { mountWallpaperNote } from "./wallpapers.js?v=47";
+import { icon } from "./icons.js?v=50";
+import { esc, h, errorText, formatBytes, plural, actionSheet, confirmSheet, toast } from "./ui.js?v=50";
+import { isBlocked } from "./files.js?v=50";
+import { putPending, MAX_BYTES } from "./pending.js?v=50";
+import { mountWallpaperNote } from "./wallpapers.js?v=50";
 
 const PSEUDO_KEY = "seminaire.pseudo";
-const MODE_LABEL = { envoi: "Envois", seminaire: "Salon", revue: "Retours" };
+const MODE_LABEL = { envoi: "Envois", seminaire: "Séminaire", revue: "Verdict" };
 
 const deck = document.getElementById("deck");
 const spacesLink = document.getElementById("spaces-link");
@@ -61,9 +61,9 @@ async function ensureAccount(form, fail) {
     fail("Ton email sert de compte (sans mot de passe) : on en a besoin.");
     return false;
   }
-  const session = await import("./session.js?v=47");
+  const session = await import("./session.js?v=50");
   await session.ensureAuth();
-  const { ensureVerified } = await import("./verify.js?v=47");
+  const { ensureVerified } = await import("./verify.js?v=50");
   if (await ensureVerified(email, { optional: false }) !== "ok") return false;
   await session.login(email);
   try { localStorage.setItem("seminaire.replyTo", email); } catch (err) { /* privé */ }
@@ -113,24 +113,24 @@ const VIEWS = {
   },
   salon() {
     return '<form class="deck-form" data-form="salon" novalidate>' +
-      '<p class="deck-lead">Un espace pour ton groupe, ta résidence, ton séminaire. Chacun y dépose ses sons ; versions et commentaires horodatés arrivent en temps réel.</p>' +
-      field("name", "Nom du salon", 'maxlength="60" placeholder="Ex : Villa septembre, Studio B"') +
+      '<p class="deck-lead">Le QG de ton groupe, façon villa en résidence. Chacun y dépose ses sons ; versions et commentaires horodatés arrivent en temps réel.</p>' +
+      field("name", "Nom du séminaire", 'maxlength="60" placeholder="Ex : Villa septembre, Studio B"') +
       pseudoField() +
       accountField() +
       '<p class="form-error" data-err hidden></p>' +
-      '<button class="btn btn-primary btn-block btn-xl" type="submit">Ouvrir le salon</button>' +
+      '<button class="btn btn-primary btn-block btn-xl" type="submit">Lancer le séminaire</button>' +
       '<p class="deck-note">Tu en deviens le host. Tu invites les membres par email : chacun vérifie son adresse avant d\'entrer.</p>' +
     "</form>";
   },
   revue() {
     return '<form class="deck-form" data-form="revue" novalidate>' +
-      '<p class="deck-lead">Tu déposes ton mix, l\'artiste le commente à la seconde près. Tu coches ce que tu as corrigé, tu envoies la v2, il valide.</p>' +
+      '<p class="deck-lead">Tu déposes ton mix, l\'artiste rend son verdict à la seconde près. Tu corriges, tu envoies la v2, il valide.</p>' +
       field("project", "Artiste ou projet", 'maxlength="60" placeholder="Ex : Kenza, EP Nuit blanche"') +
       pseudoField() +
       accountField() +
       '<label class="check-line"><input type="checkbox" name="keep"><span>Ne jamais supprimer les mix<small>Sinon, effacés au bout de 37 jours. Modifiable ensuite.</small></span></label>' +
       '<p class="form-error" data-err hidden></p>' +
-      '<button class="btn btn-primary btn-block btn-xl" type="submit">Ouvrir l\'espace de retours</button>' +
+      '<button class="btn btn-primary btn-block btn-xl" type="submit">Demander le verdict</button>' +
       '<p class="deck-note">L\'artiste reçoit une invitation par email et vérifie son adresse avant d\'entrer. Pas de compte.</p>' +
     "</form>";
   },
@@ -166,7 +166,7 @@ const VIEWS = {
       '<ul class="my-spaces">' + list.map((k) =>
         '<li data-id="' + esc(k.id) + '">' +
           '<button type="button" class="ms-open" data-open-space>' +
-            '<span class="ms-mode">' + (MODE_LABEL[k.mode] || "Salon") + "</span>" +
+            '<span class="ms-mode">' + (MODE_LABEL[k.mode] || "Séminaire") + "</span>" +
             '<span class="ms-name">' + esc(k.name) + "</span>" +
             '<span class="mono">' + esc(k.code) + "</span></button>" +
           '<button type="button" class="btn btn-ghost btn-icon btn-sm" data-space-menu aria-label="Options pour ' + esc(k.name) + '">' + icon("more", 18) + "</button>" +
@@ -233,7 +233,7 @@ function spaceMenu(k) {
     {
       label: "Oublier sur cet appareil", icon: "logout",
       run: async () => {
-        const session = await import("./session.js?v=47");
+        const session = await import("./session.js?v=50");
         session.forgetSpace(k.id);
         toast("\"" + k.name + "\" n'apparaît plus ici. Rien n'a été supprimé.", "ok");
         drawSpacesLink();
@@ -248,9 +248,9 @@ function spaceMenu(k) {
           { ok: "Tout supprimer", danger: true, title: "Supprimer l'espace" });
         if (!ok) return;
         try {
-          const session = await import("./session.js?v=47");
+          const session = await import("./session.js?v=50");
           await session.ensureAuth();
-          const api = await import("./api.js?v=47");
+          const api = await import("./api.js?v=50");
           await api.deleteSpace(k.id);
           session.forgetSpace(k.id);
           toast("\"" + k.name + "\" a été supprimé.", "ok");
@@ -280,7 +280,7 @@ deck.addEventListener("submit", async (e) => {
   const pseudo = mine && !renaming ? pseudoBefore : val("pseudo");
   if (kind !== "account" && !mine && pseudo.length < 2) return fail("Ton blaze doit faire au moins 2 caractères.");
   if (kind === "join" && val("code").length < 5) return fail("Le code fait au moins 5 caractères.");
-  if (kind === "salon" && !val("name")) return fail("Donne un nom à ton salon.");
+  if (kind === "salon" && !val("name")) return fail("Donne un nom à ton séminaire.");
   if (kind === "revue" && !val("project")) return fail("Pour quel artiste ou quel projet ?");
 
   const label = btn.textContent;
@@ -309,7 +309,7 @@ deck.addEventListener("submit", async (e) => {
     if (mine) {
       // nouveau blaze : dans l'espace d'envoi, et dans son nom "Envois de ..."
       if (renaming && pseudo !== pseudoBefore) {
-        const session = await import("./session.js?v=47");
+        const session = await import("./session.js?v=50");
         await session.renameMe(mine.id, pseudo);
         if (/^Envois de /.test(mine.name)) await session.renameSpace(mine.id, "Envois de " + pseudo).catch(() => {});
       }
@@ -318,13 +318,13 @@ deck.addEventListener("submit", async (e) => {
       return;
     }
 
-    const session = await import("./session.js?v=47");
+    const session = await import("./session.js?v=50");
     if (kind === "join") await session.joinSpace(val("code"), pseudo);
     else if (kind === "salon") await session.createSpace(val("name"), "seminaire", pseudo);
     else if (kind === "revue") {
       const created = await session.createSpace(val("project"), "revue", pseudo);
       if (form.querySelector("[name=keep]").checked) {
-        const api = await import("./api.js?v=47");
+        const api = await import("./api.js?v=50");
         await api.updateSpace(created.id, { purge_at: null }).catch((err) => {
           try { sessionStorage.setItem("seminaire.flash", errorText(err)); } catch (e3) { /* privé */ }
         });
@@ -347,7 +347,7 @@ document.addEventListener("click", async (e) => {
     const ok = await confirmSheet("Rien n'est supprimé : tu retrouveras tout en te reconnectant avec ton email.",
       { ok: "Se déconnecter", title: "Se déconnecter de cet appareil" });
     if (!ok) return;
-    const session = await import("./session.js?v=47");
+    const session = await import("./session.js?v=50");
     await session.logout();
     drawSpacesLink();
     show("send");
@@ -369,7 +369,7 @@ document.addEventListener("click", async (e) => {
 async function openInvite(token) {
   show("invite");
   const box = deck.querySelector("[data-invite-view]");
-  const session = await import("./session.js?v=47");
+  const session = await import("./session.js?v=50");
   let info;
   try {
     info = await session.inviteInfo(token);
@@ -382,7 +382,7 @@ async function openInvite(token) {
   const back = info.returning || info.member;
   box.innerHTML =
     '<form data-form="invite" novalidate>' +
-      '<p class="invite-kind">' + (revue ? "Retours de mix" : "Salon") + "</p>" +
+      '<p class="invite-kind">' + (revue ? "Verdict" : "Séminaire") + "</p>" +
       '<h2 class="invite-title">' + esc(info.space_name) + "</h2>" +
       '<p class="deck-lead">' + (info.host ? "<strong>" + esc(info.host) + "</strong> t'invite. " : "") +
         "Invitation pour <strong>" + esc(info.email) + "</strong>." + "</p>" +
@@ -477,14 +477,49 @@ setInterval(() => {
   co2.textContent = fmt.format(((performance.now() - t0) / 1000) * 0.0137) + " kg";
 }, 200);
 
+// ------------------------------------------ engagements et FAQ animés
+// Les blocs apparaissent au défilement ; les grosses stats comptent
+// jusqu'à leur valeur (100 %, 1 blaze, 0 trace).
+
+function countUp(el) {
+  const to = Number(el.dataset.count);
+  const from = Number(el.dataset.from || 0);
+  const t0 = performance.now();
+  const dur = 1100;
+  const step = (now) => {
+    const k = Math.min(1, (now - t0) / dur);
+    const ease = 1 - Math.pow(1 - k, 3);
+    el.textContent = String(Math.round(from + (to - from) * ease));
+    if (k < 1) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+}
+
+function mountReveal() {
+  const calm = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if (calm || !("IntersectionObserver" in window)) return;
+  document.documentElement.classList.add("js-reveal");
+  const seen = new IntersectionObserver((entries) => {
+    for (const e of entries) {
+      if (!e.isIntersecting) continue;
+      e.target.classList.add("is-in");
+      const n = e.target.querySelector("[data-count]");
+      if (n) { n.textContent = n.dataset.from || "0"; countUp(n); }
+      seen.unobserve(e.target);
+    }
+  }, { rootMargin: "0px 0px -12% 0px" });
+  for (const el of document.querySelectorAll(".reveal")) seen.observe(el);
+}
+
 // ------------------------------------------------------------ démarrage
 
 drawSpacesLink();
+mountReveal();
 for (const el of document.querySelectorAll("[data-icon]")) el.innerHTML = icon(el.dataset.icon, 20);
 
 // Connecté : "Mes espaces" à jour depuis le serveur (autres appareils)
 if (accountEmail()) {
-  import("./session.js?v=47").then((m) => m.syncSpaces()).then(() => {
+  import("./session.js?v=50").then((m) => m.syncSpaces()).then(() => {
     drawSpacesLink();
     if (tab === "spaces") show("spaces");
   }).catch(() => {});

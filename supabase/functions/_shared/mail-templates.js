@@ -271,15 +271,16 @@ export function verifyCodeMail(input) {
 export function inviteMail(input) {
   const site = input.site;
   const revue = input.mode === "revue";
-  const what = revue ? "l'espace de retours" : "le salon";
-  const subject = `${input.host} t'invite dans ${what} ${LQ}${input.spaceName}${RQ}`;
+  const subject = revue
+    ? `${input.host} attend ton verdict sur ${LQ}${input.spaceName}${RQ}`
+    : `${input.host} t'invite dans le séminaire ${LQ}${input.spaceName}${RQ}`;
   const preheader = revue
     ? "Écoute le mix et laisse tes retours à la seconde près."
     : "Sons, versions et commentaires du groupe, en temps réel.";
   const until = formatDate(input.expiresAt);
 
   const body =
-    eyebrow(revue ? "Retours de mix" : "Salon") +
+    eyebrow(revue ? "Verdict" : "Séminaire") +
     heading(esc(input.spaceName)) +
     para(`<strong style="color:${C.text};font-weight:600;">${esc(input.host)}</strong> t'invite à le rejoindre. ` +
       (revue
@@ -296,7 +297,7 @@ export function inviteMail(input) {
 
   const html = layout({ site, title: subject, preheader, body, footer });
   const text = tidy([
-    `${input.host} t'invite dans ${what} "${input.spaceName}".`,
+    revue ? `${input.host} attend ton verdict sur "${input.spaceName}".` : `${input.host} t'invite dans le séminaire "${input.spaceName}".`,
     "",
     `Rejoindre : ${input.link}`,
     "",
@@ -372,7 +373,7 @@ export function reviewDigestMail(input) {
     `</table>`).join("");
 
   const body =
-    eyebrow("Retours de mix · " + esc(input.spaceName)) +
+    eyebrow("Verdict · " + esc(input.spaceName)) +
     heading(approved.length && !news && !reopened ? "C'est validé." : `${esc(who)} a fait ses retours.`) +
     para(esc(bits.join(" · "))) +
     button(input.projects[0].link, "Voir les retours&nbsp;&rarr;") +

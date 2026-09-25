@@ -24,8 +24,8 @@
 <link rel="icon" href="img/favicon.svg" type="image/svg+xml">
 <link rel="icon" href="img/favicon-32.png" sizes="32x32" type="image/png">
 <link rel="apple-touch-icon" href="img/apple-touch-icon.png">
-<link rel="stylesheet" href="css/app.css?v=47">
-<script type="module" src="js/wallpaper-boot.js?v=47" blocking="render"></script>
+<link rel="stylesheet" href="css/app.css?v=50">
+<script type="module" src="js/wallpaper-boot.js?v=50" blocking="render"></script>
 </head>
 <body class="hub">
 
@@ -42,11 +42,11 @@
 <main class="hub-stage">
   <p class="claim">Le transfert de fichiers <em>le moins écoresponsable</em> du marché.</p>
 
-  <section class="deck" aria-label="Envoyer, créer un salon ou faire valider un mix">
+  <section class="deck" aria-label="Envoyer, lancer un séminaire ou demander le verdict d'un mix">
     <div class="deck-tabs" role="tablist">
       <button role="tab" data-tab="send" aria-selected="true">Envoyer</button>
-      <button role="tab" data-tab="salon" aria-selected="false">Salon</button>
-      <button role="tab" data-tab="revue" aria-selected="false">Retours</button>
+      <button role="tab" data-tab="salon" aria-selected="false">Séminaire</button>
+      <button role="tab" data-tab="revue" aria-selected="false">Verdict</button>
     </div>
     <div class="deck-body" id="deck"></div>
     <div class="deck-foot">
@@ -59,39 +59,56 @@
 </main>
 
 <section class="hub-below">
-  <h2 class="label-mono">Nos engagements</h2>
+  <div class="ticker" aria-hidden="true"><div class="ticker-track"><span>Énergie 100 % fossile</span><i>✦</i><span>Zéro arbre planté</span><i>✦</i><span>Jet privé inclus</span><i>✦</i><span>3 Go par fichier</span><i>✦</i><span>Sans mot de passe</span><i>✦</i><span>Écoute avant de télécharger</span><i>✦</i><span>Bilan carbone : oui</span><i>✦</i><span>Énergie 100 % fossile</span><i>✦</i><span>Zéro arbre planté</span><i>✦</i><span>Jet privé inclus</span><i>✦</i><span>3 Go par fichier</span><i>✦</i><span>Sans mot de passe</span><i>✦</i><span>Écoute avant de télécharger</span><i>✦</i><span>Bilan carbone : oui</span><i>✦</i></div></div>
+
+  <h2 class="label-mono reveal">Nos engagements</h2>
   <div class="pledges">
-    <div><span class="mono">01</span><h3>Énergie 100 % fossile</h3><p>Tes fichiers voyagent en jet privé. Ils arrivent quand même en quelques secondes, écoutables avant d'être téléchargés.</p></div>
-    <div><span class="mono">02</span><h3>Zéro compte, zéro compensation</h3><p>Ni inscription, ni arbre planté. Un blaze suffit, pour toi comme pour ceux qui reçoivent.</p></div>
-    <div><span class="mono">03</span><h3>Suppression automatique</h3><p>On n'est pas des monstres : tout disparaît à la date prévue. Tu peux aussi tout effacer toi-même.</p></div>
+    <article class="pledge reveal">
+      <p class="pledge-stat"><b data-count="100" data-from="0">100</b><span>%</span></p>
+      <h3>Énergie fossile</h3>
+      <p>Tes fichiers voyagent en jet privé. Ils arrivent quand même en quelques secondes, écoutables avant d'être téléchargés.</p>
+    </article>
+    <article class="pledge reveal">
+      <p class="pledge-stat"><b data-count="1" data-from="9">1</b><span>blaze</span></p>
+      <h3>Zéro mot de passe</h3>
+      <p>Ni inscription, ni arbre planté. Un blaze suffit, pour toi comme pour ceux qui reçoivent. Ton email sert de clé, avec un code.</p>
+    </article>
+    <article class="pledge reveal">
+      <p class="pledge-stat"><b data-count="0" data-from="100">0</b><span>trace</span></p>
+      <h3>Suppression automatique</h3>
+      <p>On n'est pas des monstres : tout disparaît à la date prévue. Tu peux aussi tout effacer toi-même.</p>
+    </article>
   </div>
 
   <div class="hub-faq">
-    <h2 class="label-mono">Questions (rarement) posées</h2>
-    <details>
-      <summary>C'est vraiment le moins écoresponsable ?</summary>
-      <p>On fait de notre mieux. Mais en vrai, on efface tout à la date prévue. Quelque part sous le charbon, on a un cœur.</p>
-    </details>
-    <details>
-      <summary>Il faut un compte ?</summary>
-      <p>Non, un blaze suffit. Pour l'email, un code à 6 chiffres, une fois par appareil.</p>
-    </details>
-    <details>
-      <summary>Je peux envoyer quoi ?</summary>
-      <p>Tout, jusqu'à 3 Go par fichier. Sauf les programmes : on pollue, mais proprement.</p>
-    </details>
-    <details>
-      <summary>Salon, Retours : la différence ?</summary>
-      <p>Le salon, c'est la villa : le groupe partage ses sons. Les retours, c'est le studio : l'artiste commente le mix à la seconde près, l'ingé corrige.</p>
-    </details>
-    <details>
-      <summary>Qui peut entrer dans mon salon ?</summary>
-      <p>Seulement ceux que tu invites par email, code à l'appui. Même nous, on n'a pas les clés.</p>
-    </details>
-    <details>
-      <summary>C'est gratuit ?</summary>
-      <p>Oui. C'est la planète qui paie.</p>
-    </details>
+    <h2 class="label-mono reveal">Questions (rarement) posées</h2>
+    <div class="chat">
+      <p class="chat-head"><img src="img/favicon.svg" alt="" width="18" height="18"><span>WeshTransfer<small>en ligne, malheureusement</small></span></p>
+      <details class="reveal">
+        <summary>C'est vraiment le moins écoresponsable ?</summary>
+        <div class="chat-answer"><span class="chat-typing"><i></i><i></i><i></i></span><p>On fait de notre mieux. Mais en vrai, on efface tout à la date prévue. Quelque part sous le charbon, on a un cœur.</p></div>
+      </details>
+      <details class="reveal">
+        <summary>Il faut un compte ?</summary>
+        <div class="chat-answer"><span class="chat-typing"><i></i><i></i><i></i></span><p>Non, un blaze suffit. Pour l'email, un code à 6 chiffres, une fois par appareil.</p></div>
+      </details>
+      <details class="reveal">
+        <summary>Je peux envoyer quoi ?</summary>
+        <div class="chat-answer"><span class="chat-typing"><i></i><i></i><i></i></span><p>Tout, jusqu'à 3 Go par fichier. Sauf les programmes : on pollue, mais proprement.</p></div>
+      </details>
+      <details class="reveal">
+        <summary>Séminaire, Verdict : la différence ?</summary>
+        <div class="chat-answer"><span class="chat-typing"><i></i><i></i><i></i></span><p>Le séminaire, c'est la villa : le groupe partage ses sons. Le verdict, c'est le studio : l'artiste commente le mix à la seconde près, l'ingé corrige.</p></div>
+      </details>
+      <details class="reveal">
+        <summary>Qui peut entrer dans mon séminaire ?</summary>
+        <div class="chat-answer"><span class="chat-typing"><i></i><i></i><i></i></span><p>Seulement ceux que tu invites par email, code à l'appui. Même nous, on n'a pas les clés.</p></div>
+      </details>
+      <details class="reveal">
+        <summary>C'est gratuit ?</summary>
+        <div class="chat-answer"><span class="chat-typing"><i></i><i></i><i></i></span><p>Oui. C'est la planète qui paie.</p></div>
+      </details>
+    </div>
   </div>
 
   <footer class="hub-foot">WeshTransfer est un projet parodique. Aucun jet privé n'a été affrété pour transférer tes fichiers.</footer>
@@ -100,6 +117,6 @@
 <div id="sheets"></div>
 <div class="toast-wrap" id="toasts" aria-live="polite"></div>
 
-<script type="module" src="js/hub.js?v=47"></script>
+<script type="module" src="js/hub.js?v=50"></script>
 </body>
 </html>

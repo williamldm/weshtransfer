@@ -1,15 +1,15 @@
 // Accueil de l'espace : gros boutons d'action, uploads en cours, morceaux
 // triés par activité récente.
 
-import { listProjects, createProject, listReviewComments, deleteProject, deleteFile, reviewNotifyStatus, reviewSubscribe, reviewUnsubscribe } from "../api.js?v=47";
-import { ensureVerified } from "../verify.js?v=47";
-import { mountReviewHome } from "./review-home.js?v=47";
-import { stateOf, isEngineerOf } from "./review.js?v=47";
-import { mountUploads } from "./uploads.js?v=47";
-import { openUploadSheet } from "./upload-sheet.js?v=47";
-import { openPeopleSheet } from "./people.js?v=47";
-import { icon } from "../icons.js?v=47";
-import { esc, h, kindBadge, timeAgo, plural, promptSheet, toast, errorText, daysLeft, formatDate, actionSheet, confirmSheet } from "../ui.js?v=47";
+import { listProjects, createProject, listReviewComments, deleteProject, deleteFile, reviewNotifyStatus, reviewSubscribe, reviewUnsubscribe } from "../api.js?v=50";
+import { ensureVerified } from "../verify.js?v=50";
+import { mountReviewHome } from "./review-home.js?v=50";
+import { stateOf, isEngineerOf } from "./review.js?v=50";
+import { mountUploads } from "./uploads.js?v=50";
+import { openUploadSheet } from "./upload-sheet.js?v=50";
+import { openPeopleSheet } from "./people.js?v=50";
+import { icon } from "../icons.js?v=50";
+import { esc, h, kindBadge, timeAgo, plural, promptSheet, toast, errorText, daysLeft, formatDate, actionSheet, confirmSheet } from "../ui.js?v=50";
 
 export const title = (ctx) => ctx.space.name;
 
@@ -78,7 +78,7 @@ export async function mount(root, ctx) {
   root.innerHTML =
     '<section class="space-card">' +
       '<div class="space-top">' +
-        '<div><div class="eyebrow">' + (review ? "Retours de mix" : "Espace") + "</div><h1>" + esc(s.name) + "</h1></div>" +
+        '<div><div class="eyebrow">' + (review ? "Verdict" : s.mode === "seminaire" ? "Séminaire" : "Espace") + "</div><h1>" + esc(s.name) + "</h1></div>" +
         (s.access === "invite" && s.mode !== "envoi"
           ? '<button class="code-chip is-invite" data-invite aria-label="Inviter par email">' + icon("mail", 16) + "<span>Inviter</span></button>"
           : '<button class="code-chip" data-invite aria-label="Inviter">' +

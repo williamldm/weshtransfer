@@ -43,7 +43,7 @@ function mask(email: string): string {
   return user.slice(0, 1) + "•••@" + domain;
 }
 
-const what = (mode: string) => (mode === "revue" ? "l'espace de retours" : "le salon");
+const what = (mode: string) => (mode === "revue" ? "le verdict" : "le séminaire");
 
 Deno.serve(async (req) => {
   const early = preflight(req);
