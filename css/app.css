@@ -1,5 +1,5 @@
-@import url("fonts.css?v=63");
-@import url("tokens.css?v=63");
+@import url("fonts.css?v=67");
+@import url("tokens.css?v=67");
 
 /* ================================================================= base */
 *, *::before, *::after { box-sizing: border-box; }
@@ -581,7 +581,20 @@ body.has-player .toast-wrap { bottom: calc(var(--player-h) + var(--safe-bottom) 
 /* =================================================== la centrale (hub) */
 /* Identité : la mise en page de WeTransfer, détournée. Le "fond d'écran"
    est notre centrale au charbon, la carte d'envoi est posée dessus. */
-.scene { background: #0E0B14 var(--scene, url("../img/scene.svg")) center bottom / cover no-repeat; }
+.scene { position: relative; overflow: hidden; background: #0E0B14; }
+/* le décor lui-même, sur un calque qui déborde un peu : il peut glisser
+   (profondeur, js/scene-fx.js) sans jamais montrer de bord */
+.scene::before {
+  content: "";
+  position: absolute;
+  inset: -12px -20px;
+  background: var(--scene, url("../img/scene.svg")) center bottom / cover no-repeat;
+  transform: translate3d(var(--sx, 0px), var(--sy, 0px), 0);
+  will-change: transform;
+  pointer-events: none;
+}
+/* la pollution que tu crées toi-même (traînées, bouffées) */
+.scene-fx { position: absolute; inset: 0; pointer-events: none; }
 
 /* fond transparent : sinon il se peint par-dessus la scène (z-index -1) ;
    le noir est porté par html */
@@ -920,7 +933,7 @@ body.public .scene { position: fixed; inset: 0; z-index: -1; }
 
 /* fonds d'écran : on passe au suivant */
 /* le décor suivant arrive en fondu par-dessus (js/wallpapers.js) */
-.scene-fade { position: absolute; inset: 0; background: transparent center bottom / cover no-repeat; opacity: 0; transition: opacity 1.4s ease; pointer-events: none; }
+.scene-fade { position: absolute; inset: -12px -20px; background: transparent center bottom / cover no-repeat; opacity: 0; transition: opacity 1.4s ease; pointer-events: none; transform: translate3d(var(--sx, 0px), var(--sy, 0px), 0); }
 .scene-fade.is-on { opacity: 1; }
 .scene-fade.is-instant { transition: none; }
 

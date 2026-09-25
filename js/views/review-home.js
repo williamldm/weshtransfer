@@ -6,16 +6,16 @@
 import {
   listProjects, listReviewComments, deleteProject, deleteFile,
   reviewNotifyStatus, reviewSubscribe, reviewUnsubscribe
-} from "../api.js?v=63";
-import { mountUploads } from "./uploads.js?v=63";
-import { openUploadSheet } from "./upload-sheet.js?v=63";
-import { stateOf, isEngineerOf } from "./review.js?v=63";
-import { ensureVerified } from "../verify.js?v=63";
-import { accountEmail } from "../session.js?v=63";
-import { coverOf, onCover, setCover, clearCover } from "../cover.js?v=63";
-import { playQueue, onPlayer, isCurrent, state as playerState, toggle, trackFromFile } from "../player.js?v=63";
-import { icon } from "../icons.js?v=63";
-import { esc, plural, toast, errorText, formatDuration, actionSheet, confirmSheet, promptSheet } from "../ui.js?v=63";
+} from "../api.js?v=67";
+import { mountUploads } from "./uploads.js?v=67";
+import { openUploadSheet } from "./upload-sheet.js?v=67";
+import { stateOf, isEngineerOf } from "./review.js?v=67";
+import { ensureVerified } from "../verify.js?v=67";
+import { accountEmail } from "../session.js?v=67";
+import { coverOf, onCover, setCover, clearCover } from "../cover.js?v=67";
+import { playQueue, onPlayer, isCurrent, state as playerState, toggle, trackFromFile } from "../player.js?v=67";
+import { icon } from "../icons.js?v=67";
+import { esc, plural, toast, errorText, formatDuration, actionSheet, confirmSheet, promptSheet } from "../ui.js?v=67";
 
 // Pochette générée : un aplat dont la teinte dépend du nom, les initiales
 // en grand. Pas de dégradé (identité sobre).

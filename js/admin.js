@@ -3,12 +3,12 @@
 // c'est la fonction "admin" qui vérifie que le compte connecté fait partie
 // des administrateurs, et qui renvoie les données.
 
-import { invoke } from "./db.js?v=63";
-import { accountEmail, login, logout } from "./session.js?v=63";
-import { ensureVerified } from "./verify.js?v=63";
-import { icon } from "./icons.js?v=63";
-import { esc, toast, errorText, formatBytes, formatDate, timeAgo, plural, fileBadge, confirmSheet } from "./ui.js?v=63";
-import { isAudio, categoryOf } from "./files.js?v=63";
+import { invoke } from "./db.js?v=67";
+import { accountEmail, login, logout } from "./session.js?v=67";
+import { ensureVerified } from "./verify.js?v=67";
+import { icon } from "./icons.js?v=67";
+import { esc, toast, errorText, formatBytes, formatDate, timeAgo, plural, fileBadge, confirmSheet } from "./ui.js?v=67";
+import { isAudio, categoryOf } from "./files.js?v=67";
 
 const root = document.getElementById("adm");
 const who = document.getElementById("who");
