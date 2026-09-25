@@ -1,5 +1,5 @@
-@import url("fonts.css?v=50");
-@import url("tokens.css?v=50");
+@import url("fonts.css?v=51");
+@import url("tokens.css?v=51");
 
 /* ================================================================= base */
 *, *::before, *::after { box-sizing: border-box; }
@@ -34,7 +34,7 @@ p { margin: 0; }
 .hub-hero h1 em, .send-hero h1 em, .tp-hero h1 em, .grad-text { font-style: normal; color: var(--accent-bright); }
 
 /* libellés : mono, petites capitales espacées */
-.label, .eyebrow, .label-mono, .section-head h2 {
+.label, .eyebrow, .label-mono, .section-head h2, .jam-section {
   font-family: var(--mono);
   font-size: 11px;
   font-weight: 500;
@@ -1128,3 +1128,43 @@ body.app .app-header { view-transition-name: topbar; }
 .track-note.is-verify { color: var(--accent-bright); }
 .track-note.is-ok { color: var(--ok); }
 .track-note.is-new { color: var(--text); }
+
+/* ================================================ séminaire : la jam */
+.jam-art { flex: none; }
+.jam-mosaic { display: grid; grid-template-columns: 1fr 1fr; width: 168px; height: 168px; overflow: hidden; border-radius: 14px; box-shadow: 0 24px 60px rgba(0, 0, 0, .45); }
+.jam-mosaic .cover { width: 100%; height: 100%; border-radius: 0; font-size: 26px; }
+.jam-people { display: flex; align-items: center; gap: var(--sp-2); margin: 0 0 var(--sp-4); color: var(--text-dim); font-size: var(--fs-sm); }
+.jam-avatars { display: flex; }
+.jam-avatar { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; margin-left: -8px; border: 2px solid var(--bg); border-radius: 50%; background: hsl(var(--hue), 45%, 42%); color: #fff; font-size: 12px; font-weight: 700; }
+.jam-avatar:first-child { margin-left: 0; }
+.jam-avatar.is-me { box-shadow: 0 0 0 2px var(--accent-bright); }
+.jam-who { color: hsl(var(--hue), 70%, 72%); font-weight: 600; }
+.track-sub em { font-style: italic; }
+
+.jam-live { display: flex; align-items: center; gap: var(--sp-3); margin: 0 0 var(--sp-5); padding: var(--sp-3) var(--sp-4); border: 1px solid var(--line-strong); border-radius: var(--r-md); background: var(--surface); font-size: var(--fs-sm); }
+.jam-live > span:not(.jam-pulse) { flex: 1; min-width: 0; }
+.jam-live b { color: var(--text); }
+.jam-live i { color: var(--accent-bright); }
+.jam-live.is-following { border-color: var(--accent-bright); background: var(--accent-soft); }
+.jam-live.is-following > svg { flex: none; color: var(--accent-bright); }
+.jam-live .btn { flex: none; }
+.jam-pulse { position: relative; flex: none; width: 10px; height: 10px; border-radius: 50%; background: var(--ok); }
+.jam-pulse::after { content: ""; position: absolute; inset: -4px; border-radius: 50%; border: 2px solid var(--ok); animation: jam-pulse 1.6s ease-out infinite; }
+.jam-pulse.is-paused { background: var(--text-faint); }
+.jam-pulse.is-paused::after { display: none; }
+@keyframes jam-pulse { from { transform: scale(.6); opacity: 1; } to { transform: scale(1.8); opacity: 0; } }
+
+.jam-section { margin: var(--sp-5) 0 var(--sp-2); }
+.jam-section:first-child { margin-top: 0; }
+.track.is-past { opacity: .5; }
+.track.is-past:hover { opacity: .85; }
+.track-art:not(button) { cursor: default; }
+
+@media (max-width: 559px) {
+  .jam-mosaic { width: 132px; height: 132px; }
+  .jam-mosaic .cover { font-size: 20px; }
+  .jam-people { justify-content: center; }
+  .jam-live { flex-wrap: wrap; }
+  .jam-live .btn { width: 100%; }
+}
+@media (prefers-reduced-motion: reduce) { .jam-pulse::after { animation: none; } }

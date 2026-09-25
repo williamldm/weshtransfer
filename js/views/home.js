@@ -1,15 +1,16 @@
 // Accueil de l'espace : gros boutons d'action, uploads en cours, morceaux
 // triés par activité récente.
 
-import { listProjects, createProject, listReviewComments, deleteProject, deleteFile, reviewNotifyStatus, reviewSubscribe, reviewUnsubscribe } from "../api.js?v=50";
-import { ensureVerified } from "../verify.js?v=50";
-import { mountReviewHome } from "./review-home.js?v=50";
-import { stateOf, isEngineerOf } from "./review.js?v=50";
-import { mountUploads } from "./uploads.js?v=50";
-import { openUploadSheet } from "./upload-sheet.js?v=50";
-import { openPeopleSheet } from "./people.js?v=50";
-import { icon } from "../icons.js?v=50";
-import { esc, h, kindBadge, timeAgo, plural, promptSheet, toast, errorText, daysLeft, formatDate, actionSheet, confirmSheet } from "../ui.js?v=50";
+import { listProjects, createProject, listReviewComments, deleteProject, deleteFile, reviewNotifyStatus, reviewSubscribe, reviewUnsubscribe } from "../api.js?v=51";
+import { ensureVerified } from "../verify.js?v=51";
+import { mountReviewHome } from "./review-home.js?v=51";
+import { mountJam } from "./jam.js?v=51";
+import { stateOf, isEngineerOf } from "./review.js?v=51";
+import { mountUploads } from "./uploads.js?v=51";
+import { openUploadSheet } from "./upload-sheet.js?v=51";
+import { openPeopleSheet } from "./people.js?v=51";
+import { icon } from "../icons.js?v=51";
+import { esc, h, kindBadge, timeAgo, plural, promptSheet, toast, errorText, daysLeft, formatDate, actionSheet, confirmSheet } from "../ui.js?v=51";
 
 export const title = (ctx) => ctx.space.name;
 
@@ -73,6 +74,8 @@ export function renderProjects(projects, stats, canEdit, space) {
 export async function mount(root, ctx) {
   // retours de mix : présentation "album" à part
   if (ctx.space.mode === "revue") return mountReviewHome(root, ctx);
+  // séminaire : la jam, file commune écoutée ensemble
+  if (ctx.space.mode === "seminaire") return mountJam(root, ctx);
   const s = ctx.space;
   const review = s.mode === "revue";
   root.innerHTML =

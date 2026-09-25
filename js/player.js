@@ -2,9 +2,9 @@
 // navigation entre les vues. Les vues l'écoutent pour animer leurs
 // waveforms, la barre du bas l'affiche en permanence.
 
-import { cachedUrl, signFiles } from "./api.js?v=50";
-import { icon } from "./icons.js?v=50";
-import { formatDuration, toast } from "./ui.js?v=50";
+import { cachedUrl, signFiles } from "./api.js?v=51";
+import { icon } from "./icons.js?v=51";
+import { formatDuration, toast } from "./ui.js?v=51";
 
 const audio = new Audio();
 audio.preload = "metadata";
@@ -13,6 +13,7 @@ let track = null;   // { fileId, path, title, subtitle, duration, mime }
 // File d'écoute : les morceaux s'enchaînent (fin d'un titre = suivant).
 let queue = [];
 let qIndex = -1;
+let queueTag = null;   // d'où vient la file (ex. "jam:<espace>")
 const listeners = new Set();
 let raf = 0;
 
@@ -38,20 +39,33 @@ export function state() {
 }
 
 export function queueInfo() {
-  return { length: queue.length, index: qIndex, hasNext: qIndex >= 0 && qIndex < queue.length - 1, hasPrev: qIndex > 0 };
+  return { length: queue.length, index: qIndex, tag: queueTag, hasNext: queue.length > 0 && qIndex < queue.length - 1, hasPrev: qIndex > 0 };
 }
 
 // Lance une file (album, liste de mix) à partir de `index`. Les URLs sont
 // signées d'avance : le suivant part sans attendre le réseau.
-export function playQueue(tracks, index) {
+export function playQueue(tracks, index, tag) {
   queue = (tracks || []).slice();
+  queueTag = tag || null;
   qIndex = Math.max(0, Math.min(index || 0, queue.length - 1));
   signFiles(queue.map((t) => t.fileId)).catch(() => {});
   return play(queue[qIndex], { keepQueue: true, at: 0 });
 }
 
+// La file suit sa source en direct (un son ajouté à la jam arrive en fin
+// de file) sans couper le morceau en cours.
+export function refreshQueue(tag, tracks) {
+  if (!tag || tag !== queueTag) return;
+  const cur = track ? track.fileId : null;
+  const i = tracks.findIndex((t) => t.fileId === cur);
+  // morceau en cours retiré de la source : on reprend juste après lui
+  qIndex = i !== -1 ? i : Math.min(qIndex, tracks.length) - 1;
+  queue = tracks.slice();
+  emit("queue");
+}
+
 export function next() {
-  if (qIndex < 0 || qIndex >= queue.length - 1) return;
+  if (!queue.length || qIndex >= queue.length - 1) return;
   qIndex++;
   play(queue[qIndex], { keepQueue: true, at: 0 });
 }
@@ -72,9 +86,11 @@ export function isCurrent(fileId) {
 export function play(next, options) {
   const opts = options || {};
   // lecture isolée d'un titre hors de la file : la file s'arrête là
-  if (!opts.keepQueue) {
+  // "solo" : lecture pilotée d'ailleurs (jam suivie), sans file locale
+  if (opts.solo) { queue = []; qIndex = -1; queueTag = null; }
+  else if (!opts.keepQueue) {
     const i = queue.findIndex((t) => t.fileId === next.fileId);
-    if (i === -1) { queue = []; qIndex = -1; } else qIndex = i;
+    if (i === -1) { queue = []; qIndex = -1; queueTag = null; } else qIndex = i;
   }
   if (!track || track.fileId !== next.fileId) {
     const url = next.url || cachedUrl(next.fileId);
@@ -114,6 +130,7 @@ export function seekSeconds(sec) {
     const d = state().duration;
     audio.currentTime = Math.max(0, d ? Math.min(sec, d - 0.05) : sec);
     emit("time");
+    emit("seek");
   };
   // Avant les métadonnées, Safari ignore le seek : on attend.
   if (audio.readyState >= 1) apply();
@@ -136,6 +153,7 @@ export function close() {
   track = null;
   queue = [];
   qIndex = -1;
+  queueTag = null;
   emit("track");
 }
 
@@ -152,7 +170,7 @@ audio.addEventListener("play", () => {
 });
 audio.addEventListener("pause", () => { emit("state"); updatePosition(); });
 audio.addEventListener("ended", () => {
-  if (qIndex >= 0 && qIndex < queue.length - 1) next();
+  if (queue.length && qIndex < queue.length - 1) next();
   else emit("state");
 });
 audio.addEventListener("loadedmetadata", () => { emit("time"); updatePosition(); });
@@ -245,7 +263,7 @@ export function bindPlayerBar(navigate) {
   });
 
   onPlayer((type, s) => {
-    if (type === "track") {
+    if (type === "track" || type === "queue") {
       bar.classList.toggle("is-open", !!s.track);
       document.body.classList.toggle("has-player", !!s.track);
       titleEl.textContent = s.track ? s.track.title : "";

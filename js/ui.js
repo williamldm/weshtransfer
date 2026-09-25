@@ -1,7 +1,7 @@
 // Briques d'interface partagées : DOM, messages, formatage, feuilles.
 
-import { icon } from "./icons.js?v=50";
-import { CATEGORY, categoryOf, extOf } from "./files.js?v=50";
+import { icon } from "./icons.js?v=51";
+import { CATEGORY, categoryOf, extOf } from "./files.js?v=51";
 
 // ------------------------------------------------------------------ DOM
 
