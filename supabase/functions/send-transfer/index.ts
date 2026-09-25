@@ -4,6 +4,9 @@
 // POST { transfer_id, retry }   -> renvoie aussi a ceux en echec
 // POST { check: true }          -> { email_enabled } (l'UI s'adapte)
 //
+// Une fois par envoi, l'expéditeur reçoit une confirmation avec le lien
+// (aussi pour un envoi par lien seul, sans destinataire).
+//
 // L'email de l'expediteur (reply_to) doit avoir ete verifie par code
 // (Edge Function verify-email) : rien ne part "de la part de" quelqu'un
 // qui n'a pas prouve que l'adresse est a lui.
@@ -12,10 +15,11 @@
 
 import { admin, callerId } from "../_shared/supabase.ts";
 import { json, preflight, readJson } from "../_shared/http.ts";
-import { isVerified, mailConfig, mailDayMax, mailsToday, sendEmails, transferLink, transferMail, type OutgoingEmail } from "../_shared/email.ts";
+import { isVerified, mailConfig, mailDayMax, mailsToday, sendEmails, sentConfirmMail, transferLink, transferMail, type MailConfig, type OutgoingEmail } from "../_shared/email.ts";
 
 type TransferRow = {
   id: string;
+  token: string;
   title: string;
   message: string | null;
   reply_to: string | null;
@@ -23,6 +27,24 @@ type TransferRow = {
   sender: { pseudo: string; user_id: string } | null;
   space: { name: string } | null;
 };
+
+type FileInfo = { name: string; size: number | null; kind: string };
+
+// Confirmation à l'expéditeur, avec le lien. Une seule fois : la date
+// sender_notified_at sert de verrou. Au-delà du budget d'emails du jour,
+// l'avis saute (l'envoi, lui, est parti).
+// deno-lint-ignore no-explicit-any
+async function confirmToSender(db: any, cfg: MailConfig, transfer: TransferRow, files: FileInfo[], recipients: { email: string; ok: boolean }[]) {
+  const { data: lock } = await db.from("transfers").update({ sender_notified_at: new Date().toISOString() })
+    .eq("id", transfer.id).is("sender_notified_at", null).select("id");
+  if (!lock?.length || !transfer.reply_to) return;
+  if (await mailsToday(db) > mailDayMax(cfg)) return;
+  const mail = sentConfirmMail({
+    site: cfg.site, title: transfer.title, link: transferLink(cfg.site, transfer.token),
+    files, recipients, expiresAt: transfer.expires_at,
+  });
+  await sendEmails(cfg, [{ to: transfer.reply_to, subject: mail.subject, html: mail.html, text: mail.text }]);
+}
 
 Deno.serve(async (req) => {
   const early = preflight(req);
@@ -42,7 +64,7 @@ Deno.serve(async (req) => {
 
   const { data: transfer, error } = await db
     .from("transfers")
-    .select("id, title, message, reply_to, expires_at, sender:participants(pseudo, user_id), space:spaces(name)")
+    .select("id, token, title, message, reply_to, expires_at, sender:participants(pseudo, user_id), space:spaces(name)")
     .eq("id", transferId)
     .maybeSingle<TransferRow>();
 
@@ -89,18 +111,22 @@ Deno.serve(async (req) => {
     .eq("status", "pending")
     .order("created_at");
 
-  if (!recipients?.length) return json({ email_enabled: true, results: [] });
-
   const { data: items } = await db
     .from("transfer_files")
     .select("position, file:files(original_name, size_bytes, kind)")
     .eq("transfer_id", transfer.id)
     .order("position");
 
-  const files = (items ?? [])
+  const files: FileInfo[] = (items ?? [])
     .map((i) => (i as unknown as { file: { original_name: string; size_bytes: number | null; kind: string } | null }).file)
     .filter((f): f is { original_name: string; size_bytes: number | null; kind: string } => !!f)
     .map((f) => ({ name: f.original_name, size: f.size_bytes, kind: f.kind }));
+
+  // envoi par lien seul : juste la confirmation, lien compris
+  if (!recipients?.length) {
+    await confirmToSender(db, cfg, transfer, files, []).catch(() => {});
+    return json({ email_enabled: true, results: [] });
+  }
 
   const sender = transfer.sender?.pseudo ?? "Quelqu'un";
 
@@ -144,6 +170,9 @@ Deno.serve(async (req) => {
   if (delivered.length) {
     await db.rpc("remember_contacts", { p_sender: transfer.reply_to, p_emails: delivered });
   }
+
+  await confirmToSender(db, cfg, transfer, files,
+    recipients.map((r, n) => ({ email: r.email, ok: results[n].ok }))).catch(() => {});
 
   return json({
     email_enabled: true,

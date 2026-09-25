@@ -2,20 +2,33 @@
 // Pas de supabase-js ici : un simple appel à l'Edge Function transfer-open,
 // qui vérifie le lien et renvoie des URLs signées. Page légère, rapide en 4G.
 
-import { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from "./config.js?v=69";
-import { Waveform, formatTime } from "./waveform.js?v=69";
-import { saveZip, canStreamToDisk, MEMORY_LIMIT } from "./zip.js?v=69";
-import { icon } from "./icons.js?v=69";
-import { esc, formatBytes, formatDuration, formatDate, plural, toast, triggerDownload, avatar, fileBadge, fileTile } from "./ui.js?v=69";
-import { categoryOf, canPreview } from "./files.js?v=69";
+import { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from "./config.js?v=70";
+import { Waveform, formatTime } from "./waveform.js?v=70";
+import { saveZip, canStreamToDisk, MEMORY_LIMIT } from "./zip.js?v=70";
+import { icon } from "./icons.js?v=70";
+import { esc, formatBytes, formatDuration, formatDate, plural, toast, triggerDownload, avatar, fileBadge, fileTile } from "./ui.js?v=70";
+import { categoryOf, canPreview } from "./files.js?v=70";
 
 const root = document.getElementById("tp");
 const k = new URLSearchParams(location.search).get("k") || "";
 const ENDPOINT = SUPABASE_URL + "/functions/v1/transfer-open";
 
+// Session de l'appli sur cet appareil, s'il y en a une : sert seulement à
+// reconnaître l'expéditeur qui ouvre son propre lien (pas d'avis "ouvert").
+function session() {
+  try {
+    const s = JSON.parse(localStorage.getItem("seminaire.auth") || "null");
+    return (s && s.access_token) || "";
+  } catch (err) {
+    return "";
+  }
+}
+
 function call(body, keepalive) {
   const headers = { "Content-Type": "application/json" };
   if (SUPABASE_PUBLISHABLE_KEY) headers.apikey = SUPABASE_PUBLISHABLE_KEY;
+  const token = session();
+  if (token) headers.Authorization = "Bearer " + token;
   return fetch(ENDPOINT, { method: "POST", headers, body: JSON.stringify(body), keepalive: !!keepalive });
 }
 

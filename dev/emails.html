@@ -29,7 +29,7 @@
 <pre id="text"></pre>
 
 <script type="module">
-import { transferMail, verifyCodeMail, downloadNoticeMail, inviteMail, reviewDigestMail } from "../supabase/functions/_shared/mail-templates.js";
+import { transferMail, verifyCodeMail, downloadNoticeMail, inviteMail, reviewDigestMail, sentConfirmMail, openNoticeMail } from "../supabase/functions/_shared/mail-templates.js";
 
 const site = location.origin;
 const inAWeek = new Date(Date.now() + 7 * 86400e3).toISOString();
@@ -73,6 +73,16 @@ const cases = {
   "Code (invitation)": () => verifyCodeMail({ site, email: "kenza@gmail.com", code: "731905", minutes: 15, purpose: "pour rejoindre le séminaire Villa septembre" }),
   "Invitation séminaire": () => inviteMail({ site, email: "kenza@gmail.com", host: "Lil Brume", spaceName: "Villa septembre", mode: "seminaire", link: site + "/index.html?i=0123456789abcdef0123456789abcdef", expiresAt: inAWeek }),
   "Invitation retours": () => inviteMail({ site, email: "kenza@gmail.com", host: "Ingé Max", spaceName: "Kenza, EP Nuit blanche", mode: "revue", link: site + "/index.html?i=0123456789abcdef0123456789abcdef", expiresAt: inAWeek }),
+  "Envoi parti (expéditeur)": () => sentConfirmMail({ site, title: "Nuit blanche, mix du jour 2", link: site + "/t.html?k=0123456789abcdef0123456789abcdef",
+    files: [{ name: "Nuit blanche - mix v3.wav", kind: "mix", size: 58200000 }, { name: "Stems.zip", kind: "stems", size: 412000000 }],
+    recipients: [{ email: "ingé@studio.fr", ok: true }, { email: "kenza@gmail.com", ok: true }], expiresAt: inAWeek, pick: 0 }),
+  "Envoi parti (un échec)": () => sentConfirmMail({ site, title: "Clip, montage 3", link: site + "/t.html?k=0123456789abcdef0123456789abcdef",
+    files: [{ name: "clip-v3.mp4", kind: null, size: 830000000 }],
+    recipients: [{ email: "label@maison.fr", ok: true }, { email: "adresse@fausse.zz", ok: false }], expiresAt: inAWeek, pick: 1 }),
+  "Lien prêt (sans destinataire)": () => sentConfirmMail({ site, title: "Freestyle du 12", link: site + "/t.html?k=0123456789abcdef0123456789abcdef",
+    files: [{ name: "freestyle.m4a", kind: "freestyle", size: 4200000 }], recipients: [], expiresAt: inAWeek, pick: 3 }),
+  "Ouvert (destinataire)": () => openNoticeMail({ site, who: "ingé@studio.fr", title: "Nuit blanche, mix du jour 2", pick: 1 }),
+  "Ouvert (lien partagé)": () => openNoticeMail({ site, who: null, title: "Nuit blanche, mix du jour 2", pick: 0 }),
   "Téléchargé (destinataire)": () => downloadNoticeMail({ site, who: "ingé@studio.fr", title: "Nuit blanche, mix du jour 2" }),
   "Téléchargé (lien partagé)": () => downloadNoticeMail({ site, who: null, title: "Nuit blanche, mix du jour 2" }),
 };

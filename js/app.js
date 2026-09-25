@@ -1,22 +1,22 @@
 // Coquille de l'appli : démarrage, routeur à hash, en-tête, bus
 // d'événements, temps réel. Chaque vue est un module avec mount().
 
-import { restore, getSpace, leaveSpace } from "./session.js?v=69";
-import { connectSpace } from "./realtime.js?v=69";
-import { startJam } from "./jam.js?v=69";
-import { bindPlayerBar } from "./player.js?v=69";
-import { activeCount, onUploads } from "./upload.js?v=69";
-import { openPeopleSheet } from "./views/people.js?v=69";
-import { openUploadSheet } from "./views/upload-sheet.js?v=69";
-import { icon } from "./icons.js?v=69";
-import { monogram } from "./brand.js?v=69";
-import { toast, errorText, esc } from "./ui.js?v=69";
+import { restore, getSpace, leaveSpace } from "./session.js?v=70";
+import { connectSpace } from "./realtime.js?v=70";
+import { startJam } from "./jam.js?v=70";
+import { bindPlayerBar } from "./player.js?v=70";
+import { activeCount, onUploads } from "./upload.js?v=70";
+import { openPeopleSheet } from "./views/people.js?v=70";
+import { openUploadSheet } from "./views/upload-sheet.js?v=70";
+import { icon } from "./icons.js?v=70";
+import { monogram } from "./brand.js?v=70";
+import { toast, errorText, esc } from "./ui.js?v=70";
 
-import * as home from "./views/home.js?v=69";
-import * as project from "./views/project.js?v=69";
-import * as file from "./views/file.js?v=69";
-import * as send from "./views/send.js?v=69";
-import * as transfers from "./views/transfers.js?v=69";
+import * as home from "./views/home.js?v=70";
+import * as project from "./views/project.js?v=70";
+import * as file from "./views/file.js?v=70";
+import * as send from "./views/send.js?v=70";
+import * as transfers from "./views/transfers.js?v=70";
 
 // L'accueil dépend du mode de l'espace : morceaux (séminaire) ou
 // directement le composeur d'envoi (espace dédié aux envois).
@@ -271,7 +271,7 @@ async function boot() {
   window.addEventListener("hashchange", routeSmoothly);
 
   // compte : "Mes espaces" à jour depuis le serveur (autres appareils)
-  import("./session.js?v=69").then((m) => m.syncSpaces()).catch(() => {});
+  import("./session.js?v=70").then((m) => m.syncSpaces()).catch(() => {});
 
   // message laissé par l'accueil (ex. réglage refusé à la création)
   try {

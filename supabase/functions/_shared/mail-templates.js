@@ -415,6 +415,131 @@ export function reviewDigestMail(input) {
 // ------------------------------------------ avis de premier téléchargement
 
 // input : { site, who, title }
+// ------------------------------------------------------ avis à l'expéditeur
+// Une blague de pollution par avis, tirée au hasard (pick peut être fixé
+// pour les aperçus et les tests).
+
+const OPEN_JOKES = [
+  "Pour afficher la page, on a rallumé une turbine. Elle te salue.",
+  "Quelque part, un ours polaire a senti un léger courant d'air chaud.",
+  "Les serveurs ont chauffé pour l'occasion : un glaçon de plus a fondu.",
+  "La centrale a lâché un petit nuage de joie. Noir, le nuage.",
+  "Ouverture confirmée. Le compteur de CO₂ a fait un bond, lui aussi.",
+];
+const SENT_JOKES = [
+  "Le jet a décollé, plein de kérosène, avec tes fichiers en première classe.",
+  "Tes fichiers voyagent en jet privé. Seuls à bord, clim à fond.",
+  "Décollage réussi. Les nuages derrière, c'est nous.",
+  "On a allumé la centrale rien que pour toi. Elle tourne encore.",
+];
+const DOWNLOAD_JOKES = [
+  "Pour l'occasion, on a brûlé un peu plus de charbon. Ça se fête.",
+  "Livraison effectuée par jet privé. Retour à vide, évidemment.",
+  "Les ventilateurs des serveurs applaudissent. Bruyamment.",
+];
+function joke(list, pick) {
+  const i = Number.isInteger(pick) ? pick : Math.floor(Math.random() * list.length);
+  return list[((i % list.length) + list.length) % list.length];
+}
+
+// Bloc "bilan carbone" : la même blague que l'appli, en encadré.
+function carbonBox(text) {
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:26px 0 0;"><tr>` +
+    `<td bgcolor="${C.raised}" style="background:${C.raised};border:1px dashed ${C.line};border-radius:12px;padding:14px 16px;font-family:${MONO};font-size:12px;line-height:1.6;color:${C.soft};">${text}</td>` +
+    `</tr></table>`;
+}
+
+// Confirmation d'envoi, pour l'expéditeur, avec le lien.
+// input : { site, title, link, files: [{ name, kind, size }], recipients: [{ email, ok }],
+//           expiresAt, pick? }
+export function sentConfirmMail(input) {
+  const site = input.site;
+  const count = input.files.length;
+  const total = input.files.reduce((sum, f) => sum + (f.size || 0), 0);
+  const countLabel = count > 1 ? `${count} fichiers` : "1 fichier";
+  const until = formatDate(input.expiresAt);
+  const sent = input.recipients.filter((r) => r.ok);
+  const failed = input.recipients.filter((r) => !r.ok);
+  // un aller-retour Paris-Dubaï en jet par tranche de 50 Mo : pure blague
+  const trips = Math.max(1, Math.round(total / (50 * 1024 * 1024))) * Math.max(1, sent.length);
+
+  const subject = `Ton envoi ${LQ}${input.title}${RQ} a décollé`;
+  const preheader = sent.length
+    ? `${countLabel}, ${formatBytes(total)}, en route vers ${sent.length} personne${sent.length > 1 ? "s" : ""}. Le lien est dedans.`
+    : `${countLabel}, ${formatBytes(total)}. Ton lien est prêt, il est dedans.`;
+
+  const who = sent.length
+    ? ` est en route vers <strong style="color:${C.text};font-weight:600;">${sent.length} personne${sent.length > 1 ? "s" : ""}</strong>.`
+    : " est prêt. Partage le lien où tu veux.";
+  const list = input.recipients.length
+    ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:22px 0 0;border-top:1px solid ${C.line};">` +
+      input.recipients.map((r) => `<tr>` +
+        `<td style="padding:11px 0;border-bottom:1px solid ${C.rule};font-family:${SANS};font-size:14px;color:${C.text};word-break:break-all;">${esc(r.email)}</td>` +
+        `<td align="right" style="padding:11px 0;border-bottom:1px solid ${C.rule};font-family:${MONO};font-size:11px;letter-spacing:1px;text-transform:uppercase;color:${r.ok ? C.bright : "#E2B55A"};white-space:nowrap;">${r.ok ? "envoyé" : "échec"}</td>` +
+        `</tr>`).join("") + `</table>`
+    : "";
+
+  const body =
+    eyebrow(`Envoi parti · ${esc(countLabel)} · ${esc(formatBytes(total))}`) +
+    heading("Décollage réussi.") +
+    para(`<strong style="color:${C.text};font-weight:600;">${LQ}${esc(input.title)}${RQ}</strong>${who} ${esc(joke(SENT_JOKES, input.pick))}`) +
+    button(input.link, "Voir le transfert&nbsp;&rarr;") +
+    `<p style="margin:14px 0 0;font-family:${MONO};font-size:12px;line-height:1.5;word-break:break-all;"><a href="${esc(input.link)}" style="color:${C.soft};">${esc(input.link)}</a></p>` +
+    list +
+    (failed.length ? small(`${failed.length} adresse${failed.length > 1 ? "s n'ont" : " n'a"} pas reçu l'email : envoie-leur le lien toi-même.`) : "") +
+    carbonBox(`Bilan carbone de cet envoi : l'équivalent de ${trips} aller${trips > 1 ? "s" : ""}-retour${trips > 1 ? "s" : ""} Paris-Dubaï en jet privé.<br><span style="color:${C.faint};">Estimation totalement fantaisiste. Culpabilité bien réelle.</span>`) +
+    small(`Disponible jusqu'au ${esc(until)}. Tu seras prévenu à la première ouverture et au premier téléchargement.`, "22px 0 0");
+
+  const footer = `<p style="margin:0;">Tu reçois cet email parce que tu viens d'envoyer des fichiers avec WeshTransfer depuis cette adresse.</p>`;
+  const html = layout({ site, title: subject, preheader, body, footer });
+  const text = tidy([
+    `Ton envoi "${input.title}" a décollé (${countLabel}, ${formatBytes(total)}).`,
+    sent.length ? `En route vers : ${sent.map((r) => r.email).join(", ")}.` : "Ton lien est prêt : partage-le où tu veux.",
+    failed.length ? `Pas reçu : ${failed.map((r) => r.email).join(", ")}. Envoie-leur le lien toi-même.` : "",
+    "",
+    `Le lien : ${input.link}`,
+    `Disponible jusqu'au ${until}.`,
+    "",
+    `Bilan carbone : ${trips} aller(s)-retour(s) Paris-Dubaï en jet privé. Estimation totalement fantaisiste.`,
+    "",
+    textFooter(site),
+  ]);
+  return { subject, html, text };
+}
+
+// Première ouverture d'un envoi (lien personnel d'un destinataire, ou lien
+// partagé). input : { site, who (email ou null), title, pick? }
+export function openNoticeMail(input) {
+  const site = input.site;
+  const who = input.who || null;
+  const subject = who
+    ? `${who} a ouvert ${LQ}${input.title}${RQ}`
+    : `Ton lien ${LQ}${input.title}${RQ} vient d'être ouvert`;
+  const preheader = "Première ouverture de ton envoi. Les suivantes, on ne te dérange pas.";
+  const line = joke(OPEN_JOKES, input.pick);
+
+  const body =
+    eyebrow("Ouvert") +
+    heading(who ? "C'est ouvert." : "Quelqu'un a cliqué.") +
+    para((who ? `<strong style="color:${C.text};font-weight:600;">${esc(who)}</strong> vient d'ouvrir` : "Ton lien partagé vient d'être ouvert : quelqu'un regarde") +
+      ` ton envoi <strong style="color:${C.text};font-weight:600;">${LQ}${esc(input.title)}${RQ}</strong>.`) +
+    carbonBox(esc(line)) +
+    small((who ? "Tu seras prévenu quand il téléchargera." : "Tu seras prévenu au premier téléchargement.") + " Pour les ouvertures suivantes, on ne te dérange pas.", "20px 0 0") +
+    button(`${site}/app.html#/transfers`, "Voir mes envois&nbsp;&rarr;");
+
+  const footer = `<p style="margin:0;">Tu reçois cet avis parce que tu as envoyé des fichiers avec WeshTransfer en donnant cette adresse.</p>`;
+  const html = layout({ site, title: subject, preheader, body, footer });
+  const text = tidy([
+    who ? `${who} vient d'ouvrir ton envoi "${input.title}".` : `Ton lien "${input.title}" vient d'être ouvert.`,
+    line,
+    "",
+    `Voir mes envois : ${site}/app.html#/transfers`,
+    "",
+    textFooter(site),
+  ]);
+  return { subject, html, text };
+}
+
 export function downloadNoticeMail(input) {
   const site = input.site;
   const who = input.who || null;
@@ -428,7 +553,8 @@ export function downloadNoticeMail(input) {
     heading(who ? "C'est récupéré." : "Quelqu'un a récupéré tes fichiers.") +
     para((who ? `<strong style="color:${C.text};font-weight:600;">${esc(who)}</strong> vient de télécharger` : "Ton lien partagé vient de servir pour télécharger") +
       ` ton envoi <strong style="color:${C.text};font-weight:600;">${LQ}${esc(input.title)}${RQ}</strong>.`) +
-    small("C'est le premier téléchargement : pour les suivants, on ne te dérange pas.") +
+    carbonBox(esc(joke(DOWNLOAD_JOKES, input.pick))) +
+    small("C'est le premier téléchargement : pour les suivants, on ne te dérange pas.", "20px 0 0") +
     button(`${site}/app.html#/transfers`, "Voir mes envois&nbsp;&rarr;") +
     small("Le suivi des envois s'ouvre sur l'appareil qui a servi à envoyer.");
 

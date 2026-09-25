@@ -6,19 +6,19 @@ import {
   getProject, getFilesByIds, createTransfer, sendTransfer, emailEnabled,
   getTransfer, transferUrl, createProject, signFiles, cachedUrl,
   knownVerified, listContacts, forgetContact, rememberContactsLocal
-} from "../api.js?v=69";
-import { accountEmail } from "../session.js?v=69";
-import { ensureVerified } from "../verify.js?v=69";
-import { openUploadSheet } from "./upload-sheet.js?v=69";
-import { mountUploads } from "./uploads.js?v=69";
-import { onUploads, enqueue, checkFile, getJobs } from "../upload.js?v=69";
-import { categoryOf, canPreview } from "../files.js?v=69";
-import { takePending } from "../pending.js?v=69";
-import { icon } from "../icons.js?v=69";
+} from "../api.js?v=70";
+import { accountEmail } from "../session.js?v=70";
+import { ensureVerified } from "../verify.js?v=70";
+import { openUploadSheet } from "./upload-sheet.js?v=70";
+import { mountUploads } from "./uploads.js?v=70";
+import { onUploads, enqueue, checkFile, getJobs } from "../upload.js?v=70";
+import { categoryOf, canPreview } from "../files.js?v=70";
+import { takePending } from "../pending.js?v=70";
+import { icon } from "../icons.js?v=70";
 import {
   esc, h, formatBytes, formatDuration, plural, toast, errorText, openSheet, copyText, shareLink,
   canShare, formatDate, daysLeft, fileBadge, fileTile
-} from "../ui.js?v=69";
+} from "../ui.js?v=70";
 
 // Dans un espace "envoi", ce composeur EST l'accueil.
 export const title = (ctx) => (ctx && ctx.space.mode === "envoi" ? ctx.space.name : "Envoyer");
@@ -582,13 +582,15 @@ export async function mount(root, ctx, params) {
         days: state.days
       });
 
+      // emails aux destinataires, et confirmation (avec le lien) à
+      // l'expéditeur, même pour un envoi par lien seul
       let results = [];
-      if (state.emails.length && emailOn) {
+      if (emailOn && (state.emails.length || replyTo)) {
         try {
           const r = await sendTransfer(created.id);
           results = (r && r.results) || [];
         } catch (err) {
-          toast("Lien créé, mais l'envoi des emails a échoué : " + errorText(err), "err");
+          if (state.emails.length) toast("Lien créé, mais l'envoi des emails a échoué : " + errorText(err), "err");
         }
       }
       showDone(root, ctx, created, { emailOn, results, title });

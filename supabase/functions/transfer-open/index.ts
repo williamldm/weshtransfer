@@ -6,10 +6,15 @@
 //
 // Deux sortes de token : celui d'un destinataire (lien personnel, permet
 // de savoir qui a telecharge) ou celui de l'envoi (lien partage).
+//
+// L'expediteur est prevenu par email a la premiere ouverture (par
+// destinataire, ou du lien partage) et au premier telechargement. Pas
+// quand c'est lui qui ouvre son propre lien : la page envoie sa session
+// si elle en a une, pour le reconnaitre.
 
 import { admin } from "../_shared/supabase.ts";
 import { json, preflight, readJson } from "../_shared/http.ts";
-import { downloadNoticeMail, isVerified, mailConfig, sendEmails } from "../_shared/email.ts";
+import { downloadNoticeMail, isVerified, mailConfig, mailDayMax, mailsToday, openNoticeMail, sendEmails } from "../_shared/email.ts";
 import { b2Config, presignGet } from "../_shared/b2.ts";
 
 const URL_TTL = 6 * 3600;
@@ -21,12 +26,20 @@ type Transfer = {
   reply_to: string | null;
   notify_sender: boolean;
   expires_at: string;
-  sender: { pseudo: string } | null;
+  sender: { pseudo: string; user_id: string } | null;
   space: { name: string; purge_at: string | null } | null;
 };
 
 const TRANSFER_COLS =
-  "id, title, message, reply_to, notify_sender, expires_at, sender:participants(pseudo), space:spaces(name, purge_at)";
+  "id, title, message, reply_to, notify_sender, expires_at, sender:participants(pseudo, user_id), space:spaces(name, purge_at)";
+
+// Envoi en arriere-plan : la page s'affiche sans attendre le serveur mail.
+function later(task: Promise<unknown>) {
+  const rt = (globalThis as unknown as { EdgeRuntime?: { waitUntil?: (p: Promise<unknown>) => void } }).EdgeRuntime;
+  const safe = task.catch(() => {});
+  if (rt?.waitUntil) rt.waitUntil(safe);
+  return rt?.waitUntil ? Promise.resolve() : safe;
+}
 
 Deno.serve(async (req) => {
   const early = preflight(req);
@@ -65,6 +78,20 @@ Deno.serve(async (req) => {
     }, 410);
   }
 
+  // l'expediteur qui ouvre son propre envoi (session de l'appli sur cet
+  // appareil) : ni avis, ni "ouvert"
+  let isSender = false;
+  const bearer = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "");
+  if (bearer && !bearer.startsWith("sb_") && transfer.sender?.user_id) {
+    const { data: who } = await db.auth.getUser(bearer);
+    isSender = !!who?.user && who.user.id === transfer.sender.user_id;
+  }
+  const cfg = mailConfig();
+  const canNotify = async () =>
+    !!cfg && transfer.notify_sender && !!transfer.reply_to && !isSender && !!transfer.sender?.user_id &&
+    await isVerified(db, transfer.sender.user_id, transfer.reply_to) &&
+    await mailsToday(db) < mailDayMax(cfg);
+
   // ---------------------------------------------- comptage d'un telechargement
   if (body.action === "download") {
     const { data: reg } = await db.rpc("register_transfer_download", {
@@ -73,29 +100,31 @@ Deno.serve(async (req) => {
     });
 
     const first = !!(reg as { first?: boolean } | null)?.first;
-    const cfg = mailConfig();
 
     // L'expediteur est prevenu une fois par destinataire (ou une fois pour le
-    // lien partage), jamais a chaque clic.
-    if (first && cfg && transfer.notify_sender && transfer.reply_to) {
-      // uniquement vers une adresse que l'expediteur a prouvee : sinon ce
-      // serait un moyen d'ecrire a n'importe qui
-      const { data: owner } = await db.from("transfers")
-        .select("sender:participants(user_id)").eq("id", transfer.id).maybeSingle();
-      const uid = (owner as { sender?: { user_id?: string } } | null)?.sender?.user_id;
-      if (uid && await isVerified(db, uid, transfer.reply_to)) {
-        const mail = downloadNoticeMail({ site: cfg.site, who: recipient?.email ?? null, title: transfer.title });
-        await sendEmails(cfg, [{ to: transfer.reply_to, subject: mail.subject, html: mail.html, text: mail.text }]);
-      }
+    // lien partage), jamais a chaque clic, et uniquement a une adresse qu'il
+    // a prouvee (sinon ce serait un moyen d'ecrire a n'importe qui).
+    if (first && await canNotify()) {
+      const mail = downloadNoticeMail({ site: cfg!.site, who: recipient?.email ?? null, title: transfer.title });
+      await later(sendEmails(cfg!, [{ to: transfer.reply_to!, subject: mail.subject, html: mail.html, text: mail.text }]));
     }
     return json({ ok: true });
   }
 
   // ------------------------------------------------------ ouverture de la page
-  if (recipient && !recipient.first_opened_at) {
-    await db.from("transfer_recipients")
-      .update({ first_opened_at: new Date().toISOString() })
-      .eq("id", recipient.id);
+  // premiere ouverture : la date sert de verrou (un seul avis, meme si la
+  // page est ouverte deux fois en meme temps)
+  if (!isSender) {
+    const now = new Date().toISOString();
+    const { data: opened } = recipient
+      ? await db.from("transfer_recipients").update({ first_opened_at: now })
+        .eq("id", recipient.id).is("first_opened_at", null).select("id")
+      : await db.from("transfers").update({ link_opened_at: now })
+        .eq("id", transfer.id).is("link_opened_at", null).select("id");
+    if (opened?.length && await canNotify()) {
+      const mail = openNoticeMail({ site: cfg!.site, who: recipient?.email ?? null, title: transfer.title });
+      await later(sendEmails(cfg!, [{ to: transfer.reply_to!, subject: mail.subject, html: mail.html, text: mail.text }]));
+    }
   }
 
   const { data: items, error } = await db

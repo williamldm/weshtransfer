@@ -12,6 +12,7 @@
 import { smtpConfig, smtpSendAll, type SmtpConfig } from "./smtp.ts";
 export {
   esc, formatBytes, formatDate, typeLabel, transferMail, verifyCodeMail, downloadNoticeMail, inviteMail, reviewDigestMail,
+  sentConfirmMail, openNoticeMail,
 } from "./mail-templates.js";
 
 export type Sender = { name?: string; email: string };
@@ -113,12 +114,13 @@ export function mailDayMax(cfg: MailConfig): number {
 }
 export async function mailsToday(db: any): Promise<number> {
   const since = new Date(Date.now() - 86400e3).toISOString();
-  const [a, b, c] = await Promise.all([
+  const [a, b, c, d] = await Promise.all([
     db.from("email_codes").select("id", { count: "exact", head: true }).gte("created_at", since),
     db.from("transfer_recipients").select("id", { count: "exact", head: true }).eq("status", "sent").gte("sent_at", since),
     db.from("space_invites").select("id", { count: "exact", head: true }).gte("created_at", since),
+    db.from("transfers").select("id", { count: "exact", head: true }).gte("sender_notified_at", since),
   ]);
-  return (a.count ?? 0) + (b.count ?? 0) + (c.count ?? 0);
+  return (a.count ?? 0) + (b.count ?? 0) + (c.count ?? 0) + (d.count ?? 0);
 }
 
 export async function isVerified(db: any, userId: string, email: string | null): Promise<boolean> {
