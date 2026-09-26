@@ -1,18 +1,18 @@
 // Écoute d'une version : grande waveform, transport, commentaires
 // horodatés façon SoundCloud ("à 1:23, la voix sature").
 
-import { getFile, listComments, addComment, deleteComment, signFiles, cachedUrl, cachedDownload, deleteFile, updateFile } from "../api.js?v=76";
-import { createReview } from "./review.js?v=76";
-import { cover } from "./review-home.js?v=76";
-import { coverOf } from "../cover.js?v=76";
-import { Waveform, formatTime } from "../waveform.js?v=76";
-import { play, toggle, isCurrent, onPlayer, seekRatio, seekSeconds, skip, state as playerState, trackFromFile } from "../player.js?v=76";
-import { icon } from "../icons.js?v=76";
-import { isAudio, canPreview, categoryOf } from "../files.js?v=76";
+import { getFile, listComments, addComment, deleteComment, signFiles, cachedUrl, cachedDownload, deleteFile, updateFile } from "../api.js?v=77";
+import { createReview } from "./review.js?v=77";
+import { cover } from "./review-home.js?v=77";
+import { coverOf } from "../cover.js?v=77";
+import { Waveform, formatTime } from "../waveform.js?v=77";
+import { play, toggle, isCurrent, onPlayer, seekRatio, seekSeconds, skip, state as playerState, trackFromFile } from "../player.js?v=77";
+import { icon } from "../icons.js?v=77";
+import { isAudio, canPreview, categoryOf } from "../files.js?v=77";
 import {
   esc, h, fileBadge, fileTile, timeAgo, formatBytes, avatar, toast, errorText, triggerDownload, plural,
   confirmSheet, actionSheet, KINDS, openSheet
-} from "../ui.js?v=76";
+} from "../ui.js?v=77";
 
 export const title = () => "Écoute";
 

@@ -1,5 +1,5 @@
-@import url("fonts.css?v=76");
-@import url("tokens.css?v=76");
+@import url("fonts.css?v=77");
+@import url("tokens.css?v=77");
 
 /* ================================================================= base */
 *, *::before, *::after { box-sizing: border-box; }
@@ -644,7 +644,10 @@ body.hub .scene { position: fixed; inset: 0; z-index: -1; }
 /* la carte */
 .deck {
   grid-area: deck;
-  align-self: center;
+  /* en haut, aligné sur le grand titre (centré, il descendait trop sur
+     les grands écrans) */
+  align-self: start;
+  margin-top: var(--sp-5);
   width: 100%;
   border: 1px solid var(--line-strong);
   border-radius: var(--r-lg);
@@ -772,7 +775,7 @@ body.is-dropping .add-circle { transform: scale(1.08); }
   .logo { font-size: 21px; }
   .hub-stage { display: flex; flex-direction: column; min-height: 0; padding: 0 var(--sp-3) var(--sp-5); }
   .claim { order: 1; max-width: 12ch; margin: var(--sp-4) 0 0; padding: 0 var(--sp-1); font-size: clamp(34px, 10vw, 46px); text-align: left; }
-  .deck { order: 2; margin-top: 64px; }
+  .deck { order: 2; margin-top: 28px; }
   .wallpaper-note { order: 3; align-self: flex-start; margin-top: var(--sp-4); padding: 0 var(--sp-1); text-align: left; }
   .pledges { grid-template-columns: 1fr; gap: var(--sp-3); }
   .hub-below { padding: var(--sp-6) var(--sp-4) calc(var(--sp-7) + var(--safe-bottom)); }
