@@ -4,18 +4,18 @@
 // version) ; toucher sa pochette le joue, et les suivants s'enchaînent.
 
 import {
-  listProjects, listReviewComments, deleteProject, deleteFile, listParticipants,
+  listProjects, listReviewComments, deleteProject, deleteFile, listParticipants, updateProject,
   reviewNotifyStatus, reviewSubscribe, reviewUnsubscribe
-} from "../api.js?v=83";
-import { mountUploads } from "./uploads.js?v=83";
-import { openUploadSheet } from "./upload-sheet.js?v=83";
-import { stateOf, isEngineerOf } from "./review.js?v=83";
-import { ensureVerified } from "../verify.js?v=83";
-import { accountEmail } from "../session.js?v=83";
-import { albumOf, onCover, setCover, clearCover, setAlbumTitle } from "../cover.js?v=83";
-import { playQueue, onPlayer, isCurrent, state as playerState, toggle, trackFromFile } from "../player.js?v=83";
-import { icon } from "../icons.js?v=83";
-import { esc, h, plural, toast, errorText, formatDuration, actionSheet, confirmSheet, promptSheet, openSheet } from "../ui.js?v=83";
+} from "../api.js?v=85";
+import { mountUploads } from "./uploads.js?v=85";
+import { openUploadSheet } from "./upload-sheet.js?v=85";
+import { stateOf, isEngineerOf } from "./review.js?v=85";
+import { ensureVerified } from "../verify.js?v=85";
+import { accountEmail } from "../session.js?v=85";
+import { albumOf, onCover, setCover, clearCover, setAlbumTitle } from "../cover.js?v=85";
+import { playQueue, onPlayer, isCurrent, state as playerState, toggle, trackFromFile } from "../player.js?v=85";
+import { icon } from "../icons.js?v=85";
+import { esc, h, plural, toast, errorText, formatDuration, actionSheet, confirmSheet, promptSheet, openSheet } from "../ui.js?v=85";
 
 // Pochette générée : un aplat dont la teinte dépend du nom, les initiales
 // en grand. Pas de dégradé (identité sobre).
@@ -294,7 +294,6 @@ export async function mountReviewHome(root, ctx) {
         : "Pas encore de mix. Tu seras prévenu dès que l'ingé en dépose un.") + "</li>";
       return;
     }
-    const canEdit = (p) => p.created_by === s.participantId || s.isHost;
     list.innerHTML = projects.map((p, i) => {
       const f = latestOf(p);
       const st = statusOf(p, stats, engineer);
@@ -311,7 +310,9 @@ export async function mountReviewHome(root, ctx) {
             (st.text ? ' · <em class="track-note ' + st.cls + '">' + esc(st.text) + "</em>" : "") + "</span>" +
         "</a>" +
         '<span class="track-dur mono">' + (f && f.duration_sec ? formatDuration(Number(f.duration_sec)) : "") + "</span>" +
-        (canEdit(p) ? '<button class="btn btn-ghost btn-icon btn-sm" data-menu aria-label="Options">' + icon("more", 18) + "</button>" : "") +
+        '<button class="btn btn-ghost btn-icon btn-sm" data-menu aria-label="Options">' + icon("more", 18) + "</button>" +
+        // poignée : glisser pour changer l'ordre (souris ou doigt)
+        (projects.length > 1 ? '<button type="button" class="track-drag" data-drag aria-label="Déplacer ' + esc(p.title) + '" title="Glisser pour changer l\'ordre">' + icon("grip", 18) + "</button>" : "") +
       "</li>";
     }).join("");
   }
@@ -331,9 +332,22 @@ export async function mountReviewHome(root, ctx) {
     const menu = e.target.closest("[data-menu]");
     if (menu) {
       const p = projects.find((x) => x.id === menu.closest(".track").dataset.id);
+      const i = projects.indexOf(p);
       actionSheet(p.title, [
-        { label: "Toutes les versions", icon: "layers", run: () => ctx.navigate("#/p/" + p.id) },
+        // renommer : l'artiste aussi (c'est son album)
         {
+          label: "Renommer", icon: "edit",
+          run: async () => {
+            const t = await promptSheet("Titre du morceau", p.title, { max: 80, ok: "Renommer" });
+            if (!t || !t.trim() || t.trim() === p.title) return;
+            try { await updateProject(p.id, { title: t.trim() }); p.title = t.trim(); draw(); toast("Renommé", "ok"); }
+            catch (err) { toast(errorText(err), "err"); }
+          }
+        },
+        i > 0 ? { label: "Monter", icon: "arrowUp", run: () => moveTrack(i, i - 1) } : null,
+        i < projects.length - 1 ? { label: "Descendre", icon: "arrowDown", run: () => moveTrack(i, i + 1) } : null,
+        { label: "Toutes les versions", icon: "layers", run: () => ctx.navigate("#/p/" + p.id) },
+        !canEditProject(p) ? null : {
           label: "Supprimer ce morceau et ses versions", icon: "trash", danger: true,
           run: async () => {
             const ok = await confirmSheet("Toutes les versions, leurs fichiers et leurs retours seront effacés.",
@@ -347,8 +361,69 @@ export async function mountReviewHome(root, ctx) {
             } catch (err) { toast(errorText(err), "err"); }
           }
         }
-      ]);
+      ].filter(Boolean));
     }
+  });
+
+  const canEditProject = (p) => p.created_by === s.participantId || s.isHost;
+
+  // ---------------------------------------------------- ordre des morceaux
+  // Nouvel ordre enregistré morceau par morceau (seuls ceux qui bougent).
+  async function saveOrder() {
+    const changed = projects.map((p, k) => [p, k]).filter(([p, k]) => p.position !== k);
+    for (const [p, k] of changed) p.position = k;
+    draw();
+    try { await Promise.all(changed.map(([p, k]) => updateProject(p.id, { position: k }))); }
+    catch (err) { toast(errorText(err), "err"); load(); }
+  }
+  function moveTrack(from, to) {
+    if (to < 0 || to >= projects.length || from === to) return;
+    const [p] = projects.splice(from, 1);
+    projects.splice(to, 0, p);
+    saveOrder();
+  }
+
+  // Glisser-déposer à la poignée : la ligne suit le doigt ou la souris, les
+  // autres s'écartent, on lâche = nouvel ordre.
+  list.addEventListener("pointerdown", (e) => {
+    const handle = e.target.closest("[data-drag]");
+    if (!handle) return;
+    e.preventDefault();
+    const row = handle.closest(".track");
+    const rows = [...list.querySelectorAll(".track")];
+    const from = rows.indexOf(row);
+    const tops = rows.map((r) => r.getBoundingClientRect());
+    const startY = e.clientY;
+    let to = from;
+    row.classList.add("is-dragging");
+    try { handle.setPointerCapture(e.pointerId); } catch (err) { /* pointeur déjà relâché */ }
+    const move = (ev) => {
+      const dy = ev.clientY - startY;
+      row.style.transform = "translateY(" + dy + "px)";
+      const mid = tops[from].top + tops[from].height / 2 + dy;
+      to = from;
+      for (let k = 0; k < rows.length; k++) {
+        if (k < from && mid < tops[k].top + tops[k].height / 2) { to = k; break; }
+        if (k > from && mid > tops[k].top + tops[k].height / 2) to = k;
+      }
+      rows.forEach((r, k) => {
+        if (r === row) return;
+        const shift = from < to && k > from && k <= to ? -tops[from].height
+          : from > to && k >= to && k < from ? tops[from].height : 0;
+        r.style.transform = shift ? "translateY(" + shift + "px)" : "";
+      });
+    };
+    const end = () => {
+      handle.removeEventListener("pointermove", move);
+      handle.removeEventListener("pointerup", end);
+      handle.removeEventListener("pointercancel", end);
+      rows.forEach((r) => { r.style.transform = ""; });
+      row.classList.remove("is-dragging");
+      if (to !== from) moveTrack(from, to);
+    };
+    handle.addEventListener("pointermove", move);
+    handle.addEventListener("pointerup", end);
+    handle.addEventListener("pointercancel", end);
   });
 
   playAll.onclick = () => {
@@ -363,8 +438,12 @@ export async function mountReviewHome(root, ctx) {
     loading = true;
     try {
       const [ps, all] = await Promise.all([listProjects(s.id), listReviewComments(s.id)]);
-      // ordre d'album : le premier morceau déposé en premier
-      projects = ps.slice().sort((a, b) => (a.created_at < b.created_at ? -1 : 1));
+      // ordre d'album : celui choisi à la main, sinon l'ordre d'arrivée
+      projects = ps.slice().sort((a, b) => {
+        const pa = a.position == null ? Infinity : a.position;
+        const pb = b.position == null ? Infinity : b.position;
+        return pa !== pb ? pa - pb : (a.created_at < b.created_at ? -1 : 1);
+      });
       stats = new Map();
       for (const c of all) {
         const st = stats.get(c.file_id) || { open: 0, verify: 0, all: 0 };

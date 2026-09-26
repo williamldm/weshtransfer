@@ -5,12 +5,12 @@
 // va couper. TUS reprend là où ça s'est arrêté au lieu de tout recommencer.
 
 import { Upload } from "https://cdn.jsdelivr.net/npm/tus-js-client@4.3.1/+esm";
-import { sb, BUCKET } from "./db.js?v=83";
-import { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, PEAKS_MAX_BYTES } from "./config.js?v=83";
-import { extOf as fileExt, isBlocked, isAudio, mimeOf, FILE_MAX } from "./files.js?v=83";
-import { computePeaks } from "./peaks.js?v=83";
-import { insertFile, storageCall, storageConfig } from "./api.js?v=83";
-import { errorText } from "./ui.js?v=83";
+import { sb, BUCKET } from "./db.js?v=85";
+import { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, PEAKS_MAX_BYTES } from "./config.js?v=85";
+import { extOf as fileExt, isBlocked, isAudio, mimeOf, FILE_MAX } from "./files.js?v=85";
+import { computePeaks } from "./peaks.js?v=85";
+import { insertFile, storageCall, storageConfig } from "./api.js?v=85";
+import { errorText } from "./ui.js?v=85";
 
 // Hôte de stockage direct : recommandé par Supabase pour les gros fichiers.
 const ENDPOINT = SUPABASE_URL.replace(".supabase.co", ".storage.supabase.co") + "/storage/v1/upload/resumable";

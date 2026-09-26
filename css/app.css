@@ -1,5 +1,5 @@
-@import url("fonts.css?v=83");
-@import url("tokens.css?v=83");
+@import url("fonts.css?v=85");
+@import url("tokens.css?v=85");
 
 /* ================================================================= base */
 *, *::before, *::after { box-sizing: border-box; }
@@ -1460,3 +1460,9 @@ body.admin { min-height: 100vh; background: var(--bg); }
   .rv-quick-chips .chip { flex: none; }
   .rv-quick-hint { display: none; }
 }
+
+/* Verdict : changer l'ordre des morceaux */
+.track-drag { display: flex; flex: none; align-items: center; justify-content: center; width: 32px; height: 40px; padding: 0; border: none; background: none; color: var(--text-faint); cursor: grab; touch-action: none; }
+.track-drag:hover { color: var(--text); }
+.tracklist .track { transition: transform .18s ease, background .15s; }
+.tracklist .track.is-dragging { position: relative; z-index: 5; background: var(--surface-3); box-shadow: 0 14px 34px rgba(0, 0, 0, .45); transition: none; cursor: grabbing; }

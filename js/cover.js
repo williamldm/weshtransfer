@@ -2,7 +2,7 @@
 // l'accueil "album", la page d'un morceau et l'écran verrouillé.
 // L'image est recadrée au carré et compressée ici, avant l'envoi.
 
-import { getAlbum, saveCover, removeCover, saveAlbumTitle } from "./api.js?v=83";
+import { getAlbum, saveCover, removeCover, saveAlbumTitle } from "./api.js?v=85";
 
 const cache = new Map();      // spaceId -> Promise<{ image, title }>
 const listeners = new Set();
