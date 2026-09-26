@@ -183,7 +183,9 @@ export function transferMail(input) {
   const hidden = count - shown.length;
 
   const subject = `${input.sender} t'a envoyé ${LQ}${input.title}${RQ}`;
-  const preheader = `${countLabel}, ${formatBytes(total)}. Écoute avant de télécharger, jusqu'au ${until}.`;
+  const preheader = input.untilDownload
+    ? `${countLabel}, ${formatBytes(total)}. Attention : autodestruction au premier téléchargement complet.`
+    : `${countLabel}, ${formatBytes(total)}. Écoute avant de télécharger, jusqu'au ${until}.`;
 
   const rows = shown.map((f) => {
     const ext = (extOf(f.name) || "?").slice(0, 4).toUpperCase();
@@ -214,7 +216,9 @@ export function transferMail(input) {
       ` t'a envoyé ${count > 1 ? "des fichiers" : "un fichier"}. Écoute avant de télécharger, sans compte.`) +
     message +
     button(input.link, "Écouter et télécharger&nbsp;&rarr;") +
-    small(`Disponible jusqu'au ${esc(until)}. Après, on libère la place pour la prochaine fournée de charbon.`) +
+    small(input.untilDownload
+      ? "Autodestruction : chaque fichier est effacé dès qu'il a été téléchargé en entier. Un seul essai, garde-le bien."
+      : `Disponible jusqu'au ${esc(until)}. Après, on libère la place pour la prochaine fournée de charbon.`) +
     `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:30px 0 0;border-top:1px solid ${C.line};">${rows}${more}</table>` +
     (input.canReply ? small(`Réponds à cet email pour écrire directement à ${esc(input.sender)}.`, "22px 0 0") : "");
 
@@ -232,7 +236,9 @@ export function transferMail(input) {
     hidden > 0 ? `+ ${hidden} autre(s)` : "",
     "",
     `Écouter et télécharger : ${input.link}`,
-    `Disponible jusqu'au ${until}.`,
+    input.untilDownload
+      ? "Autodestruction : chaque fichier est effacé dès qu'il a été téléchargé en entier. Un seul essai, garde-le bien."
+      : `Disponible jusqu'au ${until}.`,
     input.canReply ? `\nRéponds à cet email pour écrire directement à ${input.sender}.` : "",
     "",
     textFooter(site),
@@ -488,7 +494,9 @@ export function sentConfirmMail(input) {
     list +
     (failed.length ? small(`${failed.length} adresse${failed.length > 1 ? "s n'ont" : " n'a"} pas reçu l'email : envoie-leur le lien toi-même.`) : "") +
     carbonBox(`Bilan carbone de cet envoi : l'équivalent de ${trips} aller${trips > 1 ? "s" : ""}-retour${trips > 1 ? "s" : ""} Paris-Dubaï en jet privé.<br><span style="color:${C.faint};">Estimation totalement fantaisiste. Culpabilité bien réelle.</span>`) +
-    small(`Disponible jusqu'au ${esc(until)}. Tu seras prévenu à la première ouverture et au premier téléchargement.`, "22px 0 0");
+    small((input.untilDownload
+      ? "Disponible jusqu'au premier téléchargement complet, puis détruit."
+      : `Disponible jusqu'au ${esc(until)}.`) + " Tu seras prévenu à la première ouverture et au premier téléchargement.", "22px 0 0");
 
   const footer = `<p style="margin:0;">Tu reçois cet email parce que tu viens d'envoyer des fichiers avec WeshTransfer depuis cette adresse.</p>`;
   const html = layout({ site, title: subject, preheader, body, footer });
@@ -498,7 +506,7 @@ export function sentConfirmMail(input) {
     failed.length ? `Pas reçu : ${failed.map((r) => r.email).join(", ")}. Envoie-leur le lien toi-même.` : "",
     "",
     `Le lien : ${input.link}`,
-    `Disponible jusqu'au ${until}.`,
+    input.untilDownload ? "Disponible jusqu'au premier téléchargement complet, puis détruit." : `Disponible jusqu'au ${until}.`,
     "",
     `Bilan carbone : ${trips} aller${trips > 1 ? "s" : ""}-retour${trips > 1 ? "s" : ""} Paris-Dubaï en jet privé. Estimation totalement fantaisiste.`,
     "",
@@ -564,6 +572,37 @@ export function downloadNoticeMail(input) {
   const text = tidy([
     who ? `${who} a téléchargé ton envoi "${input.title}".` : `Ton envoi "${input.title}" a été téléchargé.`,
     "C'est le premier téléchargement : pour les suivants, on ne te dérange pas.",
+    "",
+    `Voir mes envois : ${site}/app.html#/transfers`,
+    "",
+    textFooter(site),
+  ]);
+  return { subject, html, text };
+}
+
+// Fichier d'un envoi "jusqu'au premier téléchargement" : récupéré en
+// entier, donc détruit. input : { site, who, title, file }
+export function burnNoticeMail(input) {
+  const site = input.site;
+  const who = input.who || null;
+  const subject = `${LQ}${input.file}${RQ} récupéré, puis détruit`;
+  const preheader = "Premier téléchargement complet : le fichier n'existe plus chez nous.";
+
+  const body =
+    eyebrow("Autodestruction") +
+    heading("Récupéré. Et pulvérisé.") +
+    para((who ? `<strong style="color:${C.text};font-weight:600;">${esc(who)}</strong> a téléchargé` : "Quelqu'un a téléchargé") +
+      ` <strong style="color:${C.text};font-weight:600;">${LQ}${esc(input.file)}${RQ}</strong> en entier` +
+      ` (envoi ${LQ}${esc(input.title)}${RQ}). Comme prévu, on l'a effacé de nos serveurs : le lien ne le propose plus.`) +
+    carbonBox("Un fichier de moins sur nos serveurs : la centrale a baissé d'un degré. Ça ne durera pas.") +
+    button(`${site}/app.html#/transfers`, "Voir mes envois&nbsp;&rarr;");
+
+  const footer = `<p style="margin:0;">Tu reçois cet avis parce que tu as envoyé des fichiers avec WeshTransfer en donnant cette adresse.</p>`;
+
+  const html = layout({ site, title: subject, preheader, body, footer });
+  const text = tidy([
+    `${who ? who + " a téléchargé" : "Quelqu'un a téléchargé"} "${input.file}" en entier (envoi "${input.title}").`,
+    "Comme prévu, le fichier est effacé de nos serveurs.",
     "",
     `Voir mes envois : ${site}/app.html#/transfers`,
     "",

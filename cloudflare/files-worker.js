@@ -12,6 +12,12 @@
 // de la validité du lien).
 
 const UPSTREAM = "https://s3.eu-central-003.backblazeb2.com";
+// "Jusqu'au premier téléchargement" : quand un lien porte wt=<jeton signé>,
+// le Worker compte les octets servis ; si le fichier est parti en entier
+// (jusqu'au dernier octet), il le signale à transfer-open, qui détruit le
+// fichier. Le jeton est retiré avant B2 (il ne fait pas partie de la
+// signature) et vérifié côté Supabase (HMAC) : le Worker n'a aucun secret.
+const COMPLETE_URL = "https://mqjzzcnzbsbhololiiyw.supabase.co/functions/v1/transfer-open";
 const BUCKET = "/weshtransfer/";
 
 const cors = {
@@ -46,8 +52,35 @@ function remaining(q) {
   return Math.floor(start + exp - Date.now() / 1000);
 }
 
+// fin de fichier atteinte ? 200 complet, ou 206 qui se termine au dernier
+// octet (reprise d'un téléchargement interrompu)
+function reachesEnd(res) {
+  if (res.status === 200) return Number(res.headers.get("Content-Length")) || 0;
+  const m = /^bytes (\d+)-(\d+)\/(\d+)$/.exec(res.headers.get("Content-Range") || "");
+  if (res.status === 206 && m && Number(m[2]) === Number(m[3]) - 1) return Number(m[2]) - Number(m[1]) + 1;
+  return 0;
+}
+
+function watchCompletion(body, expected, wt, ctx) {
+  let seen = 0;
+  const counter = new TransformStream({
+    transform(chunk, controller) { seen += chunk.byteLength; controller.enqueue(chunk); },
+    flush() {
+      // flush n'arrive que si tout a été lu : un téléchargement annulé ne compte pas
+      if (seen === expected) {
+        ctx.waitUntil(fetch(COMPLETE_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "complete", wt }),
+        }).catch(() => {}));
+      }
+    },
+  });
+  return body.pipeThrough(counter);
+}
+
 export default {
-  async fetch(request) {
+  async fetch(request, env, ctx) {
     if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
     if (request.method !== "GET" && request.method !== "HEAD") return deny(405, "Méthode refusée");
 
@@ -59,17 +92,28 @@ export default {
     const left = remaining(url.searchParams);
     if (left <= 0) return deny(403, "Lien expiré");
 
+    const wt = url.searchParams.get("wt");
+    // retiré du texte brut : réécrire toute la requête changerait l'encodage
+    // des autres paramètres, et B2 refuserait la signature
+    const search = wt ? url.search.replace(/([?&])wt=[^&]*(&|$)/, (_, a, b) => (b ? a : "")) : url.search;
+    const burn = wt && /^[0-9a-f-]{36}\.[0-9a-f-]{36}\.[A-Za-z0-9_-]{20,64}$/.test(wt) && request.method === "GET";
+
     const headers = new Headers();
     const range = request.headers.get("Range");
     if (range) headers.set("Range", range);
 
-    const res = await fetch(UPSTREAM + url.pathname + url.search, {
-      method: request.method,
-      headers,
-      cf: { cacheEverything: true, cacheTtlByStatus: { "200-299": Math.min(left, 10800), "400-599": 0 } },
-    });
+    // téléchargement "jusqu'au premier" : jamais de cache (le fichier doit
+    // disparaître pour de bon après)
+    const res = await fetch(UPSTREAM + url.pathname + search, burn
+      ? { method: request.method, headers, cache: "no-store" }
+      : {
+        method: request.method,
+        headers,
+        cf: { cacheEverything: true, cacheTtlByStatus: { "200-299": Math.min(left, 10800), "400-599": 0 } },
+      });
 
-    const out = new Response(res.body, res);
+    const expected = burn && res.body ? reachesEnd(res) : 0;
+    const out = new Response(expected ? watchCompletion(res.body, expected, wt, ctx) : res.body, res);
     for (const [k, v] of Object.entries(cors)) out.headers.set(k, v);
     for (const [k, v] of Object.entries(hardening)) out.headers.set(k, v);
     // "sandbox" empêcherait le lecteur PDF du navigateur de s'ouvrir

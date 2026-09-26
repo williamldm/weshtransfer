@@ -2,12 +2,12 @@
 // Pas de supabase-js ici : un simple appel à l'Edge Function transfer-open,
 // qui vérifie le lien et renvoie des URLs signées. Page légère, rapide en 4G.
 
-import { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from "./config.js?v=90";
-import { Waveform, formatTime } from "./waveform.js?v=90";
-import { saveZip, canStreamToDisk, MEMORY_LIMIT } from "./zip.js?v=90";
-import { icon } from "./icons.js?v=90";
-import { esc, formatBytes, formatDuration, formatDate, plural, toast, triggerDownload, avatar, fileBadge, fileTile } from "./ui.js?v=90";
-import { categoryOf, canPreview } from "./files.js?v=90";
+import { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from "./config.js?v=91";
+import { Waveform, formatTime } from "./waveform.js?v=91";
+import { saveZip, canStreamToDisk, MEMORY_LIMIT } from "./zip.js?v=91";
+import { icon } from "./icons.js?v=91";
+import { esc, formatBytes, formatDuration, formatDate, plural, toast, triggerDownload, avatar, fileBadge, fileTile } from "./ui.js?v=91";
+import { categoryOf, canPreview } from "./files.js?v=91";
 
 const root = document.getElementById("tp");
 // le jeton : lien court /t/<jeton>, ou ancien t.html?k=<jeton>
@@ -173,8 +173,13 @@ function render(d) {
       '<div class="tp-stats">' +
         "<span>" + icon("file", 14) + plural(d.files.length, "fichier", "fichiers") + "</span>" +
         "<span>" + icon("archive", 14) + formatBytes(total) + "</span>" +
-        "<span>" + icon("clock", 14) + "jusqu'au " + esc(formatDate(d.expires_at)) + "</span>" +
+        (d.until_download
+          ? "<span>" + icon("clock", 14) + "jusqu'au 1er téléchargement</span>"
+          : "<span>" + icon("clock", 14) + "jusqu'au " + esc(formatDate(d.expires_at)) + "</span>") +
       "</div>" +
+      (d.until_download
+        ? '<p class="tp-burn">' + icon("alert", 14) + " Autodestruction : chaque fichier est effacé de nos serveurs dès qu'il a été téléchargé en entier. Un seul essai, garde-le bien.</p>"
+        : "") +
       (d.files.length
         ? '<button class="btn btn-primary btn-xl btn-block" data-all>' + icon("download", 22) +
             "<span>" + (single ? "Télécharger" : "Tout télécharger") + "</span></button>"
@@ -312,7 +317,7 @@ async function onClick(e) {
     all.disabled = true;
     try {
       const saved = await saveZip(data.title + ".zip",
-        data.files.filter((f) => f.url).map((f) => ({ name: f.name, url: f.url, size: f.size })),
+        data.files.filter((f) => f.download_url || f.url).map((f) => ({ name: f.name, url: f.download_url || f.url, size: f.size })),
         (r) => { all.innerHTML = icon("download", 22) + "<span>Préparation du zip " + Math.round(r * 100) + " %</span>"; });
       if (saved) { registerDownload(); toast("Téléchargement terminé", "ok"); }
     } catch (err) {
@@ -339,6 +344,11 @@ async function load() {
   }
   const body = await res.json().catch(() => ({}));
 
+  if (res.status === 410 && body.error === "DEJA_RECUPERE") {
+    fail("Déjà récupéré", (body.title ? "\"" + body.title + "\"" + (body.sender ? " de " + body.sender : "") + " " : "Ce fichier ") +
+      "a été téléchargé en entier, puis détruit comme prévu. Demande à l'expéditeur de te le renvoyer.");
+    return;
+  }
   if (res.status === 410) {
     fail("Ce lien a expiré", (body.title ? "\"" + body.title + "\"" + (body.sender ? " de " + body.sender : "") + " n'est plus disponible. " : "") +
       "Demande à l'expéditeur de te le renvoyer.");

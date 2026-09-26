@@ -1,7 +1,7 @@
 // Accès aux données. Toutes les requêtes de l'appli passent par ici : les
 // vues ne connaissent ni PostgREST ni le Storage.
 
-import { sb, q, invoke, requireClient } from "./db.js?v=90";
+import { sb, q, invoke, requireClient } from "./db.js?v=91";
 
 // Toute requête passe par ici : sans config, message clair plutôt
 // qu'un "Cannot read properties of null".
@@ -268,7 +268,8 @@ export function createTransfer(params) {
     p_message: params.message || null,
     p_reply_to: params.replyTo || null,
     p_days: params.days,
-    p_notify: true
+    p_notify: true,
+    p_until_download: !!params.untilDownload
   }));
 }
 
@@ -391,7 +392,7 @@ export function emailEnabled() {
   return emailCheck;
 }
 
-const TRANSFER_COLS = `id, title, message, token, expires_at, created_at, download_count, sender_id, reply_to,
+const TRANSFER_COLS = `id, title, message, token, expires_at, until_download, created_at, download_count, sender_id, reply_to,
   sender:participants(pseudo),
   transfer_files(position, file:files(id, original_name, size_bytes, kind)),
   transfer_recipients(id, email, token, status, error, sent_at, first_opened_at, first_download_at)`;

@@ -24,6 +24,7 @@ type TransferRow = {
   message: string | null;
   reply_to: string | null;
   expires_at: string;
+  until_download: boolean;
   sender: { pseudo: string; user_id: string } | null;
   space: { name: string } | null;
 };
@@ -41,7 +42,7 @@ async function confirmToSender(db: any, cfg: MailConfig, transfer: TransferRow, 
   if (await mailsToday(db) > mailDayMax(cfg)) return;
   const mail = sentConfirmMail({
     site: cfg.site, title: transfer.title, link: transferLink(cfg.site, transfer.token),
-    files, recipients, expiresAt: transfer.expires_at,
+    files, recipients, expiresAt: transfer.expires_at, untilDownload: transfer.until_download,
   });
   await sendEmails(cfg, [{ to: transfer.reply_to, subject: mail.subject, html: mail.html, text: mail.text }], { kind: "confirmation" });
 }
@@ -64,7 +65,7 @@ Deno.serve(async (req) => {
 
   const { data: transfer, error } = await db
     .from("transfers")
-    .select("id, token, title, message, reply_to, expires_at, sender:participants(pseudo, user_id), space:spaces(name)")
+    .select("id, token, title, message, reply_to, expires_at, until_download, sender:participants(pseudo, user_id), space:spaces(name)")
     .eq("id", transferId)
     .maybeSingle<TransferRow>();
 
@@ -141,6 +142,7 @@ Deno.serve(async (req) => {
       files,
       link: transferLink(cfg.site, r.token),
       expiresAt: transfer.expires_at,
+      untilDownload: transfer.until_download,
       canReply: !!transfer.reply_to,
     });
     return {

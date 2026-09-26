@@ -3,6 +3,9 @@
 //
 // POST { k }                               -> contenu de l'envoi + URLs signees
 // POST { k, action: "download" }           -> comptabilise un telechargement
+// POST { action: "complete", wt }           -> (Worker Cloudflare) un fichier d'un
+//                                             envoi "jusqu'au telechargement" est
+//                                             parti en entier : il est detruit
 //
 // Deux sortes de token : celui d'un destinataire (lien personnel, permet
 // de savoir qui a telecharge) ou celui de l'envoi (lien partage).
@@ -14,8 +17,9 @@
 
 import { admin } from "../_shared/supabase.ts";
 import { json, preflight, readJson } from "../_shared/http.ts";
-import { downloadNoticeMail, isVerified, mailConfig, mailDayMax, mailsToday, openNoticeMail, sendEmails } from "../_shared/email.ts";
-import { b2Config, presignGet } from "../_shared/b2.ts";
+import { burnNoticeMail, downloadNoticeMail, isVerified, mailConfig, mailDayMax, mailsToday, openNoticeMail, sendEmails } from "../_shared/email.ts";
+import { b2Config, deletePrefix, presignGet } from "../_shared/b2.ts";
+import { makeDlToken, readDlToken } from "../_shared/dl-token.ts";
 
 const URL_TTL = 6 * 3600;
 
@@ -26,12 +30,13 @@ type Transfer = {
   reply_to: string | null;
   notify_sender: boolean;
   expires_at: string;
+  until_download: boolean;
   sender: { pseudo: string; user_id: string } | null;
   space: { name: string; purge_at: string | null } | null;
 };
 
 const TRANSFER_COLS =
-  "id, title, message, reply_to, notify_sender, expires_at, sender:participants(pseudo, user_id), space:spaces(name, purge_at)";
+  "id, title, message, reply_to, notify_sender, expires_at, until_download, sender:participants(pseudo, user_id), space:spaces(name, purge_at)";
 
 // Envoi en arriere-plan : la page s'affiche sans attendre le serveur mail.
 function later(task: Promise<unknown>) {
@@ -46,6 +51,7 @@ Deno.serve(async (req) => {
   if (early) return early;
 
   const body = await readJson(req);
+  if (body.action === "complete") return complete(String(body.wt ?? ""));
   const k = typeof body.k === "string" ? body.k : "";
   // jetons courts (12 caractères) ou anciens (32 hexadécimaux)
   if (!/^(?:[0-9a-f]{32}|[A-Za-z0-9]{12})$/.test(k)) return json({ error: "LIEN_INCONNU" }, 404);
@@ -68,8 +74,9 @@ Deno.serve(async (req) => {
 
   if (!transfer) return json({ error: "LIEN_INCONNU" }, 404);
 
+  // un envoi "jusqu'au telechargement" protege son espace de la purge
   const expired = new Date(transfer.expires_at) < new Date()
-    || (!!transfer.space?.purge_at && new Date(transfer.space.purge_at) < new Date());
+    || (!transfer.until_download && !!transfer.space?.purge_at && new Date(transfer.space.purge_at) < new Date());
 
   if (expired) {
     return json({
@@ -132,7 +139,7 @@ Deno.serve(async (req) => {
     .from("transfer_files")
     .select(`position, file:files(
       id, original_name, size_bytes, kind, duration_sec, peaks, label, version_no,
-      mime_type, storage_path, backend,
+      mime_type, storage_path, backend, burned_at,
       project:projects(title),
       uploader:participants(pseudo)
     )`)
@@ -144,13 +151,21 @@ Deno.serve(async (req) => {
   type FileRow = {
     id: string; original_name: string; size_bytes: number | null; kind: string;
     duration_sec: number | null; peaks: number[] | null; label: string | null;
-    version_no: number; mime_type: string | null; storage_path: string; backend: string;
+    version_no: number; mime_type: string | null; storage_path: string; backend: string; burned_at: string | null;
     project: { title: string } | null; uploader: { pseudo: string } | null;
   };
 
   const files = (items ?? [])
     .map((i) => (i as unknown as { file: FileRow | null }).file)
-    .filter((f): f is FileRow => !!f);
+    .filter((f): f is FileRow => !!f && !f.burned_at);
+
+  // tout a deja ete recupere (et detruit)
+  if (transfer.until_download && !files.length) {
+    return json({ error: "DEJA_RECUPERE", title: transfer.title, sender: transfer.sender?.pseudo ?? null }, 410);
+  }
+  // lien de telechargement d'un destinataire : jeton "complet" pour le
+  // Worker (seulement via le relais Cloudflare, seul a voir la fin)
+  const burnable = transfer.until_download && !isSender && !!Deno.env.get("FILES_BASE");
 
   // URLs signées selon l'endroit où vit chaque fichier (Storage ou B2)
   const urls = new Map<string, { url: string; download: string }>();
@@ -167,9 +182,12 @@ Deno.serve(async (req) => {
   const b2 = b2Config();
   if (b2) {
     await Promise.all(files.filter((f) => f.backend === "b2").map(async (f) => {
+      let download = await presignGet(b2, f.storage_path, URL_TTL, f.original_name);
+      const wt = burnable ? await makeDlToken(transfer.id, f.id) : null;
+      if (wt) download += `&wt=${encodeURIComponent(wt)}`;
       urls.set(f.id, {
         url: await presignGet(b2, f.storage_path, URL_TTL),
-        download: await presignGet(b2, f.storage_path, URL_TTL, f.original_name),
+        download,
       });
     }));
   }
@@ -180,6 +198,7 @@ Deno.serve(async (req) => {
     sender: transfer.sender?.pseudo ?? null,
     space: transfer.space?.name ?? null,
     expires_at: transfer.expires_at,
+    until_download: transfer.until_download,
     recipient: recipient?.email ?? null,
     files: files.map((f) => {
       const signed = urls.get(f.id);
@@ -201,3 +220,38 @@ Deno.serve(async (req) => {
     }),
   });
 });
+
+// ------------------------------------------ telechargement complet (Worker)
+// Le jeton signe designe un fichier d'un envoi : premier passage = le
+// fichier est marque detruit (la purge horaire l'efface du stockage) et
+// l'expediteur est prevenu. Les passages suivants ne font rien.
+async function complete(wt: string): Promise<Response> {
+  const ids = await readDlToken(wt);
+  if (!ids) return json({ error: "JETON_INVALIDE" }, 403);
+  const db = admin();
+  const { data: first, error } = await db.rpc("burn_transfer_file", { p_transfer: ids.transferId, p_file: ids.fileId });
+  if (error) return json({ error: "ERREUR_BASE", detail: error.message }, 500);
+  if (!first) return json({ ok: true, already: true });
+
+  const [{ data: t }, { data: f }] = await Promise.all([
+    db.from("transfers").select("title, reply_to, notify_sender, sender:participants(user_id)").eq("id", ids.transferId).maybeSingle(),
+    db.from("files").select("original_name, storage_path, backend").eq("id", ids.fileId).maybeSingle(),
+  ]);
+  // effacé tout de suite : les liens déjà signés ne mènent plus à rien (la
+  // purge horaire rattrape si ça échoue ici)
+  const b2 = b2Config();
+  if (f && f.backend === "b2" && b2) {
+    await later((async () => {
+      await deletePrefix(b2, f.storage_path);
+      await db.from("files").delete().eq("id", ids.fileId);
+    })());
+  }
+  const cfg = mailConfig();
+  const senderId = (t as any)?.sender?.user_id as string | undefined;
+  if (cfg && t?.notify_sender && t.reply_to && senderId && await isVerified(db, senderId, t.reply_to) &&
+      await mailsToday(db) < mailDayMax(cfg)) {
+    const mail = burnNoticeMail({ site: cfg.site, who: null, title: t.title, file: f?.original_name ?? "ton fichier" });
+    await later(sendEmails(cfg, [{ to: t.reply_to, subject: mail.subject, html: mail.html, text: mail.text }], { kind: "avis" }));
+  }
+  return json({ ok: true });
+}

@@ -6,29 +6,34 @@ import {
   getProject, getFilesByIds, createTransfer, sendTransfer, emailEnabled,
   getTransfer, transferUrl, createProject, signFiles, cachedUrl,
   knownVerified, listContacts, forgetContact, rememberContactsLocal, suggestContacts
-} from "../api.js?v=90";
-import { accountEmail } from "../session.js?v=90";
-import { ensureVerified } from "../verify.js?v=90";
-import { openUploadSheet } from "./upload-sheet.js?v=90";
-import { mountUploads } from "./uploads.js?v=90";
-import { onUploads, enqueue, checkFile, getJobs } from "../upload.js?v=90";
-import { categoryOf, canPreview, FILE_MAX } from "../files.js?v=90";
-import { takePending } from "../pending.js?v=90";
-import { icon } from "../icons.js?v=90";
+} from "../api.js?v=91";
+import { accountEmail } from "../session.js?v=91";
+import { ensureVerified } from "../verify.js?v=91";
+import { openUploadSheet } from "./upload-sheet.js?v=91";
+import { mountUploads } from "./uploads.js?v=91";
+import { onUploads, enqueue, checkFile, getJobs } from "../upload.js?v=91";
+import { categoryOf, canPreview, FILE_MAX } from "../files.js?v=91";
+import { takePending } from "../pending.js?v=91";
+import { icon } from "../icons.js?v=91";
 import {
   esc, h, formatBytes, formatDuration, plural, toast, errorText, openSheet, copyText, shareLink,
   canShare, formatDate, daysLeft, fileBadge, fileTile
-} from "../ui.js?v=90";
+} from "../ui.js?v=91";
 
 // Dans un espace "envoi", ce composeur EST l'accueil.
 export const title = (ctx) => (ctx && ctx.space.mode === "envoi" ? ctx.space.name : "Envoyer");
 
 const REPLY_KEY = "seminaire.replyTo";
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
-const DURATIONS = [1, 3, 7, 14];
+// 0 = "jusqu'au premier téléchargement" : pas de date limite, chaque
+// fichier est détruit dès qu'un destinataire l'a téléchargé en entier.
+// Choix par défaut dès qu'il y a une archive (sessions FL Studio zippées).
+const DURATIONS = [0, 1, 3, 7, 14];
+const dayLabel = (d) => (d === 0 ? "1er téléchargement" : plural(d, "jour", "jours"));
 
 // Ce que coûte chaque durée à la planète (selon nos calculs, faux).
 const DAY_JOKES = {
+  0: "Sans date limite : ton fichier dort au chaud jusqu'au premier téléchargement complet, puis on le pulvérise.",
   1: "24 h : la centrale tourne à peine, on a presque honte.",
   3: "3 jours : un plein de jet privé, sans le champagne.",
   7: "7 jours : une semaine de serveurs au charbon. Classique.",
@@ -57,6 +62,7 @@ export async function mount(root, ctx, params) {
     message: "",
     replyTo: remembered(),
     days: 7,
+    daysTouched: false, // choisi à la main : on ne le change plus tout seul
     sending: false,
     contacts: [],       // carnet de l'email d'expédition (vérifié)
     contactsOf: ""
@@ -139,7 +145,7 @@ export async function mount(root, ctx, params) {
           '<input class="input" name="title" maxlength="80" placeholder="Ex : Nuit blanche, mix du jour 2" value="' + esc(state.title) + '"></label>' +
         '<div class="field"><span class="label">Disponible pendant</span><div class="chips" data-days>' +
           DURATIONS.map((d) => '<button type="button" class="chip' + (d === state.days ? " is-on" : "") + '" data-d="' + d + '"' +
-            (d > maxDays ? " disabled" : "") + ">" + plural(d, "jour", "jours") + "</button>").join("") +
+            (d > maxDays ? " disabled" : "") + ">" + dayLabel(d) + "</button>").join("") +
         '</div><span class="hint sx-joke" data-day-joke></span></div>' +
       "</details>" +
 
@@ -178,7 +184,7 @@ export async function mount(root, ctx, params) {
   }
   const dayJoke = root.querySelector("[data-day-joke]");
   function drawMoreSum() {
-    moreSum.textContent = "· " + plural(state.days, "jour", "jours") + " de charbon";
+    moreSum.textContent = state.days === 0 ? "· jusqu'au 1er téléchargement" : "· " + plural(state.days, "jour", "jours") + " de charbon";
     dayJoke.textContent = DAY_JOKES[state.days] || "";
   }
 
@@ -199,7 +205,20 @@ export async function mount(root, ctx, params) {
 
   // Bordereau d'expédition : le récapitulatif de l'envoi, en direct, façon
   // ticket de fret. Le CO2 est une pure blague (la même que sur l'accueil).
+  // une archive dans l'envoi : "jusqu'au premier téléchargement" par défaut
+  function autoDays() {
+    if (state.daysTouched) return;
+    const names = state.files.map((f) => f.original_name)
+      .concat(getJobs().filter((j) => j.meta.tag === tag && j.state !== "error" && j.state !== "canceled").map((j) => j.name));
+    const want = names.some((n) => categoryOf(n) === "archive") ? 0 : (DURATIONS.filter((d) => d > 0 && d <= Math.min(7, maxDays)).pop() || 1);
+    if (want === state.days) return;
+    state.days = want;
+    for (const b of root.querySelectorAll("[data-d]")) b.classList.toggle("is-on", Number(b.dataset.d) === want);
+    if (moreSum) drawMoreSum();
+  }
+
   function drawWaybill() {
+    autoDays();
     if (!waybillEl) return;
     const n = state.files.length;
     const bytes = state.files.reduce((s, f) => s + (f.size_bytes || 0), 0);
@@ -210,7 +229,7 @@ export async function mount(root, ctx, params) {
       ["Colis", n ? plural(n, "fichier", "fichiers") + " · " + formatBytes(bytes) : "vide pour l'instant"],
       ["Destinataires", to ? plural(to, "adresse", "adresses") : "un lien à partager"],
       ["Transport", "jet privé, vol direct"],
-      ["Conservation", plural(state.days, "jour", "jours") + ", jusqu'au " + formatDate(until)],
+      ["Conservation", state.days === 0 ? "jusqu'au 1er téléchargement complet, puis destruction" : plural(state.days, "jour", "jours") + ", jusqu'au " + formatDate(until)],
       ["CO₂ estimé", n ? kg.toFixed(1).replace(".", ",") + " kg*" : "en attente du colis"]
     ];
     waybillEl.innerHTML =
@@ -254,7 +273,7 @@ export async function mount(root, ctx, params) {
 
   // Si la durée par défaut dépasse la vie de l'espace, on prend la plus longue possible.
   if (state.days > maxDays) {
-    const best = DURATIONS.filter((d) => d <= maxDays).pop() || 1;
+    const best = DURATIONS.filter((d) => d > 0 && d <= maxDays).pop() || 1;
     state.days = best;
     for (const b of root.querySelectorAll("[data-d]")) b.classList.toggle("is-on", Number(b.dataset.d) === best);
   }
@@ -512,6 +531,7 @@ export async function mount(root, ctx, params) {
     const b = e.target.closest("[data-d]");
     if (!b || b.disabled) return;
     state.days = Number(b.dataset.d);
+    state.daysTouched = true;
     drawWaybill();
     drawMoreSum();
     for (const x of root.querySelectorAll("[data-d]")) x.classList.toggle("is-on", x === b);
@@ -570,7 +590,8 @@ export async function mount(root, ctx, params) {
         emails: state.emails,
         message: messageInput.value,
         replyTo,
-        days: state.days
+        days: state.days || 7,
+        untilDownload: state.days === 0
       });
 
       // emails aux destinataires, et confirmation (avec le lien) à
@@ -629,9 +650,9 @@ export async function showDone(root, ctx, created, info) {
     ? "Ton lien est prêt"
     : failed && !sent ? "Lien créé, emails non partis" : "Envoyé !";
   const sub = !recipients.length || !info.emailOn
-    ? "Partage-le où tu veux. Il expire le " + formatDate(created.expires_at) + "."
+    ? "Partage-le où tu veux. " + (created.until_download ? "Il s'autodétruit au premier téléchargement complet." : "Il expire le " + formatDate(created.expires_at) + ".")
     : plural(sent, "email parti", "emails partis") + (failed ? ", " + failed + " en échec" : "") +
-      ". Disponible jusqu'au " + formatDate(created.expires_at) + ".";
+      (created.until_download ? ". Autodestruction au premier téléchargement complet." : ". Disponible jusqu'au " + formatDate(created.expires_at) + ".");
 
   root.innerHTML =
     '<div class="done">' +
@@ -657,7 +678,7 @@ export async function showDone(root, ctx, created, info) {
               : r.status === "failed" ? '<span class="st st-bad">échec</span>' : '<span class="st">en attente</span>';
             const mailto = "mailto:" + encodeURIComponent(r.email) +
               "?subject=" + encodeURIComponent(ctx.space.pseudo + " t'a envoyé : " + info.title) +
-              "&body=" + encodeURIComponent("Écoute et télécharge ici :\n" + personal + "\n\nDisponible jusqu'au " + formatDate(created.expires_at) + ".");
+              "&body=" + encodeURIComponent("Écoute et télécharge ici :\n" + personal + (created.until_download ? "\n\nAttention : le fichier s'autodétruit au premier téléchargement complet." : "\n\nDisponible jusqu'au " + formatDate(created.expires_at) + "."));
             return "<li><span class=\"r-mail\">" + esc(r.email) + "</span>" + status +
               (!info.emailOn || r.status === "failed"
                 ? '<a class="btn btn-sm" href="' + esc(mailto) + '">' + icon("mail", 16) + " Écrire</a>"

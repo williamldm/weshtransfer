@@ -1,5 +1,5 @@
-@import url("fonts.css?v=90");
-@import url("tokens.css?v=90");
+@import url("fonts.css?v=91");
+@import url("tokens.css?v=91");
 
 /* ================================================================= base */
 *, *::before, *::after { box-sizing: border-box; }
@@ -814,6 +814,8 @@ body.public .scene { position: fixed; inset: 0; z-index: -1; }
 .tp-from strong { color: var(--text); }
 .tp-space { color: var(--text-faint); font-family: var(--mono); font-size: 11px; text-transform: uppercase; letter-spacing: .1em; }
 .tp-hero h1 { margin-bottom: var(--sp-4); font-size: clamp(26px, 6.5vw, 38px); line-height: 1.1; overflow-wrap: anywhere; }
+.tp-burn { display: flex; gap: var(--sp-2); align-items: flex-start; margin: 0 0 var(--sp-4); padding: var(--sp-3); border: 1px solid var(--line-strong); border-radius: var(--r-md); color: var(--text-dim); font-size: var(--fs-sm); }
+.tp-burn svg { flex: none; margin-top: 2px; color: var(--accent-bright); }
 .tp-msg { margin: 0 0 var(--sp-4); padding: var(--sp-3) var(--sp-4); border-radius: var(--r-md); background: var(--surface); white-space: pre-wrap; }
 .tp-stats { display: flex; flex-wrap: wrap; gap: var(--sp-2) var(--sp-4); margin-bottom: var(--sp-5); color: var(--text-faint); font-family: var(--mono); font-size: var(--fs-xs); }
 .tp-stats span { display: inline-flex; align-items: center; gap: 6px; }

@@ -1,5 +1,8 @@
-// Purge des espaces dont la date de suppression est passée, et des sons
-// de séminaire (jam) arrivés à 5 jours. Appelée toutes les heures par
+// Purge des espaces dont la date de suppression est passée, des sons
+// de séminaire (jam) arrivés à 5 jours, et des fichiers d'envois "jusqu'au
+// premier téléchargement" déjà récupérés en entier (files.burned_at).
+// Un espace qui abrite encore un tel fichier en attente n'est pas purgé :
+// ses autres fichiers sont effacés, lui est repoussé de 7 jours. Appelée toutes les heures par
 // pg_cron (via pg_net), qui n'envoie pas de JWT : déployée avec
 // --no-verify-jwt, protégée par le secret CRON_SECRET.
 
@@ -27,8 +30,51 @@ Deno.serve(async (req) => {
     .lt("purge_at", new Date().toISOString());
   if (error) return json({ error: error.message }, 500);
 
-  const report: { space: string; files: number; ok: boolean; error?: string }[] = [];
+  const b2 = b2Config();
+  // fichier effacé du stockage puis sa fiche (transfer_files suit en cascade)
+  const dropFile = async (f: { id: string; storage_path: string; backend: string }) => {
+    if (f.backend === "b2") {
+      if (!b2) throw new Error("B2 non configuré");
+      await deletePrefix(b2, f.storage_path);
+    } else {
+      const { error: rmErr } = await db.storage.from("seminar").remove([f.storage_path]);
+      if (rmErr) throw new Error(rmErr.message);
+    }
+    const { error: delErr } = await db.from("files").delete().eq("id", f.id);
+    if (delErr) throw new Error(delErr.message);
+  };
+
+  // espaces qui gardent un fichier encore attendu
+  const due = (spaces ?? []).map((s) => s.id);
+  const { data: held } = due.length
+    ? await db.rpc("spaces_holding_downloads", { p_spaces: due })
+    : { data: [] };
+  const keep = new Map<string, Set<string>>();
+  for (const h of (held ?? []) as { space_id: string; file_id: string }[]) {
+    if (!keep.has(h.space_id)) keep.set(h.space_id, new Set());
+    keep.get(h.space_id)!.add(h.file_id);
+  }
+
+  const report: { space: string; files: number; ok: boolean; error?: string; kept?: number }[] = [];
   for (const space of spaces ?? []) {
+    const kept = keep.get(space.id);
+    if (kept) {
+      try {
+        const { data: others } = await db.from("files").select("id, storage_path, backend").eq("space_id", space.id);
+        let n = 0;
+        for (const f of (others ?? []) as { id: string; storage_path: string; backend: string }[]) {
+          if (kept.has(f.id)) continue;
+          await dropFile(f);
+          n++;
+        }
+        const { error: pinErr } = await db.rpc("pin_space_for_downloads", { p_space: space.id });
+        if (pinErr) throw new Error(pinErr.message);
+        report.push({ space: space.name, files: n, ok: true, kept: kept.size });
+      } catch (err) {
+        report.push({ space: space.name, files: 0, ok: false, error: (err as Error).message });
+      }
+      continue;
+    }
     try {
       report.push({ space: space.name, files: await wipeSpace(db, space.id), ok: true });
     } catch (err) {
@@ -36,9 +82,16 @@ Deno.serve(async (req) => {
       report.push({ space: space.name, files: 0, ok: false, error: (err as Error).message });
     }
   }
+  // Envois "jusqu'au premier téléchargement" : fichiers déjà récupérés
+  const { data: burned } = await db.from("files").select("id, storage_path, backend")
+    .not("burned_at", "is", null).limit(500);
+  let burnedFiles = 0;
+  for (const f of (burned ?? []) as { id: string; storage_path: string; backend: string }[]) {
+    try { await dropFile(f); burnedFiles++; } catch { /* retenté à l'heure suivante */ }
+  }
+
   // Séminaire : chaque son part 5 jours après son ajout. Le fichier
   // d'abord, la ligne ensuite (le trigger retire le morceau devenu vide).
-  const b2 = b2Config();
   const { data: expired, error: jamErr } = await db.rpc("jam_expired_files", { p_limit: 500 });
   let jamFiles = 0;
   const jamErrors: string[] = [];
@@ -80,5 +133,6 @@ Deno.serve(async (req) => {
     purged: report.filter((r) => r.ok).length, report,
     jam: { files: jamFiles, errors: jamErr ? [jamErr.message] : jamErrors },
     versions: trashed,
+    downloaded: burnedFiles,
   });
 });

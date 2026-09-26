@@ -1,12 +1,12 @@
 // Historique des envois de l'espace : qui a reçu quoi, qui a ouvert,
 // qui a téléchargé. Mis à jour en direct.
 
-import { listTransfers, revokeTransfer, deleteTransfer, sendTransfer, transferUrl, emailEnabled, deleteFile, listTransferRefs } from "../api.js?v=90";
-import { icon } from "../icons.js?v=90";
+import { listTransfers, revokeTransfer, deleteTransfer, sendTransfer, transferUrl, emailEnabled, deleteFile, listTransferRefs } from "../api.js?v=91";
+import { icon } from "../icons.js?v=91";
 import {
   esc, formatBytes, plural, timeAgo, formatDate, daysLeft, toast, errorText, copyText, shareLink,
   canShare, confirmSheet, actionSheet
-} from "../ui.js?v=90";
+} from "../ui.js?v=91";
 
 export const title = () => "Envois";
 
@@ -29,7 +29,9 @@ export function renderTransfers(list, me, isHost, emailOn) {
     const files = (t.transfer_files || []).map((x) => x.file).filter(Boolean);
     const size = files.reduce((s, f) => s + (f.size_bytes || 0), 0);
     const left = daysLeft(t.expires_at);
-    const expired = left <= 0;
+    // "jusqu'au 1er téléchargement" : fini quand tout a été récupéré (et détruit)
+    const taken = !!t.until_download && !files.length;
+    const expired = left <= 0 || taken;
     const mine = t.sender_id === me;
     const recips = t.transfer_recipients || [];
     const failed = recips.filter((r) => r.status === "failed").length;
@@ -37,8 +39,9 @@ export function renderTransfers(list, me, isHost, emailOn) {
     return '<article class="transfer' + (expired ? " is-expired" : "") + '" data-id="' + t.id + '">' +
       '<div class="tr-head">' +
         '<h3>' + esc(t.title) + "</h3>" +
-        '<span class="pill' + (expired ? " is-off" : left <= 1 ? " is-warn" : "") + '">' +
-          (expired ? "expiré" : "encore " + plural(left, "jour", "jours")) + "</span>" +
+        '<span class="pill' + (expired ? " is-off" : !t.until_download && left <= 1 ? " is-warn" : "") + '">' +
+          (expired ? (taken ? "récupéré" : "expiré")
+            : t.until_download ? "jusqu'au 1er téléchargement" : "encore " + plural(left, "jour", "jours")) + "</span>" +
       "</div>" +
       '<div class="tr-meta">' + esc((t.sender ? t.sender.pseudo : "?") + " · " + timeAgo(t.created_at) + " · " +
         plural(files.length, "fichier", "fichiers") + " · " + formatBytes(size)) +
