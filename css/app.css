@@ -1,5 +1,5 @@
-@import url("fonts.css?v=95");
-@import url("tokens.css?v=95");
+@import url("fonts.css?v=96");
+@import url("tokens.css?v=96");
 
 /* ================================================================= base */
 *, *::before, *::after { box-sizing: border-box; }
@@ -1215,6 +1215,7 @@ body.admin { min-height: 100vh; background: var(--bg); }
 .adm-login form { display: grid; gap: var(--sp-3); margin-top: var(--sp-4); }
 .adm-head { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-3); }
 .adm-error, .adm-empty { padding: var(--sp-5) 0; color: var(--text-dim); }
+.adm-mailtest { margin-top: var(--sp-3); padding: var(--sp-3); border: 1px solid var(--line); border-radius: var(--r-md); }
 .adm-mail .adm-stats { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
 .adm-events { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; font-size: 13px; color: var(--text-dim); }
 .adm-stats { display: grid; grid-template-columns: repeat(6, 1fr); gap: var(--sp-3); margin: var(--sp-4) 0 var(--sp-5); }

@@ -9,6 +9,8 @@
 // POST { action: "delete-transfer", transfer_id, with_files }
 // POST { action: "delete-orphans" }          -> fichiers B2 sans fiche, envois abandonnés
 // POST { action: "delete-space", space_id }  -> espace entier, fichiers compris
+// POST { action: "mail-test-start" }         -> lance un test mail-tester.com (voie o2switch)
+// POST { action: "mail-test-check", id }     -> lit son score une fois traité
 //
 // Réservé aux adresses du secret ADMIN_EMAILS (séparées par des virgules,
 // jamais écrites dans le dépôt, qui est public) : l'appelant doit être
@@ -18,6 +20,8 @@
 import { admin } from "../_shared/supabase.ts";
 import { json, preflight, readJson } from "../_shared/http.ts";
 import { abortMultipart, b2Config, deletePrefix, listObjects, listUploads, presignGet } from "../_shared/b2.ts";
+import { smtpConfig, smtpSendAll } from "../_shared/smtp.ts";
+import { verifyCodeMail } from "../_shared/email.ts";
 import { wipeSpace } from "../_shared/wipe.ts";
 
 type Row = Record<string, unknown>;
@@ -241,6 +245,52 @@ Deno.serve(async (req) => {
     } catch (err) {
       return json({ error: "ERREUR_B2", detail: (err as Error).message.slice(0, 300) }, 500);
     }
+  }
+
+  // ------------------------- délivrabilité réelle : mail-tester.com
+  // Score de spam sur le CONTENU (pas seulement SPF/DKIM/DMARC comme la
+  // sonde port25 de mail-health) : mots qui alertent les filtres, liens,
+  // ratio HTML/texte, listes noires vues par leur propre serveur. Aucun
+  // compte requis : l'adresse de test est aléatoire, jetable, jamais
+  // réutilisée. Toujours envoyé par o2switch (jamais Brevo) : c'est cette
+  // voie qu'on veut évaluer.
+  if (body.action === "mail-test-start") {
+    const smtp = smtpConfig();
+    if (!smtp) return json({ error: "SMTP_NON_CONFIGURE" }, 503);
+    const rid = crypto.randomUUID().replace(/-/g, "").slice(0, 9);
+    const id = `test-${rid}`;
+    const to = `${id}@srv1.mail-tester.com`;
+    const mail = verifyCodeMail({ site: Deno.env.get("SITE_URL") ?? "https://weshtransfer.fr", email: to, code: "482913", minutes: 15, purpose: "pour envoyer tes fichiers" });
+    try {
+      const [r] = await smtpSendAll(smtp, [{ from: { name: "WeshTransfer", email: smtp.user }, to, subject: mail.subject, html: mail.html, text: mail.text }]);
+      if (!r.ok) return json({ error: "ENVOI_ECHEC", detail: r.error }, 502);
+    } catch (err) {
+      return json({ error: "ENVOI_ECHEC", detail: (err as Error).message.slice(0, 300) }, 502);
+    }
+    await db.from("mail_events").insert({ kind: "diagnostic", detail: `test mail-tester.com lancé : ${id}` });
+    return json({ id, wait_seconds: 30 });
+  }
+
+  if (body.action === "mail-test-check") {
+    const id = String(body.id ?? "");
+    if (!/^test-[a-z0-9]{6,12}$/.test(id)) return json({ error: "ID_INVALIDE" }, 400);
+    let html: string;
+    try {
+      const res = await fetch(`https://www.mail-tester.com/${id}`, { headers: { "User-Agent": "Mozilla/5.0" } });
+      html = await res.text();
+    } catch (err) {
+      return json({ error: "MAILTESTER_INJOIGNABLE", detail: (err as Error).message.slice(0, 200) }, 502);
+    }
+    const score = html.match(/class="score"[^>]*>\s*<[^>]+>\s*(\d+(?:\.\d+)?)/i)?.[1]
+      ?? html.match(/(\d+(?:\.\d+)?)\s*\/\s*10/)?.[1] ?? null;
+    // pas encore analysé, ou mail-tester a montré autre chose (limite de
+    // requêtes anonymes en cas d'essais trop rapprochés) : on redemandera
+    if (score === null) return json({ ready: false });
+    // titres des tests en échec ou en avertissement (SPF, DKIM, listes noires, contenu...)
+    const issues = [...html.matchAll(/class="[^"]*(?:failure|warning)[^"]*"[^>]*>\s*<[^>]+>\s*([^<]{3,140})</gi)]
+      .map((m) => m[1].trim()).filter((t, i, a) => t && a.indexOf(t) === i).slice(0, 15);
+    await db.from("mail_events").insert({ kind: "diagnostic", detail: `mail-tester ${id} : ${score ?? "?"}/10${issues.length ? " — " + issues.slice(0, 3).join(", ") : ""}` });
+    return json({ ready: true, score: score ? Number(score) : null, issues, report_url: `https://www.mail-tester.com/${id}` });
   }
 
   if (body.action !== "overview") return json({ error: "ACTION_INCONNUE" }, 400);

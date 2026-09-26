@@ -108,7 +108,8 @@ async function handleBounces(db: any, mails: Mail[], domain: string) {
     const diag = (text.match(/^Diagnostic-Code:\s*([^\n]*(?:\n[ \t][^\n]*)*)/im)?.[1] ??
       text.match(/^(?:.*(?:550|554|552|553|421|451|452)[ -].*)$/m)?.[0] ?? "").replace(/\s+/g, " ").trim().slice(0, 400);
     if (status.startsWith("2")) continue;   // accusé de réception, pas un rebond
-    const cited = [...new Set(text.match(new RegExp(`[0-9a-f-]{36}@${domain.replace(/\./g, "\\.")}`, "gi")) ?? [])].slice(0, 5);
+    // format du Message-ID : voir smtp.ts (horodatage.hex@domaine)
+    const cited = [...new Set(text.match(new RegExp(`[0-9a-z]{6,12}\\.[0-9a-f]{16}@${domain.replace(/\./g, "\\.")}`, "gi")) ?? [])].slice(0, 5);
     const { data: known } = cited.length
       ? await db.from("mail_log").select("id, message_id").eq("via", "smtp").in("message_id", cited)
         .gte("created_at", new Date(Date.now() - 14 * 86400e3).toISOString())

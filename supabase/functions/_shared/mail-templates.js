@@ -135,7 +135,7 @@ a{color:${C.bright}}
 </style>
 </head>
 <body style="margin:0;padding:0;background:${C.bg};" bgcolor="${C.bg}">
-<div style="display:none;max-height:0;max-width:0;overflow:hidden;mso-hide:all;font-size:1px;line-height:1px;color:${C.bg};opacity:0;">${esc(o.preheader)}${filler}</div>
+<div style="max-height:0;max-width:0;overflow:hidden;mso-hide:all;font-size:1px;line-height:1px;color:${C.bg};">${esc(o.preheader)}${filler}</div>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${C.bg}" style="background:${C.bg};">
 <tr><td align="center" style="padding:28px 12px 44px;">
 <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:600px;">

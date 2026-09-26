@@ -59,7 +59,14 @@ function address(email: string): string {
 
 function buildMessage(m: SmtpMessage): { id: string; data: string } {
   const domain = m.from.email.split("@")[1];
-  const id = `${crypto.randomUUID()}@${domain}`;
+  // Un UUID nu comme Message-ID est un signal que certains filtres associent
+  // aux générateurs automatiques (règle SpamAssassin FONT_INVIS_MSGID,
+  // repérée avec mail-tester.com le 26/09/2026, combinée au texte caché du
+  // prévisualisateur). Un identifiant horodaté, plus proche de ce qu'un
+  // vrai serveur de mail produit, corrige ça sans rien changer d'autre.
+  const stamp = Date.now().toString(36);
+  const rand = crypto.randomUUID().replace(/-/g, "").slice(0, 16);
+  const id = `${stamp}.${rand}@${domain}`;
   const boundary = `wt_${crypto.randomUUID().replace(/-/g, "")}`;
   const from = m.from.name ? `${encodeHeader(m.from.name)} ${address(m.from.email)}` : address(m.from.email);
   const headers = [
@@ -71,6 +78,9 @@ function buildMessage(m: SmtpMessage): { id: string; data: string } {
     `Message-ID: <${id}>`,
     "MIME-Version: 1.0",
     "Auto-Submitted: auto-generated",
+    // simple point de contact humain, pas un vrai flux en un clic : on n'a
+    // pas de liste de diffusion, juste une adresse qui répond
+    `List-Unsubscribe: <mailto:${m.from.email}>`,
     `Content-Type: multipart/alternative; boundary="${boundary}"`,
   ];
   const part = (type: string, body: string) =>

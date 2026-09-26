@@ -3,12 +3,12 @@
 // c'est la fonction "admin" qui vérifie que le compte connecté fait partie
 // des administrateurs, et qui renvoie les données.
 
-import { invoke } from "./db.js?v=95";
-import { accountEmail, login, logout } from "./session.js?v=95";
-import { ensureVerified } from "./verify.js?v=95";
-import { icon } from "./icons.js?v=95";
-import { esc, toast, errorText, formatBytes, formatDate, timeAgo, plural, fileBadge, confirmSheet } from "./ui.js?v=95";
-import { isAudio, categoryOf } from "./files.js?v=95";
+import { invoke } from "./db.js?v=96";
+import { accountEmail, login, logout } from "./session.js?v=96";
+import { ensureVerified } from "./verify.js?v=96";
+import { icon } from "./icons.js?v=96";
+import { esc, toast, errorText, formatBytes, formatDate, timeAgo, plural, fileBadge, confirmSheet } from "./ui.js?v=96";
+import { isAudio, categoryOf } from "./files.js?v=96";
 
 const root = document.getElementById("adm");
 const who = document.getElementById("who");
@@ -325,7 +325,8 @@ async function loadMail() {
   drawList();
 }
 
-const EVENT = { pause: "Coupure", resume: "Reprise", blacklist: "Liste noire", bounce: "Rebond", engagement: "Ouvertures", probe: "Sonde", error: "Erreur" };
+const EVENT = { pause: "Coupure", resume: "Reprise", blacklist: "Liste noire", bounce: "Rebond", engagement: "Ouvertures", probe: "Sonde", error: "Erreur", diagnostic: "Test" };
+let mailTest = null;   // { id, state: "loading" | "ready" | "timeout" | "err", score, issues, report_url }
 
 function drawMail() {
   if (!mail || mail.loading) return '<div class="skeleton tall"></div>';
@@ -352,14 +353,62 @@ function drawMail() {
     "<p>" + (paused
       ? '<button class="btn btn-sm" data-mail-resume>Rétablir o2switch</button>'
       : '<button class="btn btn-sm" data-mail-pause' + (mail.smtp_configured ? "" : " disabled") + ">Tout envoyer par Brevo</button>") +
-    ' <button class="btn btn-sm btn-ghost" data-mail-reload>' + icon("retry", 16) + "<span>Actualiser</span></button></p>" +
+    ' <button class="btn btn-sm btn-ghost" data-mail-reload>' + icon("retry", 16) + "<span>Actualiser</span></button>" +
+    ' <button class="btn btn-sm btn-ghost" data-mail-test' + (mailTest && mailTest.state === "loading" ? " disabled" : "") + (mail.smtp_configured ? "" : " disabled") + ">" +
+      (mailTest && mailTest.state === "loading" ? "Test en cours (mail-tester.com)…" : "Tester la délivrabilité (mail-tester.com)") + "</button></p>" +
+    drawMailTest() +
     (mail.events.length ? "<h3>Historique</h3><ul class=\"adm-events\">" + mail.events.map((e) =>
       "<li>" + when(e.created_at) + " · <b>" + esc(EVENT[e.kind] || e.kind) + "</b> " + esc(e.detail || "") + "</li>").join("") + "</ul>" : "") +
   "</div>";
 }
 
+// Score réel de délivrabilité (mail-tester.com) : contenu, listes noires,
+// SPF/DKIM/DMARC, vus par un vrai serveur destinataire. Adresse jetable à
+// chaque clic, aucun compte requis. Toujours envoyé par o2switch : c'est
+// cette voie qu'on veut évaluer, jamais Brevo.
+function drawMailTest() {
+  if (!mailTest) return "";
+  if (mailTest.state === "loading") return '<p class="muted small">Email de test envoyé, analyse dans ~30 s...</p>';
+  if (mailTest.state === "err") return '<p class="adm-error small">' + esc(mailTest.error) + "</p>";
+  if (mailTest.state === "timeout") return '<p class="muted small">Pas encore analysé après 2 minutes. <a href="' + esc(mailTest.report_url) + '" target="_blank" rel="noopener">Voir la page</a> (elle se termine toute seule).</p>';
+  const score = mailTest.score;
+  const cls = score == null ? "" : score >= 8 ? "st-ok" : score >= 5 ? "" : "st-bad";
+  return '<div class="adm-mailtest">' +
+    '<p><b class="' + cls + '">Score : ' + (score != null ? score + " / 10" : "?") + "</b> — " +
+      '<a href="' + esc(mailTest.report_url) + '" target="_blank" rel="noopener">rapport complet&nbsp;&rarr;</a></p>' +
+    (mailTest.issues.length ? "<ul class=\"adm-events\">" + mailTest.issues.map((t) => "<li>" + esc(t) + "</li>").join("") + "</ul>"
+      : '<p class="muted small">Rien à améliorer trouvé.</p>') +
+  "</div>";
+}
+
+async function pollMailTest(id, triesLeft) {
+  let r;
+  try { r = await invoke("admin", { action: "mail-test-check", id }); }
+  catch (err) { mailTest = { id, state: "err", error: errorText(err) }; drawList(); return; }
+  if (r.ready) {
+    mailTest = { id, state: "ready", score: r.score, issues: r.issues, report_url: r.report_url };
+    drawList();
+    return;
+  }
+  if (triesLeft <= 0) {
+    mailTest = { id, state: "timeout", report_url: "https://www.mail-tester.com/" + id };
+    drawList();
+    return;
+  }
+  setTimeout(() => pollMailTest(id, triesLeft - 1), 8000);
+}
+
 root.addEventListener("click", async (e) => {
   if (e.target.closest("[data-mail-reload]")) { loadMail(); return; }
+  if (e.target.closest("[data-mail-test]")) {
+    try {
+      const r = await invoke("admin", { action: "mail-test-start" });
+      mailTest = { id: r.id, state: "loading" };
+      drawList();
+      setTimeout(() => pollMailTest(r.id, 12), r.wait_seconds * 1000);
+    } catch (err) { toast(errorText(err), "err"); }
+    return;
+  }
   const pause = e.target.closest("[data-mail-pause]");
   if (!pause && !e.target.closest("[data-mail-resume]")) return;
   if (pause && !await confirmSheet("Tous les emails partiront par Brevo (quota de 300 par jour) jusqu'à ce que tu rétablisses o2switch.",
