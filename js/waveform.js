@@ -241,6 +241,15 @@ export class Waveform {
     if (this._pinned()) return this._drawPins(w, h);
     for (const m of this.markers) {
       const x = m.ratio * w;
+      // couleur fournie (retours de mix) : trait fin de la couleur de l'état,
+      // les auteurs sont affichés à part, sous la forme d'onde
+      if (m.color) {
+        ctx.fillStyle = m.color;
+        ctx.globalAlpha = m.dim ? 0.3 : m.active ? 1 : 0.75;
+        ctx.fillRect(x - (m.active ? 1 : 0.5), 0, m.active ? 2 : 1, h);
+        ctx.globalAlpha = 1;
+        continue;
+      }
       ctx.fillStyle = opts.markerColor;
       ctx.globalAlpha = 0.55;
       ctx.fillRect(x - 0.5, 0, 1, h);

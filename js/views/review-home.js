@@ -4,18 +4,18 @@
 // version) ; toucher sa pochette le joue, et les suivants s'enchaînent.
 
 import {
-  listProjects, listReviewComments, deleteProject, deleteFile,
+  listProjects, listReviewComments, deleteProject, deleteFile, listParticipants,
   reviewNotifyStatus, reviewSubscribe, reviewUnsubscribe
-} from "../api.js?v=77";
-import { mountUploads } from "./uploads.js?v=77";
-import { openUploadSheet } from "./upload-sheet.js?v=77";
-import { stateOf, isEngineerOf } from "./review.js?v=77";
-import { ensureVerified } from "../verify.js?v=77";
-import { accountEmail } from "../session.js?v=77";
-import { coverOf, onCover, setCover, clearCover } from "../cover.js?v=77";
-import { playQueue, onPlayer, isCurrent, state as playerState, toggle, trackFromFile } from "../player.js?v=77";
-import { icon } from "../icons.js?v=77";
-import { esc, plural, toast, errorText, formatDuration, actionSheet, confirmSheet, promptSheet } from "../ui.js?v=77";
+} from "../api.js?v=82";
+import { mountUploads } from "./uploads.js?v=82";
+import { openUploadSheet } from "./upload-sheet.js?v=82";
+import { stateOf, isEngineerOf } from "./review.js?v=82";
+import { ensureVerified } from "../verify.js?v=82";
+import { accountEmail } from "../session.js?v=82";
+import { albumOf, onCover, setCover, clearCover, setAlbumTitle } from "../cover.js?v=82";
+import { playQueue, onPlayer, isCurrent, state as playerState, toggle, trackFromFile } from "../player.js?v=82";
+import { icon } from "../icons.js?v=82";
+import { esc, h, plural, toast, errorText, formatDuration, actionSheet, confirmSheet, promptSheet, openSheet } from "../ui.js?v=82";
 
 // Pochette générée : un aplat dont la teinte dépend du nom, les initiales
 // en grand. Pas de dégradé (identité sobre).
@@ -57,7 +57,16 @@ function statusOf(p, stats, engineer) {
   return { text: any ? "Plus rien à modifier ? Valide-le" : "Des modifs à demander ? Ouvre-le", cls: "is-new" };
 }
 
+// Fond d'en-tête façon plateforme de streaming : la pochette, floutée et
+// assombrie ; sans pochette, un aplat de la teinte du titre.
+export function backdrop(image, text) {
+  return image
+    ? '<div class="rv-backdrop" style="background-image:url(\'' + esc(image) + '\')" aria-hidden="true"></div>'
+    : '<div class="rv-backdrop is-flat" style="--hue:' + hueOf(text) + '" aria-hidden="true"></div>';
+}
+
 const HELP_KEY = "weshtransfer.reviewHelp";
+const WELCOME_KEY = "weshtransfer.verdictWelcome.";
 function helpClosed() {
   try { return localStorage.getItem(HELP_KEY) === "closed"; } catch (err) { return false; }
 }
@@ -68,15 +77,20 @@ export async function mountReviewHome(root, ctx) {
   let stats = new Map();
   let engineer = !!s.isHost;
   let coverImg = null;
+  let albumTitle = null;
+  let hostName = "";
   let loaded = false;
+  const titleOf = () => albumTitle || s.name;
 
   root.innerHTML =
-    '<section class="rh-hero">' +
+    '<section class="rh-hero rv-hero">' +
+      '<div data-backdrop></div>' +
       '<div class="rh-cover" data-cover-box></div>' +
       '<input type="file" accept="image/*" hidden data-cover-pick>' +
       '<div class="rh-info">' +
-        '<p class="eyebrow">Verdict</p>' +
-        "<h1>" + esc(s.name) + "</h1>" +
+        '<p class="eyebrow" data-eyebrow>Verdict</p>' +
+        '<h1 class="rh-title"><span data-album-title>' + esc(s.name) + '</span>' +
+          '<button type="button" class="rh-title-edit" data-edit-title aria-label="Renommer l\'album" title="Renommer l\'album">' + icon("edit", 16) + "</button></h1>" +
         '<p class="rh-meta" data-meta></p>' +
         '<div class="rh-actions">' +
           '<button class="btn btn-primary" data-play-all disabled>' + icon("play", 18) + "<span>Tout écouter</span></button>" +
@@ -95,6 +109,70 @@ export async function mountReviewHome(root, ctx) {
   const coverBox = root.querySelector("[data-cover-box]");
   const coverPick = root.querySelector("[data-cover-pick]");
   const helpBox = root.querySelector("[data-help]");
+  const backdropBox = root.querySelector("[data-backdrop]");
+  const titleEl = root.querySelector("[data-album-title]");
+  const eyebrow = root.querySelector("[data-eyebrow]");
+
+  function drawAlbum() {
+    backdropBox.innerHTML = backdrop(coverImg, titleOf());
+    titleEl.textContent = titleOf();
+    eyebrow.textContent = "Verdict" + (hostName ? " · par " + hostName : "");
+    if (ctx.setTitle) ctx.setTitle(titleOf());
+  }
+
+  root.querySelector("[data-edit-title]").onclick = async () => {
+    const next = await promptSheet("Titre de l'album", titleOf(), { max: 80, ok: "Enregistrer" });
+    if (next == null || next.trim() === titleOf()) return;
+    try { await setAlbumTitle(s.id, next); toast("Titre enregistré", "ok"); }
+    catch (err) { toast(errorText(err), "err"); }
+  };
+
+  // Accueil de l'artiste, la première fois : titre de l'album et pochette
+  function welcomed() {
+    try { return localStorage.getItem(WELCOME_KEY + s.id) === "1"; } catch (err) { return false; }
+  }
+  function openWelcome() {
+    try { localStorage.setItem(WELCOME_KEY + s.id, "1"); } catch (err) { /* privé */ }
+    const body = h(
+      '<div class="welcome">' +
+        '<p class="welcome-lead">' + (hostName ? "<b>" + esc(hostName) + "</b> t'a invité" : "Tu es invité") +
+          " à écouter ses mix et à dire ce qui ne va pas. Avant d'y aller, habille ton projet :</p>" +
+        '<label class="welcome-cover" data-wc-pick>' +
+          '<span data-wc-preview>' + (coverImg ? cover(titleOf(), "cover-xl", coverImg)
+            : '<span class="cover cover-xl cover-add">' + icon("image", 28) + "<span>Ajoute la cover</span></span>") + "</span>" +
+          '<input type="file" accept="image/*" hidden data-wc-file>' +
+          '<span class="welcome-cover-hint">' + (coverImg ? "Changer la cover" : "Choisir une image") + "</span>" +
+        "</label>" +
+        '<label class="field"><span class="label">Titre de l\'album</span>' +
+          '<input class="input" name="album" maxlength="80" value="' + esc(titleOf()) + '" placeholder="Ex : Nuit blanche"></label>' +
+        '<button class="btn btn-primary btn-block btn-xl" data-go>' + icon("play", 20) + "<span>C'est parti</span></button>" +
+        '<button class="btn btn-ghost btn-block" data-later>Plus tard</button>' +
+      "</div>"
+    );
+    const sheet = openSheet({ title: "Bienvenue dans le verdict", body });
+    const file = body.querySelector("[data-wc-file]");
+    const preview = body.querySelector("[data-wc-preview]");
+    file.addEventListener("change", async () => {
+      const f = file.files && file.files[0];
+      file.value = "";
+      if (!f) return;
+      preview.classList.add("is-busy");
+      try {
+        const img = await setCover(s.id, f);
+        preview.innerHTML = cover(titleOf(), "cover-xl", img);
+        body.querySelector(".welcome-cover-hint").textContent = "Changer la cover";
+      } catch (err) { toast(errorText(err), "err"); }
+      preview.classList.remove("is-busy");
+    });
+    body.querySelector("[data-later]").onclick = () => sheet.close();
+    body.querySelector("[data-go]").onclick = async () => {
+      const t = body.querySelector("[name=album]").value.trim();
+      if (t && t !== titleOf()) {
+        try { await setAlbumTitle(s.id, t); } catch (err) { toast(errorText(err), "err"); return; }
+      }
+      sheet.close();
+    };
+  }
 
   // Pochette : proposée à l'artiste tant qu'il n'y en a pas ; l'ingé
   // peut aussi la mettre. Toucher la pochette = la changer.
@@ -140,7 +218,7 @@ export async function mountReviewHome(root, ctx) {
         "<summary>" + icon("comment", 18) + "<span>Comment ça marche ?</span></summary>" +
         "<ol>" +
           "<li><b>Écoute.</b> Touche un morceau pour l'ouvrir.</li>" +
-          "<li><b>Demande tes modifs.</b> Là où quelque chose te gêne, écris-le avec tes mots : voix trop loin, basse trop forte, fin trop longue... Le retour s'accroche à la seconde près.</li>" +
+          "<li><b>Demande tes modifs.</b> Là où quelque chose te gêne, touche un point rapide (voix trop basse, clic, trop de basse...) ou écris-le avec tes mots. Il s'accroche à la seconde près, sous la forme d'onde.</li>" +
           "<li><b>Vérifie.</b> L'ingé corrige et renvoie une nouvelle version. Tu confirmes chaque correction, puis tu valides le morceau.</li>" +
         "</ol>" +
         "<p>Pas besoin de vocabulaire technique, et tu peux demander autant de modifications que tu veux.</p>" +
@@ -193,7 +271,7 @@ export async function mountReviewHome(root, ctx) {
       const f = latestOf(p);
       if (!f) return null;
       const tr = trackFromFile(Object.assign({}, f, { uploader: null }), p.title);
-      tr.album = s.name;
+      tr.album = titleOf();
       if (coverImg) tr.artwork = coverImg;
       return tr;
     }).filter(Boolean);
@@ -222,8 +300,9 @@ export async function mountReviewHome(root, ctx) {
       const st = statusOf(p, stats, engineer);
       const playing = f && isCurrent(f.id);
       return '<li class="track' + (playing ? " is-current" : "") + (playing && playerState().playing ? " is-playing" : "") + '" data-id="' + p.id + '">' +
-        '<button class="track-art" data-play="' + i + '" aria-label="Écouter ' + esc(p.title) + '"' + (f ? "" : " disabled") + ">" +
-          cover(p.title, "", coverImg) + '<span class="track-play">' + icon(playing && playerState().playing ? "pause" : "play", 18) + "</span>" +
+        '<button class="track-num" data-play="' + i + '" aria-label="Écouter ' + esc(p.title) + '"' + (f ? "" : " disabled") + ">" +
+          '<span class="track-n">' + (i + 1) + "</span>" +
+          '<span class="track-play">' + icon(playing && playerState().playing ? "pause" : "play", 16) + "</span>" +
           '<span class="eq" aria-hidden="true"><i></i><i></i><i></i></span>' +
         "</button>" +
         '<a class="track-main" href="' + (f ? "#/f/" + f.id : "#/p/" + p.id) + '">' +
@@ -309,8 +388,20 @@ export async function mountReviewHome(root, ctx) {
   drawEngineerActions();
   drawCover();
   drawHelp();
-  coverOf(s.id).then((img) => { coverImg = img; drawCover(); if (loaded) draw(); });
-  const offCover = onCover((id, img) => { if (id === s.id) { coverImg = img; drawCover(); if (loaded) draw(); } });
+  drawAlbum();
+  const albumReady = albumOf(s.id).then((a) => { coverImg = a.image; albumTitle = a.title; drawCover(); drawAlbum(); if (loaded) draw(); });
+  const offCover = onCover((id, img, a) => {
+    if (id !== s.id) return;
+    coverImg = img;
+    albumTitle = a ? a.title : albumTitle;
+    drawCover(); drawAlbum();
+    if (loaded) draw();
+  });
+  const hostReady = listParticipants(s.id).then((ps) => {
+    const host = ps.find((x) => x.is_host);
+    hostName = host ? host.pseudo : "";
+    drawAlbum();
+  }).catch(() => {});
   if (engineer) reviewNotifyStatus(s.id).then((r) => { notifyEmail = r && r.email; drawEngineerActions(); }).catch(() => {});
 
   const offUploads = mountUploads(root.querySelector("[data-uploads]"));
@@ -322,5 +413,10 @@ export async function mountReviewHome(root, ctx) {
   ctx.setDrop((files) => { if (engineer) openUploadSheet(ctx, files); });
 
   await load();
+  // l'artiste qui arrive : on lui propose d'habiller l'album
+  if (!engineer && !welcomed()) {
+    await Promise.all([albumReady, hostReady]);
+    if (root.isConnected) openWelcome();
+  }
   return () => { offUploads(); offDb(); offPlayer(); offCover(); };
 }

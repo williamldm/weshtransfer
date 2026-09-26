@@ -41,7 +41,9 @@ async function digest(db: any, cfg: MailConfig, sub: Sub, force: boolean): Promi
       .eq("space_id", space.id).neq("author_id", sub.participant_id)
       .or(`created_at.gt.${since},verified_at.gt.${since},reopened_at.gt.${since}`),
     db.from("files").select("id, version_no, project_id, approved_at, approved_by")
-      .eq("space_id", space.id).gt("approved_at", since),
+      .eq("space_id", space.id).gt("approved_at", since)
+      // validation notée par l'ingé lui-même : pas une nouvelle pour lui
+      .eq("approved_on_behalf", false),
   ]);
   const cs = (comments ?? []) as any[];
   const aps = (approvals ?? []) as any[];

@@ -1,25 +1,35 @@
-// Pochette d'un espace de retours : chargée une fois, partagée entre
+// Album d'un Verdict (pochette + titre) : chargé une fois, partagé entre
 // l'accueil "album", la page d'un morceau et l'écran verrouillé.
 // L'image est recadrée au carré et compressée ici, avant l'envoi.
 
-import { getCover, saveCover, removeCover } from "./api.js?v=77";
+import { getAlbum, saveCover, removeCover, saveAlbumTitle } from "./api.js?v=82";
 
-const cache = new Map();      // spaceId -> Promise<string|null>
+const cache = new Map();      // spaceId -> Promise<{ image, title }>
 const listeners = new Set();
 
-export function coverOf(spaceId) {
-  if (!cache.has(spaceId)) cache.set(spaceId, getCover(spaceId).catch(() => null));
+export function albumOf(spaceId) {
+  if (!cache.has(spaceId)) cache.set(spaceId, getAlbum(spaceId).catch(() => ({ image: null, title: null })));
   return cache.get(spaceId);
 }
+export const coverOf = (spaceId) => albumOf(spaceId).then((a) => a.image);
 
+// fn(spaceId, image, album)
 export function onCover(fn) {
   listeners.add(fn);
   return () => listeners.delete(fn);
 }
 
-function changed(spaceId, image) {
-  cache.set(spaceId, Promise.resolve(image));
-  for (const fn of listeners) fn(spaceId, image);
+async function changed(spaceId, patch) {
+  const album = Object.assign({}, await albumOf(spaceId), patch);
+  cache.set(spaceId, Promise.resolve(album));
+  for (const fn of listeners) fn(spaceId, album.image, album);
+}
+
+export async function setAlbumTitle(spaceId, title) {
+  const clean = String(title || "").trim().slice(0, 80) || null;
+  await saveAlbumTitle(spaceId, clean);
+  await changed(spaceId, { title: clean });
+  return clean;
 }
 
 const SIZE = 640;
@@ -68,11 +78,11 @@ export async function coverFromFile(file) {
 export async function setCover(spaceId, file) {
   const image = await coverFromFile(file);
   await saveCover(spaceId, image);
-  changed(spaceId, image);
+  await changed(spaceId, { image });
   return image;
 }
 
 export async function clearCover(spaceId) {
   await removeCover(spaceId);
-  changed(spaceId, null);
+  await changed(spaceId, { image: null });
 }

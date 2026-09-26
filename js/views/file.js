@@ -1,18 +1,18 @@
 // Écoute d'une version : grande waveform, transport, commentaires
 // horodatés façon SoundCloud ("à 1:23, la voix sature").
 
-import { getFile, listComments, addComment, deleteComment, signFiles, cachedUrl, cachedDownload, deleteFile, updateFile } from "../api.js?v=77";
-import { createReview } from "./review.js?v=77";
-import { cover } from "./review-home.js?v=77";
-import { coverOf } from "../cover.js?v=77";
-import { Waveform, formatTime } from "../waveform.js?v=77";
-import { play, toggle, isCurrent, onPlayer, seekRatio, seekSeconds, skip, state as playerState, trackFromFile } from "../player.js?v=77";
-import { icon } from "../icons.js?v=77";
-import { isAudio, canPreview, categoryOf } from "../files.js?v=77";
+import { getFile, listComments, addComment, deleteComment, signFiles, cachedUrl, cachedDownload, deleteFile, updateFile } from "../api.js?v=82";
+import { createReview } from "./review.js?v=82";
+import { cover, backdrop } from "./review-home.js?v=82";
+import { albumOf } from "../cover.js?v=82";
+import { Waveform, formatTime } from "../waveform.js?v=82";
+import { play, toggle, isCurrent, onPlayer, seekRatio, seekSeconds, skip, state as playerState, trackFromFile } from "../player.js?v=82";
+import { icon } from "../icons.js?v=82";
+import { isAudio, canPreview, categoryOf } from "../files.js?v=82";
 import {
   esc, h, fileBadge, fileTile, timeAgo, formatBytes, avatar, toast, errorText, triggerDownload, plural,
   confirmSheet, actionSheet, KINDS, openSheet
-} from "../ui.js?v=77";
+} from "../ui.js?v=82";
 
 export const title = () => "Écoute";
 
@@ -115,17 +115,25 @@ export function renderFileShell(file, space) {
   );
 }
 
-// Retours de mix : l'essentiel seulement. Le morceau et sa version en
-// titre, les versions pour comparer, le lecteur, puis les retours.
+// Verdict : présenté comme une plateforme de streaming. En-tête "en
+// lecture" sur la pochette floutée, la forme d'onde avec les retours posés
+// dessus (pastilles des auteurs, comme SoundCloud), les points rapides,
+// puis la liste des retours.
 function renderReviewShell(file, versions, audio, media, cat, mine, space) {
   const title = file.project ? file.project.title : file.original_name;
   return (
-    '<header class="rv-top">' +
-      '<span data-rv-cover>' + cover(title) + "</span>" +
-      '<div class="rv-top-text"><h1>' + esc(title) + "</h1>" +
-        '<p class="muted">v' + file.version_no + (file.uploader ? " · " + esc(file.uploader.pseudo) : "") + " · " + timeAgo(file.created_at) + "</p></div>" +
-      '<button class="btn btn-ghost btn-icon" data-dl aria-label="Télécharger">' + icon("download", 20) + "</button>" +
-      (mine || space.isHost ? '<button class="btn btn-ghost btn-icon" data-more aria-label="Plus">' + icon("more") + "</button>" : "") +
+    '<header class="rv-hero rv-now">' +
+      '<div data-rv-backdrop>' + backdrop(null, title) + "</div>" +
+      '<span class="rv-now-cover" data-rv-cover>' + cover(title, "cover-lg") + "</span>" +
+      '<div class="rv-now-text">' +
+        '<p class="eyebrow" data-rv-album>Verdict</p>' +
+        "<h1>" + esc(title) + "</h1>" +
+        '<p class="rv-now-meta">v' + file.version_no + (file.uploader ? " · " + esc(file.uploader.pseudo) : "") + " · " + timeAgo(file.created_at) + "</p>" +
+      "</div>" +
+      '<div class="rv-now-tools">' +
+        '<button class="btn btn-ghost btn-icon" data-dl aria-label="Télécharger">' + icon("download", 20) + "</button>" +
+        (mine || space.isHost ? '<button class="btn btn-ghost btn-icon" data-more aria-label="Plus">' + icon("more") + "</button>" : "") +
+      "</div>" +
     "</header>" +
     (versions.length > 1
       ? '<nav class="version-switch" aria-label="Versions" title="Pendant la lecture, changer de version garde la position (comparaison A/B)">' + versions.map((v) =>
@@ -137,8 +145,10 @@ function renderReviewShell(file, versions, audio, media, cat, mine, space) {
           ? '<div class="player-card media-card">' +
               (cat === "image" ? '<img alt="" data-media>' : '<video controls playsinline preload="metadata" data-media></video>') + "</div>"
           : '<div class="player-card zip-card">' + fileTile(file.original_name, file.mime_type) + "<p>Pas d'aperçu pour ce type de fichier : télécharge-le.</p></div>")
-      : '<section class="player-card">' +
-          '<div class="wave wave-lg has-pins"><canvas></canvas></div>' +
+      : '<section class="player-card rv-stage">' +
+          '<div class="wave wave-lg rv-wave"><canvas></canvas></div>' +
+          // les retours, posés sous la forme d'onde à leur seconde
+          '<div class="rv-rail" data-rail></div>' +
           '<div class="transport">' +
             '<span class="mono t-time" data-time>0:00</span>' +
             '<button class="btn btn-ghost btn-icon" data-back aria-label="Reculer de 10 secondes">' + icon("back10", 22) + "</button>" +
@@ -146,6 +156,8 @@ function renderReviewShell(file, versions, audio, media, cat, mine, space) {
             '<button class="btn btn-ghost btn-icon" data-fwd aria-label="Avancer de 10 secondes">' + icon("fwd10", 22) + "</button>" +
             '<span class="mono t-dur" data-dur>' + formatTime(Number(file.duration_sec) || 0) + "</span>" +
           "</div>" +
+          // correction rapide : un tap sur un problème, posé à la seconde
+          '<div class="rv-quick" data-quickbox></div>' +
         "</section>") +
     '<div data-review-root></div>'
   );
@@ -165,7 +177,7 @@ export async function mount(root, ctx, params) {
 
   // retours : la pochette de l'espace suit le morceau jusqu'à l'écran verrouillé
   let artwork = null;
-  const withArt = (tr) => (artwork ? Object.assign(tr, { artwork, album: ctx.space.name }) : tr);
+  const withArt = (tr) => (artwork ? Object.assign(tr, { artwork }) : tr);
   const track = () => withArt(trackFromFile(file, file.project ? file.project.title : ""));
   const durationSec = () => (isCurrent(file.id) && playerState().duration) || Number(file.duration_sec) || 0;
 
@@ -178,9 +190,15 @@ export async function mount(root, ctx, params) {
     root.innerHTML = renderFileShell(file, ctx.space);
     const coverSlot = root.querySelector("[data-rv-cover]");
     if (coverSlot) {
-      coverOf(ctx.space.id).then((img) => {
-        artwork = img;
-        if (img && coverSlot.isConnected) coverSlot.innerHTML = cover("", "", img);
+      albumOf(ctx.space.id).then((a) => {
+        artwork = a.image;
+        if (!coverSlot.isConnected) return;
+        const title = file.project ? file.project.title : file.original_name;
+        if (a.image) {
+          coverSlot.innerHTML = cover(title, "cover-lg", a.image);
+          root.querySelector("[data-rv-backdrop]").innerHTML = backdrop(a.image, title);
+        }
+        root.querySelector("[data-rv-album]").textContent = "Verdict · " + (a.title || ctx.space.name);
       });
     }
 
@@ -216,6 +234,9 @@ export async function mount(root, ctx, params) {
         ctx,
         currentMs,
         playAt,
+        rail: root.querySelector("[data-rail]"),
+        quick: root.querySelector("[data-quickbox]"),
+        durationMs: () => durationSec() * 1000,
         // on écrit sur ce moment-là : le son s'arrête, l'horodatage aussi
         pause: () => { if (isCurrent(file.id) && playerState().playing) toggle(); },
         setMarkers: (list) => { markers = list; applyMarkers(); }
@@ -229,6 +250,7 @@ export async function mount(root, ctx, params) {
 
   function applyMarkers() {
     if (wave) wave.setMarkers(markers, durationSec() * 1000);
+    if (rv && rv.drawRail) rv.drawRail();
   }
 
   // Lire CETTE version à un instant donné (vérifier une correction)

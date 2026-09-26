@@ -15,17 +15,25 @@
 import {
   listCommentsOf, addComment, deleteComment, setCommentResolved, setCommentVerified,
   setFileApproved, updateFile, reviewFlush
-} from "../api.js?v=77";
-import { formatTime } from "../waveform.js?v=77";
-import { icon } from "../icons.js?v=77";
-import { esc, h, timeAgo, toast, errorText, plural, confirmSheet, openSheet, copyText, triggerDownload, formatBytes } from "../ui.js?v=77";
-import { enqueue, onUploads, checkFile } from "../upload.js?v=77";
+} from "../api.js?v=82";
+import { formatTime } from "../waveform.js?v=82";
+import { icon } from "../icons.js?v=82";
+import { esc, h, timeAgo, toast, errorText, plural, confirmSheet, openSheet, copyText, triggerDownload, formatBytes } from "../ui.js?v=82";
+import { enqueue, onUploads, checkFile } from "../upload.js?v=82";
 
 export const TAGS = [
   ["voix", "Voix"], ["instru", "Instru"], ["basse", "Basse"], ["batterie", "Batterie"],
   ["effets", "Effets"], ["niveau", "Volume"], ["structure", "Structure"], ["autre", "Autre"]
 ];
 const TAG_LABEL = Object.fromEntries(TAGS);
+
+// Points rapides : les problèmes qu'on entend le plus, posés d'un tap à la
+// seconde où on est (comme un commentaire SoundCloud, en plus direct).
+const QUICK = [
+  ["Voix trop basse", "voix"], ["Voix trop forte", "voix"], ["Plus de basse", "basse"], ["Moins de basse", "basse"],
+  ["Kick trop faible", "batterie"], ["Trop de réverb", "effets"], ["Aigus qui piquent", "instru"],
+  ["Clic / craquement", "autre"], ["Trop compressé", "niveau"], ["Ça sature", "niveau"]
+];
 
 const STATES = {
   open: { label: "À corriger", cls: "is-open", color: "#E2B55A" },
@@ -188,6 +196,7 @@ export function createReview(o) {
       .sort((a, b) => a.version_no - b.version_no);
     engineer = isEngineerOf(ctx.space, versions.length ? versions : [f]);
     el.innerHTML = renderReviewShell(engineer);
+    drawQuick();
     bind();
     if (engineer && ctx.setDrop) ctx.setDrop((files) => openUpdate(files));
   }
@@ -235,15 +244,53 @@ export function createReview(o) {
     const flush = q("[data-rv-flush]");
     if (flush) flush.hidden = !items.some((c) => c.author_id === ctx.space.participantId);
     drawMarkers();
+    drawRail();
   }
 
   // Sur la forme d'onde : une pastille numérotée par retour, couleur de
   // son état ; les réglés restent, en retrait.
   function drawMarkers() {
     o.setMarkers(top().filter((c) => c.at_ms != null).map((c) => ({
-      id: c.id, atMs: c.at_ms, label: numbers.get(c.id), color: STATES[stateOf(c)].color,
+      id: c.id, atMs: c.at_ms, color: STATES[stateOf(c)].color,
       dim: stateOf(c) === "done", active: c.id === activeId
     })));
+  }
+
+  // Le rail sous la forme d'onde : une pastille par retour, l'initiale de
+  // son auteur dans la couleur de son état ; au survol (ou quand la lecture
+  // y passe) la bulle du commentaire s'ouvre, comme sur SoundCloud.
+  function drawRail() {
+    const rail = o.rail;
+    if (!rail) return;
+    const dur = o.durationMs ? o.durationMs() : 0;
+    const items = top().filter((c) => c.at_ms != null).sort(byTime);
+    if (!dur || !items.length) { rail.innerHTML = ""; rail.classList.toggle("is-empty", true); return; }
+    rail.classList.remove("is-empty");
+    rail.innerHTML = items.map((c) => {
+      const st = stateOf(c);
+      const pos = Math.min(100, Math.max(0, (c.at_ms / dur) * 100));
+      const who = c.author ? c.author.pseudo : "?";
+      const side = pos < 18 ? " is-left" : pos > 82 ? " is-right" : "";
+      return '<button type="button" class="rv-dot is-' + st + side + (c.id === activeId ? " is-now" : "") + '" data-dot="' + c.id + '" data-at="' + c.at_ms + '"' +
+        ' style="left:' + pos.toFixed(2) + "%;--c:" + STATES[st].color + '" aria-label="' + esc(who) + " à " + formatTime(c.at_ms / 1000) + " : " + esc(c.body) + '">' +
+        '<span class="rv-dot-av">' + esc(who.charAt(0).toUpperCase()) + "</span>" +
+        '<span class="rv-bubble"><span class="rv-bubble-head"><b>' + esc(who) + '</b><span class="mono">' + formatTime(c.at_ms / 1000) + "</span></span>" +
+          esc(c.body) + "</span>" +
+      "</button>";
+    }).join("");
+  }
+
+  // Les points rapides, sous le lecteur
+  function drawQuick() {
+    const box = o.quick;
+    if (!box) return;
+    box.innerHTML =
+      '<div class="rv-quick-head">' + icon("plus", 14) + "<span>" + (engineer ? "Note rapide" : "Point rapide") +
+        ' à <b class="mono" data-quick-at>' + formatTime(o.currentMs() / 1000) + '</b></span><span class="rv-quick-hint">un tap, c\'est noté</span></div>' +
+      '<div class="rv-quick-chips">' +
+        QUICK.map(([label], i) => '<button type="button" class="chip" data-quick="' + i + '">' + esc(label) + "</button>").join("") +
+        '<button type="button" class="chip chip-more" data-quick-more>' + icon("edit", 13) + " Autre…</button>" +
+      "</div>";
   }
 
   // Barre d'avancement : réglés / à vérifier / à corriger
@@ -267,6 +314,7 @@ export function createReview(o) {
     const c = id && top().find((x) => x.id === id);
     if (c && scroll && stateOf(c) !== filter) { filter = stateOf(c); draw(); }
     for (const li of el.querySelectorAll(".rv-item")) li.classList.toggle("is-now", li.dataset.id === id);
+    if (o.rail) for (const d of o.rail.querySelectorAll("[data-dot]")) d.classList.toggle("is-now", d.dataset.dot === id);
     drawMarkers();
     if (c && scroll) {
       const li = el.querySelector('.rv-item[data-id="' + id + '"]');
@@ -344,12 +392,18 @@ export function createReview(o) {
     const mineFile = file.uploaded_by === ctx.space.participantId;
     const v = "v" + file.version_no;
     if (file.approved_at) {
+      // validée par l'artiste, ou notée par l'ingé (l'artiste l'a dit ailleurs)
+      const behalf = !!file.approved_on_behalf;
       box.innerHTML = '<div class="approve is-on"><div class="approve-text">' + icon("check", 18) +
-        "<span><strong>" + v + " validée</strong>" + (file.approved_by ? " par " + esc(file.approved_by) : "") + " · " + timeAgo(file.approved_at) + "</span></div>" +
-        (!mineFile ? '<button class="btn btn-ghost btn-sm" data-approve>Annuler</button>' : "") + "</div>";
+        "<span><strong>" + v + " validée</strong>" +
+        (behalf ? " · notée par " + esc(file.approved_by || "l'ingé") : file.approved_by ? " par " + esc(file.approved_by) : "") +
+        " · " + timeAgo(file.approved_at) + "</span></div>" +
+        (!mineFile || behalf ? '<button class="btn btn-ghost btn-sm" data-approve>Annuler</button>' : "") + "</div>";
     } else if (mineFile) {
+      // l'ingé : en attente de l'artiste, ou noter une validation déjà donnée
       box.innerHTML = '<div class="approve"><div class="approve-text muted">' + icon("clock", 18) +
-        "<span>En attente de validation par l'artiste" + (counts.open || counts.verify ? " (" + plural(counts.open + counts.verify, "retour en cours", "retours en cours") + ")" : "") + ".</span></div></div>";
+        "<span>En attente de validation par l'artiste" + (counts.open || counts.verify ? " (" + plural(counts.open + counts.verify, "retour en cours", "retours en cours") + ")" : "") + ".</span></div>" +
+        '<button class="btn btn-sm" data-approve data-behalf>' + icon("check", 15) + "<span>Déjà validée</span></button></div>";
     } else {
       box.innerHTML = '<div class="approve">' +
         '<button class="btn btn-primary btn-block" data-approve>' + icon("check", 18) + "<span>Valider la " + v + " : c'est bon pour moi</span></button></div>";
@@ -359,7 +413,12 @@ export function createReview(o) {
       b.onclick = async () => {
         const approving = !file.approved_at;
         const pending = counts.open + counts.verify;
-        if (approving && pending) {
+        if (approving && b.hasAttribute("data-behalf")) {
+          const ok = await confirmSheet("L'artiste t'a déjà dit que la " + v + " était bonne (au téléphone, en studio...) ? Elle passe en validée, avec la mention \"notée par " + ctx.space.pseudo + "\". L'artiste peut toujours revenir dessus." +
+            (pending ? " " + plural(pending, "retour n'est pas encore réglé.", "retours ne sont pas encore réglés.") : ""),
+            { ok: "Marquer validée", title: "Valider la " + v });
+          if (!ok) return;
+        } else if (approving && pending) {
           const ok = await confirmSheet(
             plural(pending, "retour n'est pas encore réglé", "retours ne sont pas encore réglés") + ". Valider la " + v + " quand même ?",
             { ok: "Valider quand même", title: "Valider la " + v });
@@ -370,7 +429,8 @@ export function createReview(o) {
           await setFileApproved(file.id, approving);
           file.approved_at = approving ? new Date().toISOString() : null;
           file.approved_by = approving ? ctx.space.pseudo : null;
-          if (approving) toast("Mix validé. L'ingé le voit tout de suite.", "ok");
+          file.approved_on_behalf = approving && mineFile;
+          if (approving) toast(mineFile ? "Noté : la " + v + " est validée." : "Mix validé. L'ingé le voit tout de suite.", "ok");
           draw();
         } catch (err) { toast(errorText(err), "err"); b.disabled = false; }
       };
@@ -380,6 +440,8 @@ export function createReview(o) {
   // ------------------------------------------------------------ actions
 
   function syncTime(ms) {
+    const at = o.quick && o.quick.querySelector("[data-quick-at]");
+    if (at) at.textContent = formatTime((ms != null ? ms : o.currentMs()) / 1000);
     const chip = q("[data-rv-time]");
     if (!chip) return;
     chip.querySelector("span").textContent = "à " + formatTime((ms != null ? ms : o.currentMs()) / 1000);
@@ -519,6 +581,36 @@ export function createReview(o) {
   }
 
   function bind() {
+    // rail : toucher une pastille = l'écouter et la retrouver dans la liste
+    if (o.rail && !o.rail.dataset.bound) {
+      o.rail.dataset.bound = "1";
+      o.rail.addEventListener("click", (e) => {
+        const d = e.target.closest("[data-dot]");
+        if (!d) return;
+        highlight(d.dataset.dot, true);
+        o.playAt(Number(d.dataset.at) / 1000);
+      });
+    }
+    // points rapides : posés tout de suite, à la seconde en cours
+    if (o.quick && !o.quick.dataset.bound) {
+      o.quick.dataset.bound = "1";
+      o.quick.addEventListener("click", async (e) => {
+        if (e.target.closest("[data-quick-more]")) { focusComposer(); return; }
+        const b = e.target.closest("[data-quick]");
+        if (!b || b.disabled) return;
+        const [label, t] = QUICK[Number(b.dataset.quick)];
+        const at = o.currentMs();
+        b.disabled = true;
+        try {
+          await addComment(file.id, label, at, { tag: t });
+          filter = "open";
+          await reload();
+          toast(label + " : noté à " + formatTime(at / 1000), "ok");
+        } catch (err) { toast(errorText(err), "err"); }
+        b.disabled = false;
+      });
+    }
+
     const form = q("[data-rv-form]");
     const ta = form.querySelector("textarea");
     ta.addEventListener("focus", () => { if (o.pause) o.pause(); });
@@ -657,7 +749,7 @@ export function createReview(o) {
   }
 
   return {
-    setFile, reload, draw, syncTime, focusComposer, onPlayback,
+    setFile, reload, draw, drawRail, syncTime, focusComposer, onPlayback,
     focusMarker: (m) => { if (m && m.id) highlight(m.id, true); },
     get useTime() { return useTime; }
   };

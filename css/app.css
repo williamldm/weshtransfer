@@ -1,5 +1,5 @@
-@import url("fonts.css?v=77");
-@import url("tokens.css?v=77");
+@import url("fonts.css?v=82");
+@import url("tokens.css?v=82");
 
 /* ================================================================= base */
 *, *::before, *::after { box-sizing: border-box; }
@@ -1321,4 +1321,142 @@ body.admin { min-height: 100vh; background: var(--bg); }
 }
 @media (prefers-reduced-motion: reduce) {
   .claim .cw, .claim .cl { animation: none !important; opacity: 1 !important; }
+}
+
+/* ================================= Verdict façon plateforme de streaming */
+/* En-tête sur la pochette floutée : il déborde jusqu'aux bords de la carte */
+.rv-hero {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  margin: calc(-1 * var(--sp-6)) calc(-1 * var(--sp-5)) var(--sp-5);
+  padding: var(--sp-7) var(--sp-5) var(--sp-5);
+  border-radius: var(--r-lg) var(--r-lg) 0 0;
+}
+.rv-backdrop {
+  position: absolute;
+  inset: -60px;
+  z-index: -1;
+  background: center / cover no-repeat;
+  filter: blur(48px) saturate(1.6) brightness(.75);
+  transform: scale(1.1);
+}
+.rv-backdrop.is-flat {
+  filter: none;
+  transform: none;
+  background:
+    radial-gradient(circle at 18% 12%, hsla(var(--hue), 70%, 55%, .55), transparent 55%),
+    linear-gradient(160deg, hsla(var(--hue), 45%, 28%, .9), transparent 70%);
+}
+/* fondu vers la carte, en bas de l'en-tête */
+.rv-hero::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(to bottom, rgba(22, 20, 27, .15) 0%, rgba(22, 20, 27, .55) 55%, rgba(22, 20, 27, .97) 100%);
+  pointer-events: none;
+}
+.rv-hero .eyebrow { color: rgba(255, 255, 255, .72); }
+.rh-hero.rv-hero { margin-bottom: var(--sp-5); }
+.rh-title { display: flex; align-items: center; gap: var(--sp-2); }
+.rh-title-edit { flex: none; display: inline-flex; padding: 6px; border: none; border-radius: 50%; background: rgba(255, 255, 255, .08); color: rgba(255, 255, 255, .7); cursor: pointer; opacity: 0; transition: opacity .15s; }
+.rh-title:hover .rh-title-edit, .rh-title-edit:focus-visible { opacity: 1; }
+@media (hover: none) { .rh-title-edit { opacity: .8; } }
+
+/* page d'un morceau : "en lecture" */
+.cover-lg { width: 120px; height: 120px; border-radius: 12px; font-size: 44px; box-shadow: 0 18px 44px rgba(0, 0, 0, .5); }
+.rv-now { display: flex; align-items: flex-end; gap: var(--sp-4); }
+.rv-now-cover { flex: none; }
+.rv-now-cover .cover { display: flex; }
+.rv-now-text { flex: 1; min-width: 0; }
+.rv-now-text .eyebrow { display: block; width: auto; margin: 0 0 var(--sp-1); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rv-now-text h1 { margin: 0; font-family: var(--display); font-size: clamp(26px, 5vw, 40px); font-weight: 800; letter-spacing: -0.03em; line-height: 1.05; overflow-wrap: anywhere; }
+.rv-now-meta { margin: var(--sp-2) 0 0; color: rgba(255, 255, 255, .62); font-size: var(--fs-sm); }
+.rv-now-tools { display: flex; flex: none; gap: 2px; align-self: flex-start; }
+.rv-now-tools .btn-icon { color: rgba(255, 255, 255, .8); }
+
+/* le lecteur : large, sans cadre, les retours posés dessous */
+.player-card.rv-stage { padding: 0; border: none; background: none; }
+.rv-wave { height: 112px; }
+.rv-rail { position: relative; height: 34px; margin: 6px 0 0; border-top: 1px solid var(--line); }
+.rv-rail.is-empty { height: 0; margin: 0; border: none; }
+.rv-dot { position: absolute; top: 6px; z-index: 1; padding: 0; border: none; background: none; transform: translateX(-50%); cursor: pointer; }
+.rv-dot-av { display: flex; align-items: center; justify-content: center; width: 22px; height: 22px; border: 2px solid var(--c); border-radius: 50%; background: var(--surface-3); color: var(--text); font-size: 11px; font-weight: 700; transition: transform .15s; }
+.rv-dot.is-open .rv-dot-av { background: var(--c); color: #16141B; }
+.rv-dot.is-done { opacity: .45; }
+.rv-dot:hover, .rv-dot:focus-visible, .rv-dot.is-now { z-index: 3; opacity: 1; }
+.rv-dot:hover .rv-dot-av, .rv-dot.is-now .rv-dot-av { transform: scale(1.18); }
+/* la bulle du commentaire, au-dessus de la pastille */
+.rv-bubble {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  width: max-content;
+  max-width: 240px;
+  padding: 8px 11px;
+  border: 1px solid var(--line-strong);
+  border-radius: 12px;
+  background: var(--surface-3);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, .45);
+  color: var(--text);
+  font-size: var(--fs-sm);
+  line-height: 1.4;
+  text-align: left;
+  white-space: normal;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, 4px);
+  transition: opacity .15s, transform .15s;
+}
+.rv-dot.is-left .rv-bubble { left: -4px; transform: translate(0, 4px); }
+.rv-dot.is-right .rv-bubble { left: auto; right: -4px; transform: translate(0, 4px); }
+.rv-dot:hover .rv-bubble, .rv-dot:focus-visible .rv-bubble, .rv-dot.is-now .rv-bubble { opacity: 1; transform: translate(-50%, 0); }
+.rv-dot.is-left:hover .rv-bubble, .rv-dot.is-left.is-now .rv-bubble, .rv-dot.is-right:hover .rv-bubble, .rv-dot.is-right.is-now .rv-bubble { transform: none; }
+.rv-bubble-head { display: flex; gap: var(--sp-2); margin-bottom: 2px; font-size: var(--fs-xs); color: var(--text-dim); }
+.rv-bubble-head b { color: var(--c); }
+
+/* points rapides */
+.rv-quick { margin-top: var(--sp-4); padding: var(--sp-3) var(--sp-4); border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--surface); }
+.rv-quick-head { display: flex; align-items: center; gap: var(--sp-2); margin-bottom: var(--sp-2); font-size: var(--fs-sm); font-weight: 600; }
+.rv-quick-head svg { color: var(--accent-bright); }
+.rv-quick-head b { color: var(--accent-bright); }
+.rv-quick-hint { margin-left: auto; color: var(--text-faint); font-size: var(--fs-xs); font-weight: 400; }
+.rv-quick-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.rv-quick-chips .chip:hover { border-color: var(--accent-bright); color: var(--text); }
+.rv-quick-chips .chip:disabled { opacity: .5; }
+.rv-quick-chips .chip-more { color: var(--text-dim); }
+
+/* liste d'album numérotée, façon plateforme de streaming */
+.track-num { position: relative; display: flex; flex: none; align-items: center; justify-content: center; width: 36px; height: 36px; padding: 0; border: none; border-radius: 50%; background: none; color: var(--text-faint); font-family: var(--mono); font-size: var(--fs-sm); cursor: pointer; }
+.track-num .track-play { position: absolute; inset: 0; border-radius: 50%; background: var(--accent); color: #fff; opacity: 0; }
+.track:hover .track-num .track-play, .track-num:focus-visible .track-play, .track.is-current:not(.is-playing) .track-num .track-play { opacity: 1; }
+.track.is-playing .track-num .track-n { opacity: 0; }
+.track.is-playing .track-num .eq { display: flex; top: 50%; bottom: auto; transform: translate(-50%, -50%); }
+.track.is-playing .track-num .eq i { background: var(--accent-bright); }
+.track.is-playing .track-num:hover .track-play { opacity: 1; }
+.track.is-playing .track-num:hover .eq { display: none; }
+.track { border-radius: 10px; transition: background .15s; }
+.track:hover { background: rgba(255, 255, 255, .03); }
+
+/* accueil de l'artiste */
+.welcome { display: grid; gap: var(--sp-4); }
+.welcome-lead { margin: 0; color: var(--text-dim); line-height: 1.5; }
+.welcome-lead b { color: var(--text); }
+.welcome-cover { display: flex; flex-direction: column; align-items: center; gap: var(--sp-2); cursor: pointer; }
+.welcome-cover .cover { display: flex; }
+.welcome-cover [data-wc-preview].is-busy { opacity: .5; }
+.welcome-cover-hint { color: var(--accent-bright); font-size: var(--fs-sm); font-weight: 600; }
+
+@media (max-width: 859px) {
+  .rv-hero { margin: calc(-1 * var(--sp-5)) calc(-1 * var(--sp-4)) var(--sp-4); padding: var(--sp-6) var(--sp-4) var(--sp-4); }
+}
+@media (max-width: 559px) {
+  .cover-lg { width: 92px; height: 92px; font-size: 34px; }
+  .rv-now { align-items: center; }
+  .rv-wave { height: 96px; }
+  .rv-quick-chips { flex-wrap: nowrap; overflow-x: auto; margin: 0 calc(-1 * var(--sp-4)); padding: 2px var(--sp-4) 4px; scrollbar-width: none; }
+  .rv-quick-chips::-webkit-scrollbar { display: none; }
+  .rv-quick-chips .chip { flex: none; }
+  .rv-quick-hint { display: none; }
 }

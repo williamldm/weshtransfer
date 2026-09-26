@@ -1,7 +1,7 @@
 // Accès aux données. Toutes les requêtes de l'appli passent par ici : les
 // vues ne connaissent ni PostgREST ni le Storage.
 
-import { sb, q, invoke, requireClient } from "./db.js?v=77";
+import { sb, q, invoke, requireClient } from "./db.js?v=82";
 
 // Toute requête passe par ici : sans config, message clair plutôt
 // qu'un "Cannot read properties of null".
@@ -23,7 +23,7 @@ export function getProject(id) {
       creator:participants(pseudo),
       files(id, version_no, label, kind, status, storage_path, original_name, mime_type,
             size_bytes, duration_sec, bpm, musical_key, peaks, created_at, uploaded_by,
-            approved_at, approved_by, changelog,
+            approved_at, approved_by, approved_on_behalf, changelog,
             uploader:participants(id, pseudo), comments(id, parent_id, resolved_at, resolved_in, verified_at))`)
     .eq("id", id)
     .order("version_no", { referencedTable: "files", ascending: false })
@@ -51,7 +51,7 @@ export function getFile(id) {
   return q(db().from("files")
     .select(`id, space_id, project_id, version_no, label, kind, status, storage_path,
       original_name, mime_type, size_bytes, duration_sec, bpm, musical_key, peaks,
-      created_at, uploaded_by, approved_at, approved_by, changelog,
+      created_at, uploaded_by, approved_at, approved_by, approved_on_behalf, changelog,
       uploader:participants(id, pseudo),
       project:projects(id, title, files(id, version_no, label, kind, status, storage_path,
         original_name, mime_type, duration_sec, approved_at, uploaded_by))`)
@@ -113,15 +113,20 @@ export function reviewFlush(spaceId) {
 }
 
 // Pochette d'un espace de retours (data URL JPEG, une ligne par espace)
-export function getCover(spaceId) {
-  return q(db().from("space_covers").select("image").eq("space_id", spaceId).maybeSingle())
-    .then((r) => (r ? r.image : null));
+// Album d'un Verdict : pochette et titre (une ligne par espace, chacun
+// facultatif)
+export function getAlbum(spaceId) {
+  return q(db().from("space_covers").select("image, title").eq("space_id", spaceId).maybeSingle())
+    .then((r) => ({ image: (r && r.image) || null, title: (r && r.title) || null }));
 }
 export function saveCover(spaceId, image) {
   return q(db().from("space_covers").upsert({ space_id: spaceId, image, updated_at: new Date().toISOString() }));
 }
 export function removeCover(spaceId) {
-  return q(db().from("space_covers").delete().eq("space_id", spaceId));
+  return q(db().from("space_covers").update({ image: null, updated_at: new Date().toISOString() }).eq("space_id", spaceId));
+}
+export function saveAlbumTitle(spaceId, title) {
+  return q(db().from("space_covers").upsert({ space_id: spaceId, title: title || null, updated_at: new Date().toISOString() }));
 }
 
 export function isEngineer(projectId) {
