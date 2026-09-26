@@ -126,7 +126,7 @@ Deno.serve(async (req) => {
       });
       outgoing.push({ to: email, subject: mail.subject, html: mail.html, text: mail.text });
     }
-    const sent = await sendEmails(cfg, outgoing);
+    const sent = await sendEmails(cfg, outgoing, { kind: "invitation" });
 
     // les invités rejoignent le carnet de l'hôte (celui des transferts),
     // rattaché à son adresse : celle du compte, sinon la dernière vérifiée

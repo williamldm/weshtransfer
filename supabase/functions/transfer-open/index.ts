@@ -107,7 +107,7 @@ Deno.serve(async (req) => {
     // a prouvee (sinon ce serait un moyen d'ecrire a n'importe qui).
     if (first && await canNotify()) {
       const mail = downloadNoticeMail({ site: cfg!.site, who: recipient?.email ?? null, title: transfer.title });
-      await later(sendEmails(cfg!, [{ to: transfer.reply_to!, subject: mail.subject, html: mail.html, text: mail.text }]));
+      await later(sendEmails(cfg!, [{ to: transfer.reply_to!, subject: mail.subject, html: mail.html, text: mail.text }], { kind: "avis" }));
     }
     return json({ ok: true });
   }
@@ -124,7 +124,7 @@ Deno.serve(async (req) => {
         .eq("id", transfer.id).is("link_opened_at", null).select("id");
     if (opened?.length && await canNotify()) {
       const mail = openNoticeMail({ site: cfg!.site, who: recipient?.email ?? null, title: transfer.title });
-      await later(sendEmails(cfg!, [{ to: transfer.reply_to!, subject: mail.subject, html: mail.html, text: mail.text }]));
+      await later(sendEmails(cfg!, [{ to: transfer.reply_to!, subject: mail.subject, html: mail.html, text: mail.text }], { kind: "avis" }));
     }
   }
 

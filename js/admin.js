@@ -3,12 +3,12 @@
 // c'est la fonction "admin" qui vérifie que le compte connecté fait partie
 // des administrateurs, et qui renvoie les données.
 
-import { invoke } from "./db.js?v=86";
-import { accountEmail, login, logout } from "./session.js?v=86";
-import { ensureVerified } from "./verify.js?v=86";
-import { icon } from "./icons.js?v=86";
-import { esc, toast, errorText, formatBytes, formatDate, timeAgo, plural, fileBadge, confirmSheet } from "./ui.js?v=86";
-import { isAudio, categoryOf } from "./files.js?v=86";
+import { invoke } from "./db.js?v=87";
+import { accountEmail, login, logout } from "./session.js?v=87";
+import { ensureVerified } from "./verify.js?v=87";
+import { icon } from "./icons.js?v=87";
+import { esc, toast, errorText, formatBytes, formatDate, timeAgo, plural, fileBadge, confirmSheet } from "./ui.js?v=87";
+import { isAudio, categoryOf } from "./files.js?v=87";
 
 const root = document.getElementById("adm");
 const who = document.getElementById("who");
@@ -21,6 +21,7 @@ let tab = "transfers";
 let query = "";
 let fileSort = "recent";
 let storage = null;      // résultat de la vérification B2
+let mail = null;         // état des voies d'envoi (o2switch / Brevo)
 const selected = new Set();   // fichiers cochés (suppression groupée)
 
 function drawWho() {
@@ -312,10 +313,68 @@ async function checkStorage() {
   drawList();
 }
 
+// ------------------------------------------------------------ emails
+
+async function loadMail() {
+  mail = { loading: true };
+  try {
+    mail = await invoke("admin", { action: "mail" });
+  } catch (err) {
+    mail = { error: errorText(err) };
+  }
+  drawList();
+}
+
+const EVENT = { pause: "Coupure", resume: "Reprise", blacklist: "Liste noire", bounce: "Rebond", engagement: "Ouvertures", probe: "Sonde", error: "Erreur" };
+
+function drawMail() {
+  if (!mail || mail.loading) return '<div class="skeleton tall"></div>';
+  if (mail.error) return '<p class="adm-error">' + esc(mail.error) + "</p>";
+  const r = mail.route || {};
+  const paused = r.smtp_paused_until && new Date(r.smtp_paused_until) > new Date();
+  const state = !mail.smtp_configured ? "non configurée (tout part par Brevo)"
+    : paused ? (r.manual ? "coupée à la main" : "coupée jusqu'au " + formatDate(r.smtp_paused_until, true)) : "active";
+  const d = mail.day || {};
+  const line = (via, label) => {
+    const x = d[via] || { ok: 0, failed: 0, bounced: 0 };
+    return stat(label + " (24 h)", x.ok, x.failed + " refusés · " + x.bounced + " rebonds");
+  };
+  const chk = r.last_check || {};
+  const opens = chk.opens ? "o2switch " + chk.opens.smtp.opened + "/" + chk.opens.smtp.n + " · Brevo " + chk.opens.brevo.opened + "/" + chk.opens.brevo.n : "pas encore mesuré";
+  return '<div class="adm-mail">' +
+    '<p><b>Voie o2switch : ' + esc(state) + "</b>" + (paused && r.reason ? '<br><span class="muted small">' + esc(r.reason) + "</span>" : "") + "</p>" +
+    '<div class="adm-stats">' + line("smtp", "o2switch") + line("brevo", "Brevo") + line("none", "Non partis") + "</div>" +
+    '<p class="muted small">Dernier contrôle : ' + (r.checked_at ? when(r.checked_at) : "jamais") +
+      " · listes noires : " + esc(chk.blacklists ? (chk.blacklists.length ? chk.blacklists.join(", ") : "aucune") : "?") +
+      " · liens ouverts : " + esc(opens) +
+      " · sonde SPF/DKIM : " + esc(Array.isArray(chk.probe) ? chk.probe.join(", ") : (chk.probe || "en attente")) +
+      (chk.imap_error ? " · boîte : " + esc(chk.imap_error) : "") + "</p>" +
+    "<p>" + (paused
+      ? '<button class="btn btn-sm" data-mail-resume>Rétablir o2switch</button>'
+      : '<button class="btn btn-sm" data-mail-pause' + (mail.smtp_configured ? "" : " disabled") + ">Tout envoyer par Brevo</button>") +
+    ' <button class="btn btn-sm btn-ghost" data-mail-reload>' + icon("retry", 16) + "<span>Actualiser</span></button></p>" +
+    (mail.events.length ? "<h3>Historique</h3><ul class=\"adm-events\">" + mail.events.map((e) =>
+      "<li>" + when(e.created_at) + " · <b>" + esc(EVENT[e.kind] || e.kind) + "</b> " + esc(e.detail || "") + "</li>").join("") + "</ul>" : "") +
+  "</div>";
+}
+
+root.addEventListener("click", async (e) => {
+  if (e.target.closest("[data-mail-reload]")) { loadMail(); return; }
+  const pause = e.target.closest("[data-mail-pause]");
+  if (!pause && !e.target.closest("[data-mail-resume]")) return;
+  if (pause && !await confirmSheet("Tous les emails partiront par Brevo (quota de 300 par jour) jusqu'à ce que tu rétablisses o2switch.",
+    { ok: "Tout envoyer par Brevo", title: "Couper o2switch" })) return;
+  try {
+    await invoke("admin", { action: pause ? "mail-pause" : "mail-resume" });
+    toast(pause ? "o2switch coupée" : "o2switch rétablie", "ok");
+    loadMail();
+  } catch (err) { toast(errorText(err), "err"); }
+});
+
 function draw() {
   const st = data.stats;
   const modes = Object.entries(st.spaces_by_mode).map(([m, n]) => n + " " + (MODES[m] || m).toLowerCase()).join(", ");
-  const counts = { transfers: data.transfers.length, users: data.users.length, spaces: data.spaces.length, files: data.files.length };
+  const counts = { transfers: data.transfers.length, users: data.users.length, spaces: data.spaces.length, files: data.files.length, mail: "" };
   root.innerHTML =
     '<div class="adm-head"><h1>Vue d\'ensemble</h1>' +
       '<button class="btn btn-sm" data-reload>' + icon("retry", 16) + "<span>Actualiser</span></button></div>" +
@@ -330,7 +389,7 @@ function draw() {
     "</div>" +
     '<div class="adm-bar">' +
       '<div class="deck-tabs adm-tabs" role="tablist">' +
-        [["transfers", "Transferts"], ["users", "Utilisateurs"], ["spaces", "Espaces"], ["files", "Fichiers"]].map(([k, l]) =>
+        [["transfers", "Transferts"], ["users", "Utilisateurs"], ["spaces", "Espaces"], ["files", "Fichiers"], ["mail", "Emails"]].map(([k, l]) =>
           '<button role="tab" data-tab="' + k + '" aria-selected="' + (tab === k) + '">' + l + " <span>" + counts[k] + "</span></button>").join("") +
       "</div>" +
       '<input class="input adm-search" type="search" placeholder="Rechercher (email, blaze, fichier...)" value="' + esc(query) + '" data-search>' +
@@ -342,7 +401,9 @@ function draw() {
 function drawList() {
   const el = root.querySelector("[data-list]");
   if (!el) return;
-  el.innerHTML = tab === "users" ? drawUsers() : tab === "spaces" ? drawSpaces() : tab === "files" ? drawFiles() : drawTransfers();
+  if (tab === "mail" && !mail) loadMail();
+  el.innerHTML = tab === "users" ? drawUsers() : tab === "spaces" ? drawSpaces() : tab === "files" ? drawFiles() :
+    tab === "mail" ? drawMail() : drawTransfers();
   drawSelection();
 }
 

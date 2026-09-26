@@ -100,7 +100,7 @@ async function digest(db: any, cfg: MailConfig, sub: Sub, force: boolean): Promi
   if (!list.length) return "rien";
 
   const mail = reviewDigestMail({ site: cfg.site, spaceName: space.name, artists: [...artists], projects: list });
-  const [sent] = await sendEmails(cfg, [{ to: sub.email, subject: mail.subject, html: mail.html, text: mail.text }]);
+  const [sent] = await sendEmails(cfg, [{ to: sub.email, subject: mail.subject, html: mail.html, text: mail.text }], { kind: "retours" });
   if (!sent.ok) return "échec : " + sent.error;
   const now = new Date().toISOString();
   await db.from("review_subscriptions").update({ since: now, last_sent_at: now }).eq("participant_id", sub.participant_id);

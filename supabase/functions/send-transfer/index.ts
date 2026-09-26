@@ -43,7 +43,7 @@ async function confirmToSender(db: any, cfg: MailConfig, transfer: TransferRow, 
     site: cfg.site, title: transfer.title, link: transferLink(cfg.site, transfer.token),
     files, recipients, expiresAt: transfer.expires_at,
   });
-  await sendEmails(cfg, [{ to: transfer.reply_to, subject: mail.subject, html: mail.html, text: mail.text }]);
+  await sendEmails(cfg, [{ to: transfer.reply_to, subject: mail.subject, html: mail.html, text: mail.text }], { kind: "confirmation" });
 }
 
 Deno.serve(async (req) => {
@@ -152,7 +152,7 @@ Deno.serve(async (req) => {
     };
   });
 
-  const results = await sendEmails(cfg, emails);
+  const results = await sendEmails(cfg, emails, { kind: "transfert", refs: recipients.map((r) => r.id) });
   const now = new Date().toISOString();
 
   await Promise.all(recipients.map((r, n) => {

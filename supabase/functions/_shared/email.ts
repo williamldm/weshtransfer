@@ -1,6 +1,6 @@
 // Envoi des emails transactionnels.
 //
-// Deux voies, dans cet ordre :
+// Deux voies, dans cet ordre (choix et disjoncteur : mail-route.ts) :
 //   1. SMTP o2switch (boîte envoi@weshtransfer.fr) : gratuit, n'entame pas
 //      le quota Brevo. Secrets SMTP_HOST, SMTP_USER, SMTP_PASS (voir smtp.ts).
 //   2. Brevo (API HTTP) : en secours si le SMTP est absent ou refuse un
@@ -10,6 +10,8 @@
 // est désactivé et l'appli bascule sur le partage de lien : rien ne casse.
 
 import { smtpConfig, smtpSendAll, type SmtpConfig } from "./smtp.ts";
+import { badRecipient, logMails, smtpRoute, spamSignal, trip, type LogRow } from "./mail-route.ts";
+import { admin } from "./supabase.ts";
 export {
   esc, formatBytes, formatDate, typeLabel, transferMail, verifyCodeMail, downloadNoticeMail, inviteMail, reviewDigestMail,
   sentConfirmMail, openNoticeMail,
@@ -54,33 +56,71 @@ export type SendResult =
   | { ok: true; id: string | null; via: "smtp" | "brevo" }
   | { ok: false; error: string };
 
-// Un message par destinataire (chacun a son lien personnel). SMTP d'abord,
-// sur une seule connexion ; chaque message refusé retente par Brevo.
-export async function sendEmails(cfg: MailConfig, emails: OutgoingEmail[]): Promise<SendResult[]> {
-  const results: (SendResult | null)[] = emails.map(() => null);
-  let smtpError = "";
+// kind : étiquette du journal (code, transfert, invitation...) ; refs : un
+// identifiant par email (transfer_recipients.id) pour mesurer les ouvertures
+export type SendMeta = { kind?: string; refs?: (string | null)[] };
 
-  if (cfg.smtp && emails.length) {
+// Un message par destinataire (chacun a son lien personnel).
+// o2switch d'abord, sur une seule connexion, si la voie est saine et sous
+// ses plafonds (mail-route.ts). Chaque message refusé retente par Brevo,
+// sauf adresse inexistante. Un refus "spam / politique" ou une panne coupe
+// la voie o2switch : les envois suivants partent directement par Brevo.
+export async function sendEmails(cfg: MailConfig, emails: OutgoingEmail[], meta: SendMeta = {}): Promise<SendResult[]> {
+  const results: (SendResult | null)[] = emails.map(() => null);
+  const logs: LogRow[] = [];
+  const log = (i: number, row: Omit<LogRow, "to" | "kind" | "ref">) =>
+    logs.push({ ...row, to: emails[i].to, kind: meta.kind ?? null, ref: meta.refs?.[i] ?? null });
+  let db: any = null;
+  try { db = admin(); } catch { /* sans base : pas de journal, o2switch sans garde-fou */ }
+
+  let smtpError = "";
+  let route = { ok: !!cfg.smtp, left: emails.length, reason: cfg.smtp ? "" : "non configurée" };
+  if (cfg.smtp && db && emails.length) {
+    route = await smtpRoute(db).catch((err) => ({ ok: false, left: 0, reason: (err as Error).message }));
+  }
+
+  if (cfg.smtp && route.ok && emails.length) {
+    const batch = emails.slice(0, Math.max(0, route.left));
     try {
-      const out = await smtpSendAll(cfg.smtp, emails.map((e) => ({
+      const out = await smtpSendAll(cfg.smtp, batch.map((e) => ({
         from: cfg.from, to: e.to, replyTo: e.reply_to, subject: e.subject, html: e.html, text: e.text,
       })));
       out.forEach((r, i) => {
-        if (r.ok) results[i] = { ok: true, id: r.id, via: "smtp" };
-        else smtpError = r.error;
+        if (r.ok) {
+          results[i] = { ok: true, id: r.id, via: "smtp" };
+          log(i, { via: "smtp", ok: true, message_id: r.id });
+          return;
+        }
+        smtpError = r.error;
+        log(i, { via: "smtp", ok: false, error: r.error });
+        if (badRecipient(r.error)) results[i] = { ok: false, error: "Adresse inexistante" };
       });
     } catch (err) {
       smtpError = (err as Error).message;
+      logs.push({ via: "smtp", ok: false, to: batch[0].to, kind: meta.kind ?? null, error: smtpError });
     }
-    if (smtpError) console.warn("SMTP en échec, bascule Brevo :", smtpError);
+    if (smtpError && db) {
+      if (/\b535\b|auth/i.test(smtpError)) await trip(db, 6, `authentification o2switch refusée : ${smtpError}`);
+      else if (/rate|too many|\b421\b|\b451\b/i.test(smtpError)) await trip(db, 1, `o2switch ralentit : ${smtpError}`);
+      else if (spamSignal(smtpError)) await trip(db, 24, `refus spam/politique : ${smtpError}`);
+      else if (!results.some((r) => r && r.ok)) await trip(db, 0.5, `o2switch en panne : ${smtpError}`);
+    }
+    if (smtpError) console.warn("o2switch : bascule Brevo :", smtpError);
   }
 
   await Promise.all(emails.map(async (e, i) => {
     if (results[i]) return;
-    results[i] = cfg.brevo
-      ? await sendBrevo(cfg, e)
-      : { ok: false, error: smtpError || "Aucune voie d'envoi configurée" };
+    if (!cfg.brevo) {
+      results[i] = { ok: false, error: smtpError || route.reason || "Aucune voie d'envoi configurée" };
+      log(i, { via: "none", ok: false, error: (results[i] as { error: string }).error });
+      return;
+    }
+    const r = await sendBrevo(cfg, e);
+    results[i] = r;
+    log(i, r.ok ? { via: "brevo", ok: true, message_id: r.id } : { via: "brevo", ok: false, error: r.error });
   }));
+
+  if (db) await logMails(db, logs).catch(() => {});
   return results as SendResult[];
 }
 

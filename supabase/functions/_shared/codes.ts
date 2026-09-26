@@ -79,7 +79,7 @@ export async function requestCode(
   if (error) return { ok: false, error: "ERREUR_BASE", status: 500, detail: error.message };
 
   const mail = verifyCodeMail({ site: cfg.site, email, code, minutes: CODE_MINUTES, purpose });
-  const [sent] = await sendEmails(cfg, [{ to: email, subject: mail.subject, html: mail.html, text: mail.text }]);
+  const [sent] = await sendEmails(cfg, [{ to: email, subject: mail.subject, html: mail.html, text: mail.text }], { kind: "code" });
   if (!sent.ok) {
     await db.from("email_codes").delete().eq("id", row.id);
     return { ok: false, error: "ENVOI_CODE_ECHEC", status: 502, detail: sent.error };

@@ -181,6 +181,37 @@ Deno.serve(async (req) => {
     }
   }
 
+  // --------------------------------- emails : voie o2switch / Brevo
+  if (body.action === "mail") {
+    const since = new Date(Date.now() - 86400e3).toISOString();
+    const [{ data: route }, { data: events }, { data: logs }] = await Promise.all([
+      db.from("mail_route").select("*").eq("id", 1).maybeSingle(),
+      db.from("mail_events").select("created_at, kind, detail").order("created_at", { ascending: false }).limit(20),
+      db.from("mail_log").select("via, ok, bounced_at").gte("created_at", since).limit(5000),
+    ]);
+    const day: Record<string, { ok: number; failed: number; bounced: number }> = {};
+    for (const l of logs ?? []) {
+      const d = (day[l.via] ??= { ok: 0, failed: 0, bounced: 0 });
+      if (l.bounced_at) d.bounced++;
+      else if (l.ok) d.ok++;
+      else d.failed++;
+    }
+    return json({
+      smtp_configured: !!(Deno.env.get("SMTP_HOST") && Deno.env.get("SMTP_USER") && Deno.env.get("SMTP_PASS")),
+      brevo_configured: !!Deno.env.get("BREVO_API_KEY"),
+      route, events: events ?? [], day,
+    });
+  }
+  if (body.action === "mail-pause" || body.action === "mail-resume") {
+    const pause = body.action === "mail-pause";
+    const { error } = await db.from("mail_route").update(pause
+      ? { smtp_paused_until: "2100-01-01T00:00:00Z", manual: true, reason: "coupée à la main (admin)", updated_at: new Date().toISOString() }
+      : { smtp_paused_until: null, manual: false, reason: null, updated_at: new Date().toISOString() }).eq("id", 1);
+    if (error) return json({ error: "ERREUR", detail: error.message }, 500);
+    await db.from("mail_events").insert({ kind: pause ? "pause" : "resume", detail: "à la main, depuis l'admin" });
+    return json({ ok: true });
+  }
+
   // --------------------------------- le bucket B2, comparé à la base
   if (body.action === "storage") {
     const b2 = b2Config();
