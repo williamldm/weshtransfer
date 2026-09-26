@@ -116,15 +116,17 @@ async function handleBounces(db: any, mails: Mail[], domain: string) {
 }
 
 // ----------------------------------------------- 4. sonde d'authentification
-function probeVerdict(m: Mail): { fail: string[] } {
+function probeVerdict(m: Mail): { fail: string[]; source: string } {
   const text = decodeParts(m.raw);
   const fail: string[] = [];
+  // l'IP qui a réellement remis l'email (à autoriser dans le SPF si besoin)
+  const source = text.match(/Source IP:\s*([0-9a-f.:]+)/i)?.[1] ?? "";
   for (const check of ["SPF", "DKIM", "DMARC", "iprev", "SpamAssassin"]) {
     const r = text.match(new RegExp(`^${check} check:\\s*(\\w+)`, "im"))?.[1]?.toLowerCase();
     if (!r) continue;
     if (check === "SpamAssassin" ? r !== "ham" : !["pass", "neutral", "none"].includes(r)) fail.push(`${check} ${r}`);
   }
-  return { fail };
+  return { fail, source };
 }
 
 Deno.serve(async (req) => {
@@ -187,7 +189,9 @@ Deno.serve(async (req) => {
     for (const p of probes) {
       const v = probeVerdict(p);
       report.probe = v.fail.length ? v.fail : "ok";
-      await event("probe", v.fail.length ? `échec : ${v.fail.join(", ")}` : "SPF, DKIM, DMARC : ok");
+      report.probe_source = v.source;
+      await event("probe", (v.fail.length ? `échec : ${v.fail.join(", ")}` : "SPF, DKIM, DMARC : ok") +
+        (v.source ? ` (envoyé depuis ${v.source})` : ""));
       if (v.fail.length) await trip(db, 72, `sonde d'authentification : ${v.fail.join(", ")}`);
     }
     await markSeen(im, [...bounces, ...probes].map((m) => m.uid));
