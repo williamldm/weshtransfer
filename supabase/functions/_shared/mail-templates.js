@@ -500,7 +500,7 @@ export function sentConfirmMail(input) {
     `Le lien : ${input.link}`,
     `Disponible jusqu'au ${until}.`,
     "",
-    `Bilan carbone : ${trips} aller(s)-retour(s) Paris-Dubaï en jet privé. Estimation totalement fantaisiste.`,
+    `Bilan carbone : ${trips} aller${trips > 1 ? "s" : ""}-retour${trips > 1 ? "s" : ""} Paris-Dubaï en jet privé. Estimation totalement fantaisiste.`,
     "",
     textFooter(site),
   ]);
