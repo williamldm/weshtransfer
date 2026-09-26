@@ -6,17 +6,17 @@
 import {
   listProjects, listReviewComments, deleteProject, deleteFile, listParticipants, updateProject,
   reviewNotifyStatus, reviewSubscribe, reviewUnsubscribe, signFiles, cachedDownload
-} from "../api.js?v=92";
-import { saveZip, canStreamToDisk, MEMORY_LIMIT } from "../zip.js?v=92";
-import { mountUploads } from "./uploads.js?v=92";
-import { openUploadSheet } from "./upload-sheet.js?v=92";
-import { stateOf, isEngineerOf } from "./review.js?v=92";
-import { ensureVerified } from "../verify.js?v=92";
-import { accountEmail } from "../session.js?v=92";
-import { albumOf, onCover, setCover, clearCover, setAlbumTitle } from "../cover.js?v=92";
-import { playQueue, onPlayer, isCurrent, state as playerState, toggle, trackFromFile } from "../player.js?v=92";
-import { icon } from "../icons.js?v=92";
-import { esc, h, plural, toast, errorText, formatDuration, actionSheet, confirmSheet, promptSheet, openSheet, triggerDownload } from "../ui.js?v=92";
+} from "../api.js?v=93";
+import { saveZip, canStreamToDisk, MEMORY_LIMIT } from "../zip.js?v=93";
+import { mountUploads } from "./uploads.js?v=93";
+import { openUploadSheet } from "./upload-sheet.js?v=93";
+import { stateOf, isEngineerOf } from "./review.js?v=93";
+import { ensureVerified } from "../verify.js?v=93";
+import { accountEmail } from "../session.js?v=93";
+import { albumOf, onCover, setCover, clearCover, setAlbumTitle } from "../cover.js?v=93";
+import { playQueue, onPlayer, isCurrent, state as playerState, toggle, trackFromFile } from "../player.js?v=93";
+import { icon } from "../icons.js?v=93";
+import { esc, h, plural, toast, errorText, formatDuration, actionSheet, confirmSheet, promptSheet, openSheet, triggerDownload } from "../ui.js?v=93";
 
 // Pochette générée : un aplat dont la teinte dépend du nom, les initiales
 // en grand. Pas de dégradé (identité sobre).
