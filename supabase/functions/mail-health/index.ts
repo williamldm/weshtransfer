@@ -139,6 +139,15 @@ Deno.serve(async (req) => {
   const domain = smtp.user.split("@")[1] ?? "";
 
   const { data: route } = await db.from("mail_route").select("*").eq("id", 1).single();
+  // Identifiants refusés : on ne retente rien (ni IMAP ni sonde) tant que la
+  // coupure dure. Des échecs de connexion répétés feraient bannir l'IP de
+  // Supabase par la protection anti-force brute d'o2switch (cPHulk).
+  const authBlocked = !!(route?.smtp_paused_until && new Date(route.smtp_paused_until) > new Date() &&
+    /^authentification/.test(route.reason ?? ""));
+  const authFailed = async (where: string, err: string) => {
+    await event("error", `${where} : ${err}`);
+    await trip(db, 6, `authentification o2switch refusée (${where}) : ${err}`);
+  };
   const sinceResume = route?.smtp_paused_until && new Date(route.smtp_paused_until) < new Date()
     ? new Date(route.smtp_paused_until) : new Date(0);
   const report: Record<string, unknown> = { at: new Date().toISOString() };
@@ -159,8 +168,9 @@ Deno.serve(async (req) => {
 
   // 2 + 4. boîte d'envoi : rebonds et réponse de la sonde
   let im: Imap | null = null;
-  try {
-    im = await Imap.open(smtp.host);
+  if (authBlocked) report.imap = "suspendu (identifiants refusés)";
+  else try {
+    im = await Imap.open(Deno.env.get("IMAP_HOST") || smtp.host);
     await im.login(smtp.user, smtp.pass);
     const mails = await unreadMessages(im, new Date(Date.now() - 3 * 86400e3));
     const bounces = mails.filter(isBounce);
@@ -182,8 +192,10 @@ Deno.serve(async (req) => {
     }
     await markSeen(im, [...bounces, ...probes].map((m) => m.uid));
   } catch (err) {
-    report.imap_error = (err as Error).message;
-    await event("error", `IMAP : ${(err as Error).message}`);
+    const msg = (err as Error).message;
+    report.imap_error = msg;
+    if (/LOGIN|AUTHENTICATIONFAILED|authentication failed/i.test(msg)) await authFailed("IMAP", msg);
+    else await event("error", `IMAP : ${msg}`);
   } finally {
     if (im) await im.close();
   }
@@ -230,7 +242,7 @@ Deno.serve(async (req) => {
   // 4. sonde hebdomadaire (ou à la demande)
   {
     const lastProbe = (route?.last_check as any)?.probe_sent_at;
-    const due = body.probe || !lastProbe || Date.now() - new Date(lastProbe).getTime() > 7 * 86400e3;
+    const due = !authBlocked && (body.probe || !lastProbe || Date.now() - new Date(lastProbe).getTime() > 7 * 86400e3);
     report.probe_sent_at = lastProbe ?? null;
     if (due) {
       try {
@@ -245,6 +257,7 @@ Deno.serve(async (req) => {
         else report.probe_error = r.error;
       } catch (err) {
         report.probe_error = (err as Error).message;
+        if (/\b535\b|auth/i.test(report.probe_error as string)) await authFailed("SMTP", report.probe_error as string);
       }
     }
   }
