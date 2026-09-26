@@ -22,8 +22,19 @@ const cors = {
   "Access-Control-Max-Age": "86400",
 };
 
+// Deuxième ligne de défense (les types sont déjà imposés à l'upload, sur
+// liste blanche) : rien de ce qui est servi ici ne peut s'exécuter comme une
+// page du domaine, ni fuiter le lien signé par le Referer.
+const hardening = {
+  "X-Content-Type-Options": "nosniff",
+  "Content-Security-Policy": "default-src 'none'; sandbox",
+  "Referrer-Policy": "no-referrer",
+  "X-Robots-Tag": "noindex, nofollow",
+  "Strict-Transport-Security": "max-age=31536000",
+};
+
 function deny(status, msg) {
-  return new Response(msg, { status, headers: { ...cors, "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" } });
+  return new Response(msg, { status, headers: { ...cors, ...hardening, "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" } });
 }
 
 // secondes restantes avant expiration du lien signé (<= 0 : expiré)
@@ -41,6 +52,8 @@ export default {
     if (request.method !== "GET" && request.method !== "HEAD") return deny(405, "Méthode refusée");
 
     const url = new URL(request.url);
+    // lien signé en clair sur le réseau : jamais
+    if (url.protocol !== "https:") return deny(403, "HTTPS obligatoire");
     if (!url.pathname.startsWith(BUCKET) || url.pathname.length <= BUCKET.length) return deny(404, "Introuvable");
     if (!url.searchParams.get("X-Amz-Signature")) return deny(403, "Lien non signé");
     const left = remaining(url.searchParams);
@@ -58,6 +71,11 @@ export default {
 
     const out = new Response(res.body, res);
     for (const [k, v] of Object.entries(cors)) out.headers.set(k, v);
+    for (const [k, v] of Object.entries(hardening)) out.headers.set(k, v);
+    // "sandbox" empêcherait le lecteur PDF du navigateur de s'ouvrir
+    if (/^application\/pdf/i.test(out.headers.get("Content-Type") || "")) {
+      out.headers.set("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'");
+    }
     for (const h of ["x-amz-request-id", "x-amz-id-2", "Access-Control-Allow-Credentials", "Vary"]) out.headers.delete(h);
     return out;
   },

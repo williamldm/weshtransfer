@@ -45,8 +45,11 @@ async function dnsA(name: string): Promise<string[]> {
 }
 
 // ------------------------------------------------------ 1. listes noires
-async function blacklists(host: string): Promise<{ ips: string[]; listed: string[] }> {
-  const extra = (Deno.env.get("SMTP_OUT_IPS") ?? "").split(/[\s,]+/).filter((ip) => /^\d+\.\d+\.\d+\.\d+$/.test(ip));
+// host : le serveur o2switch ; seen : les relais de sortie déjà vus par la
+// sonde (o2switch en change), plus SMTP_OUT_IPS
+async function blacklists(host: string, seen: string[]): Promise<{ ips: string[]; listed: string[] }> {
+  const extra = [...(Deno.env.get("SMTP_OUT_IPS") ?? "").split(/[\s,]+/), ...seen]
+    .filter((ip) => /^\d+\.\d+\.\d+\.\d+$/.test(ip)).slice(0, 12);
   const ips = [...new Set([...(await dnsA(host)), ...extra])];
   const listed: string[] = [];
   await Promise.all(ips.flatMap((ip) => LISTS.map(async (bl) => {
@@ -92,8 +95,12 @@ function isProbeReply(m: Mail): boolean {
   return /port25\.com/i.test(header(m.raw, "From"));
 }
 
+// N'importe qui peut écrire à la boîte d'envoi : un faux rebond "spam" ne
+// doit pas pouvoir couper o2switch (et vider le quota Brevo). Un rebond ne
+// compte que s'il cite le Message-ID d'un email vraiment parti par
+// o2switch (identifiants aléatoires, inconnus d'un tiers).
 async function handleBounces(db: any, mails: Mail[], domain: string) {
-  let spam = 0, invalid = 0;
+  let spam = 0, invalid = 0, forged = 0;
   const notes: string[] = [];
   for (const m of mails) {
     const text = decodeParts(m.raw);
@@ -101,18 +108,21 @@ async function handleBounces(db: any, mails: Mail[], domain: string) {
     const diag = (text.match(/^Diagnostic-Code:\s*([^\n]*(?:\n[ \t][^\n]*)*)/im)?.[1] ??
       text.match(/^(?:.*(?:550|554|552|553|421|451|452)[ -].*)$/m)?.[0] ?? "").replace(/\s+/g, " ").trim().slice(0, 400);
     if (status.startsWith("2")) continue;   // accusé de réception, pas un rebond
-    const ids = [...new Set(text.match(new RegExp(`[0-9a-f-]{36}@${domain.replace(/\./g, "\\.")}`, "gi")) ?? [])];
+    const cited = [...new Set(text.match(new RegExp(`[0-9a-f-]{36}@${domain.replace(/\./g, "\\.")}`, "gi")) ?? [])].slice(0, 5);
+    const { data: known } = cited.length
+      ? await db.from("mail_log").select("id, message_id").eq("via", "smtp").in("message_id", cited)
+        .gte("created_at", new Date(Date.now() - 14 * 86400e3).toISOString())
+      : { data: [] };
+    if (!known?.length) { forged++; continue; }
     const summary = `${status} ${diag}`.trim() || "rebond illisible";
     const reputation = spamSignal(summary) && !badRecipient(summary);
     if (reputation) spam++;
     else if (badRecipient(summary) || status.startsWith("5.1")) invalid++;
-    for (const id of ids) {
-      await db.from("mail_log").update({ bounced_at: new Date().toISOString(), bounce: summary.slice(0, 500) })
-        .eq("message_id", id).eq("via", "smtp");
-    }
+    await db.from("mail_log").update({ bounced_at: new Date().toISOString(), bounce: summary.slice(0, 500) })
+      .in("id", known.map((k: any) => k.id)).is("bounced_at", null);
     if (reputation) notes.push(summary);
   }
-  return { spam, invalid, notes };
+  return { spam, invalid, forged, notes };
 }
 
 // ----------------------------------------------- 4. sonde d'authentification
@@ -157,7 +167,9 @@ Deno.serve(async (req) => {
 
   // 1. listes noires
   try {
-    const bl = await blacklists(smtp.host);
+    const seen: string[] = Array.isArray((route?.last_check as any)?.relays) ? (route!.last_check as any).relays : [];
+    report.relays = seen;
+    const bl = await blacklists(smtp.host, seen);
     report.ips = bl.ips;
     report.blacklists = bl.listed;
     if (bl.listed.length) {
@@ -178,7 +190,7 @@ Deno.serve(async (req) => {
     const bounces = mails.filter(isBounce);
     const probes = mails.filter(isProbeReply);
     const b = await handleBounces(db, bounces, domain);
-    report.bounces = { read: bounces.length, spam: b.spam, invalid: b.invalid };
+    report.bounces = { read: bounces.length, spam: b.spam, invalid: b.invalid, ignored: b.forged };
     if (b.spam) {
       await event("bounce", b.notes.join(" | "));
       const { count } = await db.from("mail_log").select("id", { count: "exact", head: true })
@@ -186,10 +198,16 @@ Deno.serve(async (req) => {
         .or("bounce.ilike.%5.7.%,bounce.ilike.%spam%,bounce.ilike.%block%,bounce.ilike.%reputation%,bounce.ilike.%policy%");
       await trip(db, (count ?? b.spam) >= 2 ? 72 : 24, `rebond spam/réputation : ${b.notes[0]}`);
     }
+    // idem pour la sonde : seule compte la réponse qui cite notre dernier envoi
+    const probeId = String((route?.last_check as any)?.probe_id ?? "");
     for (const p of probes) {
+      if (!probeId || !decodeParts(p.raw).includes(probeId)) { report.probe_ignored = true; continue; }
       const v = probeVerdict(p);
       report.probe = v.fail.length ? v.fail : "ok";
       report.probe_source = v.source;
+      if (v.source && /^\d+\.\d+\.\d+\.\d+$/.test(v.source)) {
+        report.relays = [...new Set([v.source, ...((report.relays as string[]) ?? [])])].slice(0, 8);
+      }
       await event("probe", (v.fail.length ? `échec : ${v.fail.join(", ")}` : "SPF, DKIM, DMARC : ok") +
         (v.source ? ` (envoyé depuis ${v.source})` : ""));
       if (v.fail.length) await trip(db, 72, `sonde d'authentification : ${v.fail.join(", ")}`);
@@ -248,6 +266,7 @@ Deno.serve(async (req) => {
     const lastProbe = (route?.last_check as any)?.probe_sent_at;
     const due = !authBlocked && (body.probe || !lastProbe || Date.now() - new Date(lastProbe).getTime() > 7 * 86400e3);
     report.probe_sent_at = lastProbe ?? null;
+    report.probe_id = (route?.last_check as any)?.probe_id ?? null;
     if (due) {
       try {
         const [r] = await smtpSendAll(smtp, [{
@@ -257,7 +276,7 @@ Deno.serve(async (req) => {
           text: "Contrôle automatique d'authentification (SPF, DKIM, DMARC) de WeshTransfer.",
           html: "<p>Contrôle automatique d'authentification (SPF, DKIM, DMARC) de WeshTransfer.</p>",
         }]);
-        if (r.ok) report.probe_sent_at = new Date().toISOString();
+        if (r.ok) { report.probe_sent_at = new Date().toISOString(); report.probe_id = r.id; }
         else report.probe_error = r.error;
       } catch (err) {
         report.probe_error = (err as Error).message;
