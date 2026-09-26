@@ -1,5 +1,5 @@
-@import url("fonts.css?v=89");
-@import url("tokens.css?v=89");
+@import url("fonts.css?v=90");
+@import url("tokens.css?v=90");
 
 /* ================================================================= base */
 *, *::before, *::after { box-sizing: border-box; }
@@ -646,8 +646,8 @@ body.hub .scene { position: fixed; inset: 0; z-index: -1; }
 .wallpaper-note { grid-area: note; align-self: end; justify-self: end; max-width: 300px; margin: 0; color: var(--text-faint); font-family: var(--mono); font-size: 10px; line-height: 1.6; letter-spacing: .06em; text-align: right; text-transform: uppercase; }
 
 @media (min-width: 1600px) and (min-height: 900px) { .hub-stage { --deck-zoom: 1.15; } }
-@media (min-width: 2000px) and (min-height: 1100px) { .hub-stage { --deck-zoom: 1.45; --deck-top: calc(24vh - 90px); column-gap: 120px; padding-left: 96px; padding-right: 96px; } }
-@media (min-width: 2800px) and (min-height: 1500px) { .hub-stage { --deck-zoom: 1.8; } }
+@media (min-width: 2000px) and (min-height: 1100px) { .hub-stage { --deck-zoom: 1.3; --deck-top: calc(16vh - 30px); column-gap: 120px; padding-left: 96px; padding-right: 96px; } }
+@media (min-width: 2800px) and (min-height: 1500px) { .hub-stage { --deck-zoom: 1.6; } }
 
 /* la carte */
 .deck {
