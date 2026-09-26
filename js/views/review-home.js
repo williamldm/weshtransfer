@@ -5,17 +5,18 @@
 
 import {
   listProjects, listReviewComments, deleteProject, deleteFile, listParticipants, updateProject,
-  reviewNotifyStatus, reviewSubscribe, reviewUnsubscribe
-} from "../api.js?v=91";
-import { mountUploads } from "./uploads.js?v=91";
-import { openUploadSheet } from "./upload-sheet.js?v=91";
-import { stateOf, isEngineerOf } from "./review.js?v=91";
-import { ensureVerified } from "../verify.js?v=91";
-import { accountEmail } from "../session.js?v=91";
-import { albumOf, onCover, setCover, clearCover, setAlbumTitle } from "../cover.js?v=91";
-import { playQueue, onPlayer, isCurrent, state as playerState, toggle, trackFromFile } from "../player.js?v=91";
-import { icon } from "../icons.js?v=91";
-import { esc, h, plural, toast, errorText, formatDuration, actionSheet, confirmSheet, promptSheet, openSheet } from "../ui.js?v=91";
+  reviewNotifyStatus, reviewSubscribe, reviewUnsubscribe, signFiles, cachedDownload
+} from "../api.js?v=92";
+import { saveZip, canStreamToDisk, MEMORY_LIMIT } from "../zip.js?v=92";
+import { mountUploads } from "./uploads.js?v=92";
+import { openUploadSheet } from "./upload-sheet.js?v=92";
+import { stateOf, isEngineerOf } from "./review.js?v=92";
+import { ensureVerified } from "../verify.js?v=92";
+import { accountEmail } from "../session.js?v=92";
+import { albumOf, onCover, setCover, clearCover, setAlbumTitle } from "../cover.js?v=92";
+import { playQueue, onPlayer, isCurrent, state as playerState, toggle, trackFromFile } from "../player.js?v=92";
+import { icon } from "../icons.js?v=92";
+import { esc, h, plural, toast, errorText, formatDuration, actionSheet, confirmSheet, promptSheet, openSheet, triggerDownload } from "../ui.js?v=92";
 
 // Pochette générée : un aplat dont la teinte dépend du nom, les initiales
 // en grand. Pas de dégradé (identité sobre).
@@ -94,6 +95,8 @@ export async function mountReviewHome(root, ctx) {
         '<p class="rh-meta" data-meta></p>' +
         '<div class="rh-actions">' +
           '<button class="btn btn-primary" data-play-all disabled>' + icon("play", 18) + "<span>Tout écouter</span></button>" +
+          '<button class="btn" data-dl-all disabled>' + icon("download", 18) + "<span>Tout télécharger</span></button>" +
+          '<button class="btn btn-ghost btn-icon" data-help-show hidden aria-label="Comment ça marche ?" title="Comment ça marche ?">' + icon("comment", 18) + "</button>" +
           '<span data-engineer-actions></span>' +
         "</div>" +
       "</div>" +
@@ -109,6 +112,8 @@ export async function mountReviewHome(root, ctx) {
   const coverBox = root.querySelector("[data-cover-box]");
   const coverPick = root.querySelector("[data-cover-pick]");
   const helpBox = root.querySelector("[data-help]");
+  const dlAll = root.querySelector("[data-dl-all]");
+  const helpShow = root.querySelector("[data-help-show]");
   const backdropBox = root.querySelector("[data-backdrop]");
   const titleEl = root.querySelector("[data-album-title]");
   const eyebrow = root.querySelector("[data-eyebrow]");
@@ -210,24 +215,61 @@ export async function mountReviewHome(root, ctx) {
     coverBox.classList.remove("is-busy");
   });
 
-  // Mode d'emploi pour l'artiste : ouvert tant qu'il ne l'a pas refermé.
+  // Mode d'emploi pour l'artiste : une croix le cache (mémorisé sur cet
+  // appareil), le bouton "?" à côté de "Tout écouter" le réaffiche.
   function drawHelp() {
-    if (engineer) { helpBox.innerHTML = ""; return; }
+    if (engineer || helpClosed()) {
+      helpBox.innerHTML = "";
+      helpShow.hidden = engineer;
+      return;
+    }
+    helpShow.hidden = true;
     helpBox.innerHTML =
-      '<details class="rh-help"' + (helpClosed() ? "" : " open") + ">" +
-        "<summary>" + icon("comment", 18) + "<span>Comment ça marche ?</span></summary>" +
+      '<section class="rh-help">' +
+        '<button type="button" class="rh-help-x btn btn-ghost btn-icon btn-sm" data-help-hide aria-label="Masquer" title="Masquer">' + icon("x", 16) + "</button>" +
+        "<h2>" + icon("comment", 18) + "<span>Comment ça marche ?</span></h2>" +
         "<ol>" +
           "<li><b>Écoute.</b> Touche un morceau pour l'ouvrir.</li>" +
           "<li><b>Demande tes modifs.</b> Là où quelque chose te gêne, touche un point rapide (voix trop basse, clic, trop de basse...) ou écris-le avec tes mots. Il s'accroche à la seconde près, sous la forme d'onde.</li>" +
           "<li><b>Vérifie.</b> L'ingé corrige et renvoie une nouvelle version. Tu confirmes chaque correction, puis tu valides le morceau.</li>" +
         "</ol>" +
-        "<p>Pas besoin de vocabulaire technique, et tu peux demander autant de modifications que tu veux.</p>" +
-      "</details>";
-    const d = helpBox.querySelector("details");
-    d.addEventListener("toggle", () => {
-      try { localStorage.setItem(HELP_KEY, d.open ? "open" : "closed"); } catch (err) { /* navigation privée */ }
-    });
+        "<p>Pas besoin de vocabulaire technique, et tu peux demander autant de modifications que tu veux. Télécharge un morceau avec sa flèche, ou tout d'un coup.</p>" +
+      "</section>";
   }
+  const setHelp = (v) => { try { localStorage.setItem(HELP_KEY, v); } catch (err) { /* navigation privée */ } drawHelp(); };
+  helpBox.addEventListener("click", (e) => { if (e.target.closest("[data-help-hide]")) setHelp("closed"); });
+  helpShow.addEventListener("click", () => setHelp("open"));
+
+  // Téléchargements : la dernière version de chaque morceau
+  async function downloadOne(p) {
+    const f = latestOf(p);
+    if (!f) return;
+    try {
+      await signFiles([f.id]);
+      triggerDownload(cachedDownload(f.id), f.original_name);
+    } catch (err) { toast(errorText(err), "err"); }
+  }
+  dlAll.addEventListener("click", async () => {
+    const files = projects.map((p) => latestOf(p)).filter(Boolean);
+    if (!files.length) return;
+    if (files.length === 1) { downloadOne(projects.find((p) => latestOf(p))); return; }
+    const total = files.reduce((n, f) => n + (Number(f.size_bytes) || 0), 0);
+    if (!canStreamToDisk() && total > MEMORY_LIMIT) {
+      toast("Trop lourd pour un zip sur cet appareil : télécharge les morceaux un par un.", "err");
+      return;
+    }
+    const label = dlAll.innerHTML;
+    dlAll.disabled = true;
+    try {
+      await signFiles(files.map((f) => f.id));
+      const saved = await saveZip(titleOf() + ".zip",
+        files.map((f) => ({ name: f.original_name, url: cachedDownload(f.id), size: Number(f.size_bytes) || 0 })),
+        (r) => { dlAll.innerHTML = icon("download", 18) + "<span>Zip " + Math.round(r * 100) + " %</span>"; });
+      if (saved) toast("Téléchargement terminé", "ok");
+    } catch (err) { toast(err.message || errorText(err), "err"); }
+    dlAll.disabled = false;
+    dlAll.innerHTML = label;
+  });
 
   // Actions de l'ingé : déposer un mix, emails (inviter : icône du haut). Une icône chacune.
   let notifyEmail = null;
@@ -287,6 +329,7 @@ export async function mountReviewHome(root, ctx) {
       : (verify ? plural(verify, "correction à vérifier", "corrections à vérifier") : "");
     meta.textContent = [plural(ready.length, "morceau", "morceaux"), total ? formatDuration(total) : "", summary].filter(Boolean).join(" · ");
     playAll.disabled = !ready.length;
+    dlAll.disabled = !ready.length;
 
     if (!projects.length) {
       list.innerHTML = '<li class="tracklist-empty">' + (engineer
@@ -310,6 +353,7 @@ export async function mountReviewHome(root, ctx) {
             (st.text ? ' · <em class="track-note ' + st.cls + '">' + esc(st.text) + "</em>" : "") + "</span>" +
         "</a>" +
         '<span class="track-dur mono">' + (f && f.duration_sec ? formatDuration(Number(f.duration_sec)) : "") + "</span>" +
+        (f ? '<button class="btn btn-ghost btn-icon btn-sm" data-dl-track="' + i + '" aria-label="Télécharger ' + esc(p.title) + '" title="Télécharger">' + icon("download", 18) + "</button>" : "") +
         '<button class="btn btn-ghost btn-icon btn-sm" data-menu aria-label="Options">' + icon("more", 18) + "</button>" +
         // poignée : glisser pour changer l'ordre (souris ou doigt)
         (projects.length > 1 ? '<button type="button" class="track-drag" data-drag aria-label="Déplacer ' + esc(p.title) + '" title="Glisser pour changer l\'ordre">' + icon("grip", 18) + "</button>" : "") +
@@ -318,6 +362,8 @@ export async function mountReviewHome(root, ctx) {
   }
 
   list.addEventListener("click", (e) => {
+    const dlBtn = e.target.closest("[data-dl-track]");
+    if (dlBtn) { downloadOne(projects[Number(dlBtn.dataset.dlTrack)]); return; }
     const playBtn = e.target.closest("[data-play]");
     if (playBtn) {
       const p = projects[Number(playBtn.dataset.play)];
