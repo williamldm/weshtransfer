@@ -43,6 +43,9 @@ const LIMITS = {
   ipDay: env("UPLOAD_IP_DAY_GB", 3),           // par IP, sur 24 h (3 Go)
   space: env("SPACE_MAX_GB", 50),              // par espace, au total
   globalDay: env("UPLOAD_GLOBAL_DAY_GB", 200), // tout le site, sur 24 h
+  // tout le bucket, à l'instant T : sous les 10 Go gratuits de B2 (au-delà,
+  // B2 facture). Les fichiers expirent, la place se libère toute seule.
+  total: env("STORAGE_TOTAL_GB", 9),
   open: 12,                                    // uploads ouverts en même temps
 };
 
@@ -132,6 +135,9 @@ Deno.serve(async (req) => {
         const b = budget as { user_day: number; ip_day: number; global_day: number; open: number; space: number };
         if (b.open >= LIMITS.open) return json({ error: "TROP_D_UPLOADS" }, 429);
         if (b.global_day + size > LIMITS.globalDay) return json({ error: "QUOTA_GLOBAL" }, 429);
+        const { data: used, error: usedError } = await service.rpc("storage_used");
+        if (usedError) return json({ error: "ERREUR_BASE", detail: usedError.message }, 500);
+        if (Number(used) + size > LIMITS.total) return json({ error: "STOCKAGE_PLEIN" }, 507);
         if (b.user_day + size > LIMITS.userDay || b.ip_day + size > LIMITS.ipDay) {
           // ce qu'il reste sur 24 h, pour un message précis
           const left = Math.max(0, Math.min(LIMITS.userDay - b.user_day, LIMITS.ipDay - b.ip_day));

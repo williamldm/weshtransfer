@@ -1,7 +1,7 @@
 // Briques d'interface partagées : DOM, messages, formatage, feuilles.
 
-import { icon } from "./icons.js?v=87";
-import { CATEGORY, categoryOf, extOf } from "./files.js?v=87";
+import { icon } from "./icons.js?v=88";
+import { CATEGORY, categoryOf, extOf } from "./files.js?v=88";
 
 // ------------------------------------------------------------------ DOM
 
@@ -81,6 +81,7 @@ const ERRORS = {
   QUOTA_ENVOIS: "100 envois par jour et par espace, c'est la limite.",
   QUOTA_UPLOAD_JOUR: "Limite atteinte : 3 Go envoyés par 24 h depuis ta connexion. Même le charbon a ses limites, réessaie plus tard.",
   QUOTA_ESPACE: "Cet espace est plein. Supprime des fichiers ou crée un autre espace.",
+  STOCKAGE_PLEIN: "Nos serveurs débordent (même nous, on a une limite). Les vieux fichiers expirent bientôt : réessaie dans quelques heures.",
   QUOTA_GLOBAL: "La centrale est en surchauffe : trop de fichiers aujourd'hui. Réessaie demain.",
   TROP_D_UPLOADS: "Trop d'uploads en même temps. Attends que les premiers finissent.",
   TAILLE_INCOHERENTE: "Le fichier reçu ne correspond pas à l'original. Réessaie.",
