@@ -100,7 +100,7 @@ export function mountClaim(claim) {
     new IntersectionObserver((entries) => { visible = entries[0].isIntersecting; }).observe(claim);
   }
   let fx = null;
-  import("./scene-fx.js?v=85").then((m) => { fx = m; }).catch(() => {});
+  import("./scene-fx.js?v=86").then((m) => { fx = m; }).catch(() => {});
   setInterval(() => {
     if (!fx || !visible || document.hidden || !letters.length) return;
     const l = letters[Math.floor(Math.random() * letters.length)];

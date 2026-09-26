@@ -3,14 +3,14 @@
 // les autres peuvent écouter avec lui en direct. Chaque son disparaît
 // 5 jours après son ajout.
 
-import { deleteProject, deleteFile } from "../api.js?v=85";
-import { mountUploads } from "./uploads.js?v=85";
-import { openUploadSheet } from "./upload-sheet.js?v=85";
-import { cover } from "./review-home.js?v=85";
-import { onJam, jamInfo, jamTracks, jamTag, reloadJam, followDj, unfollow, expiresAt, JAM_DAYS } from "../jam.js?v=85";
-import { playQueue, onPlayer, isCurrent, state as playerState, toggle, queueInfo } from "../player.js?v=85";
-import { icon } from "../icons.js?v=85";
-import { esc, plural, toast, errorText, formatDuration, actionSheet, confirmSheet, kindBadge } from "../ui.js?v=85";
+import { deleteProject, deleteFile } from "../api.js?v=86";
+import { mountUploads } from "./uploads.js?v=86";
+import { openUploadSheet } from "./upload-sheet.js?v=86";
+import { cover } from "./review-home.js?v=86";
+import { onJam, jamInfo, jamTracks, jamTag, reloadJam, followDj, unfollow, expiresAt, JAM_DAYS } from "../jam.js?v=86";
+import { playQueue, onPlayer, isCurrent, state as playerState, toggle, queueInfo } from "../player.js?v=86";
+import { icon } from "../icons.js?v=86";
+import { esc, plural, toast, errorText, formatDuration, actionSheet, confirmSheet, kindBadge } from "../ui.js?v=86";
 
 function hueOf(text) {
   let h = 0;

@@ -60,16 +60,29 @@ async function call(b2: B2, url: URL, init: RequestInit = {}): Promise<string> {
 
 // URL signée de lecture. Avec downloadName, le navigateur télécharge sous
 // le nom d'origine au lieu de <uuid>.wav. Le paramètre doit être signé.
+// Économie d'egress B2 : une URL signée STABLE par fenêtre de 3 h (même
+// date de signature pour tout le monde), et une consigne de cache au
+// navigateur (fichiers immuables : chaque version a sa propre clé). Réécouter
+// un son, recharger la page, suivre une jam ou zipper un envoi déjà écouté
+// ne retélécharge plus rien depuis B2 : le navigateur a déjà le fichier
+// sous cette même adresse. Validité : au moins `expires`, au plus
+// `expires` + 3 h.
+const SIGN_WINDOW = 3 * 3600;
+
 export async function presignGet(b2: B2, key: string, expires: number, downloadName?: string): Promise<string> {
+  const now = Math.floor(Date.now() / 1000);
+  const start = now - (now % SIGN_WINDOW);
+  const datetime = new Date(start * 1000).toISOString().replace(/[:-]|\.\d{3}/g, "");
   const url = objectUrl(b2, key);
-  url.searchParams.set("X-Amz-Expires", String(expires));
+  url.searchParams.set("X-Amz-Expires", String(Math.min(expires + SIGN_WINDOW, 604800)));
+  url.searchParams.set("response-cache-control", `private, max-age=${expires}, immutable`);
   if (downloadName) {
     url.searchParams.set(
       "response-content-disposition",
       `attachment; filename*=UTF-8''${encodeURIComponent(downloadName)}`,
     );
   }
-  const signed = await b2.aws.sign(url.toString(), { method: "GET", aws: { signQuery: true } });
+  const signed = await b2.aws.sign(url.toString(), { method: "GET", aws: { signQuery: true, datetime } });
   return signed.url;
 }
 

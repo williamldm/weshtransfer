@@ -6,19 +6,19 @@ import {
   getProject, getFilesByIds, createTransfer, sendTransfer, emailEnabled,
   getTransfer, transferUrl, createProject, signFiles, cachedUrl,
   knownVerified, listContacts, forgetContact, rememberContactsLocal, suggestContacts
-} from "../api.js?v=85";
-import { accountEmail } from "../session.js?v=85";
-import { ensureVerified } from "../verify.js?v=85";
-import { openUploadSheet } from "./upload-sheet.js?v=85";
-import { mountUploads } from "./uploads.js?v=85";
-import { onUploads, enqueue, checkFile, getJobs } from "../upload.js?v=85";
-import { categoryOf, canPreview, FILE_MAX } from "../files.js?v=85";
-import { takePending } from "../pending.js?v=85";
-import { icon } from "../icons.js?v=85";
+} from "../api.js?v=86";
+import { accountEmail } from "../session.js?v=86";
+import { ensureVerified } from "../verify.js?v=86";
+import { openUploadSheet } from "./upload-sheet.js?v=86";
+import { mountUploads } from "./uploads.js?v=86";
+import { onUploads, enqueue, checkFile, getJobs } from "../upload.js?v=86";
+import { categoryOf, canPreview, FILE_MAX } from "../files.js?v=86";
+import { takePending } from "../pending.js?v=86";
+import { icon } from "../icons.js?v=86";
 import {
   esc, h, formatBytes, formatDuration, plural, toast, errorText, openSheet, copyText, shareLink,
   canShare, formatDate, daysLeft, fileBadge, fileTile
-} from "../ui.js?v=85";
+} from "../ui.js?v=86";
 
 // Dans un espace "envoi", ce composeur EST l'accueil.
 export const title = (ctx) => (ctx && ctx.space.mode === "envoi" ? ctx.space.name : "Envoyer");
@@ -265,8 +265,11 @@ export async function mount(root, ctx, params) {
 
   function drawFiles() {
     autoTitle();
+    // vignette = l'image entière téléchargée depuis B2 : pas pour les grosses
+    const thumbable = (f) => categoryOf(f.original_name, f.mime_type) === "image" && canPreview(f.original_name, f.mime_type) &&
+      (f.size_bytes || 0) <= 3 * 1024 * 1024;
     const toSign = state.files
-      .filter((f) => categoryOf(f.original_name, f.mime_type) === "image" && canPreview(f.original_name, f.mime_type))
+      .filter(thumbable)
       .map((f) => f.id)
       .filter((id) => !cachedUrl(id) && !thumbRequested.has(id));
     if (toSign.length) {
@@ -276,7 +279,7 @@ export async function mount(root, ctx, params) {
 
     filesEl.innerHTML = state.files.map((f) => {
       const cat = categoryOf(f.original_name, f.mime_type);
-      const thumb = cat === "image" && canPreview(f.original_name, f.mime_type) ? cachedUrl(f.id) : null;
+      const thumb = thumbable(f) ? cachedUrl(f.id) : null;
       const bits = [
         !envoiMode && f.project ? f.project.title + " · v" + f.version_no : "",
         cat === "audio" && f.duration_sec ? formatDuration(Number(f.duration_sec)) : "",
