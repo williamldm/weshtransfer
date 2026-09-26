@@ -1,9 +1,9 @@
 // Feuille "Participants" : qui est là, inviter, réglages du host.
 
-import { listParticipants, updateSpace, deleteSpace, inviteByEmail, listInvites, deleteInvite } from "../api.js?v=82";
-import { icon } from "../icons.js?v=82";
-import { esc, h, openSheet, avatar, shareLink, copyText, toast, errorText, formatDate, confirmSheet, canShare, promptSheet } from "../ui.js?v=82";
-import { leaveSpace, knownSpaces, switchTo, forgetSpace, renameMe, accountEmail, logout } from "../session.js?v=82";
+import { listParticipants, updateSpace, deleteSpace, inviteByEmail, listInvites, deleteInvite, listContacts, suggestContacts, senderEmail, rememberContactsLocal } from "../api.js?v=83";
+import { icon } from "../icons.js?v=83";
+import { esc, h, openSheet, avatar, shareLink, copyText, toast, errorText, formatDate, confirmSheet, canShare, promptSheet } from "../ui.js?v=83";
+import { leaveSpace, knownSpaces, switchTo, forgetSpace, renameMe, accountEmail, logout } from "../session.js?v=83";
 
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
@@ -30,6 +30,7 @@ export async function openPeopleSheet(ctx) {
                   '<button class="btn btn-primary" type="submit">' + icon("send", 16) + " Inviter</button></div>" +
                   '<p class="muted">Chacun reçoit un lien personnel et vérifie son adresse avec un code avant d\'entrer : un lien transféré ne suffit pas.</p>' +
                 "</form>" +
+                '<div class="recents" data-iv-recents hidden></div>' +
                 '<ul class="invites" data-invites></ul>'
               : '<p class="muted">' + icon("lock", 14) + " Cet espace est sur invitation. Demande à l'hôte d'inviter quelqu'un par email.</p>") +
           "</div>"
@@ -85,10 +86,48 @@ export async function openPeopleSheet(ctx) {
   // Invitations par email (host, espace sur invitation)
   const inviteForm = body.querySelector("[data-invite-form]");
   const invitesEl = body.querySelector("[data-invites]");
+  const recentsEl = body.querySelector("[data-iv-recents]");
+  // le carnet de l'expéditeur (celui des transferts) : proposé sous le
+  // champ, sans ceux déjà invités ni ceux déjà tapés
+  const sender = senderEmail(accountEmail());
+  let contacts = [];
+  let invited = [];
+  const typed = () => (inviteForm ? inviteForm.querySelector("input").value : "").split(/[\s,;]+/).map((x) => x.trim().toLowerCase()).filter(Boolean);
+  const drawRecents = () => {
+    if (!recentsEl) return;
+    const value = inviteForm.querySelector("input").value;
+    const last = /[\s,;]$/.test(value) ? "" : (value.split(/[\s,;]+/).pop() || "");
+    const list = suggestContacts(contacts, last, invited.concat(typed()));
+    recentsEl.hidden = !list.length;
+    recentsEl.innerHTML = list.length
+      ? '<span class="recents-label">' + (last ? "Ton carnet" : "Récents") + "</span>" + list.map((r) =>
+          '<span class="recent"><button type="button" class="recent-add" data-add="' + esc(r.email) + '">' + icon("plus", 14) + "<span>" + esc(r.email) + "</span></button></span>").join("")
+      : "";
+  };
+  if (inviteForm && sender) {
+    listContacts(sender).then((list) => { contacts = list; drawRecents(); }).catch(() => {});
+    const input = inviteForm.querySelector("input");
+    input.addEventListener("input", drawRecents);
+    // le champ garde le focus quand on touche une suggestion
+    for (const type of ["mousedown", "pointerdown"]) {
+      recentsEl.addEventListener(type, (e) => { if (e.target.closest("button")) e.preventDefault(); });
+    }
+    recentsEl.addEventListener("click", (e) => {
+      const add = e.target.closest("[data-add]");
+      if (!add) return;
+      const value = input.value;
+      const kept = /[\s,;]$/.test(value) || !value.trim() ? value : value.replace(/[^\s,;]*$/, "");
+      input.value = (kept.trim() ? kept.replace(/[\s,;]*$/, "") + ", " : "") + add.dataset.add + ", ";
+      input.focus();
+      drawRecents();
+    });
+  }
   const drawInvites = async () => {
     if (!invitesEl) return;
     try {
       const list = await listInvites(s.id);
+      invited = list.map((iv) => iv.email);
+      drawRecents();
       const now = Date.now();
       invitesEl.innerHTML = list.map((iv) => {
         const state = iv.accepted_at ? '<span class="iv-state is-in">entré·e</span>'
@@ -107,6 +146,8 @@ export async function openPeopleSheet(ctx) {
     try {
       const r = await inviteByEmail(s.id, emails);
       const sent = (r.results || []).filter((x) => x.status === "sent").length;
+      // les invités rejoignent le carnet (proposés aussi dans Envoyer)
+      if (sender) rememberContactsLocal(sender, (r.results || []).filter((x) => x.status === "sent").map((x) => x.email));
       const failed = (r.results || []).filter((x) => x.status !== "sent");
       toast(failed.length ? failed.length + " invitation(s) non partie(s) : " + failed.map((x) => x.email).join(", ")
         : sent > 1 ? sent + " invitations envoyées" : "Invitation envoyée", failed.length ? "err" : "ok");

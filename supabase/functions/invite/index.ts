@@ -127,6 +127,21 @@ Deno.serve(async (req) => {
       outgoing.push({ to: email, subject: mail.subject, html: mail.html, text: mail.text });
     }
     const sent = await sendEmails(cfg, outgoing);
+
+    // les invités rejoignent le carnet de l'hôte (celui des transferts),
+    // rattaché à son adresse : celle du compte, sinon la dernière vérifiée
+    const delivered = emails.filter((_, i) => sent[i].ok);
+    if (delivered.length) {
+      const { data: who } = await db.auth.admin.getUserById(uid);
+      let sender = (who?.user?.email || "").toLowerCase();
+      if (!sender) {
+        const { data: v } = await db.from("sender_emails").select("email").eq("user_id", uid)
+          .not("verified_at", "is", null).order("verified_at", { ascending: false }).limit(1).maybeSingle();
+        sender = v?.email || "";
+      }
+      if (sender) await db.rpc("remember_contacts", { p_sender: sender, p_emails: delivered }).then(() => {}, () => {});
+    }
+
     return json({
       results: emails.map((email, i) => ({ email, status: sent[i].ok ? "sent" : "failed", error: sent[i].ok ? null : sent[i].error })),
     });

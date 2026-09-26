@@ -1,7 +1,7 @@
 // Accès aux données. Toutes les requêtes de l'appli passent par ici : les
 // vues ne connaissent ni PostgREST ni le Storage.
 
-import { sb, q, invoke, requireClient } from "./db.js?v=82";
+import { sb, q, invoke, requireClient } from "./db.js?v=83";
 
 // Toute requête passe par ici : sans config, message clair plutôt
 // qu'un "Cannot read properties of null".
@@ -351,6 +351,25 @@ export async function listContacts(sender) {
     if (!prev || String(r.last_at) > String(prev.last_at)) byEmail.set(r.email, { email: r.email, last_at: r.last_at });
   }
   return [...byEmail.values()].sort((a, b) => (a.last_at < b.last_at ? 1 : -1));
+}
+
+// Suggestions pour ce qui est tapé : début de l'adresse, du nom de
+// domaine, ou d'un morceau séparé par un point, un tiret...
+export function suggestContacts(contacts, query, exclude) {
+  const q = String(query || "").trim().toLowerCase();
+  const list = contacts.filter((r) => !(exclude || []).includes(r.email));
+  if (!q) return list.slice(0, 6);
+  return list
+    .filter((r) => r.email.startsWith(q) || r.email.split(/[@._+-]/).some((part) => part.startsWith(q)))
+    .sort((a, b) => Number(b.email.startsWith(q)) - Number(a.email.startsWith(q)) || (a.last_at < b.last_at ? 1 : -1))
+    .slice(0, 6);
+}
+
+// L'adresse d'expédition de cet appareil : celle du compte, sinon la
+// dernière utilisée pour un envoi (c'est elle qui porte le carnet).
+export function senderEmail(accountEmail) {
+  if (accountEmail) return accountEmail;
+  try { return localStorage.getItem("seminaire.replyTo") || ""; } catch (err) { return ""; }
 }
 
 export function forgetContact(sender, email) {

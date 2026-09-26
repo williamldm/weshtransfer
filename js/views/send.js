@@ -5,20 +5,20 @@
 import {
   getProject, getFilesByIds, createTransfer, sendTransfer, emailEnabled,
   getTransfer, transferUrl, createProject, signFiles, cachedUrl,
-  knownVerified, listContacts, forgetContact, rememberContactsLocal
-} from "../api.js?v=82";
-import { accountEmail } from "../session.js?v=82";
-import { ensureVerified } from "../verify.js?v=82";
-import { openUploadSheet } from "./upload-sheet.js?v=82";
-import { mountUploads } from "./uploads.js?v=82";
-import { onUploads, enqueue, checkFile, getJobs } from "../upload.js?v=82";
-import { categoryOf, canPreview, FILE_MAX } from "../files.js?v=82";
-import { takePending } from "../pending.js?v=82";
-import { icon } from "../icons.js?v=82";
+  knownVerified, listContacts, forgetContact, rememberContactsLocal, suggestContacts
+} from "../api.js?v=83";
+import { accountEmail } from "../session.js?v=83";
+import { ensureVerified } from "../verify.js?v=83";
+import { openUploadSheet } from "./upload-sheet.js?v=83";
+import { mountUploads } from "./uploads.js?v=83";
+import { onUploads, enqueue, checkFile, getJobs } from "../upload.js?v=83";
+import { categoryOf, canPreview, FILE_MAX } from "../files.js?v=83";
+import { takePending } from "../pending.js?v=83";
+import { icon } from "../icons.js?v=83";
 import {
   esc, h, formatBytes, formatDuration, plural, toast, errorText, openSheet, copyText, shareLink,
   canShare, formatDate, daysLeft, fileBadge, fileTile
-} from "../ui.js?v=82";
+} from "../ui.js?v=83";
 
 // Dans un espace "envoi", ce composeur EST l'accueil.
 export const title = (ctx) => (ctx && ctx.space.mode === "envoi" ? ctx.space.name : "Envoyer");
@@ -48,18 +48,6 @@ function remembered() {
 // Première version : carnet gardé dans le navigateur. Il vit désormais
 // sur le serveur, rattaché à l'email d'expédition : on efface l'ancien.
 try { localStorage.removeItem("seminaire.recentRecipients"); } catch (err) { /* privé */ }
-
-// Suggestions pour ce qui est tapé : début de l'adresse, du nom de
-// domaine, ou d'un morceau séparé par un point, un tiret...
-function suggest(contacts, query, exclude) {
-  const q = query.trim().toLowerCase();
-  const list = contacts.filter((r) => !exclude.includes(r.email));
-  if (!q) return list.slice(0, 6);
-  return list
-    .filter((r) => r.email.startsWith(q) || r.email.split(/[@._+-]/).some((part) => part.startsWith(q)))
-    .sort((a, b) => Number(b.email.startsWith(q)) - Number(a.email.startsWith(q)) || (a.last_at < b.last_at ? 1 : -1))
-    .slice(0, 6);
-}
 
 export async function mount(root, ctx, params) {
   const state = {
@@ -311,7 +299,7 @@ export async function mount(root, ctx, params) {
 
   // Destinataires déjà utilisés : proposés sous le champ, filtrés par la saisie
   function drawRecents() {
-    const list = suggest(state.contacts, emailEl.value, state.emails);
+    const list = suggestContacts(state.contacts, emailEl.value, state.emails);
     recentsEl.hidden = !list.length;
     if (!list.length) { recentsEl.innerHTML = ""; return; }
     recentsEl.innerHTML =
