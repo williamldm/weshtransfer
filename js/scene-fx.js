@@ -11,7 +11,7 @@
 // Rien ne tourne quand rien ne bouge (la boucle s'arrête d'elle-même), rien
 // du tout avec "réduire les animations", ni onglet caché.
 
-import { WALLPAPERS } from "./wallpapers.js?v=88";
+import { WALLPAPERS } from "./wallpapers.js?v=89";
 
 const MAX_PARTICLES = 240;
 const SHIFT_X = 16;   // px, amplitude de la profondeur

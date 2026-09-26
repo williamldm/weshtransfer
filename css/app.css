@@ -1,5 +1,5 @@
-@import url("fonts.css?v=88");
-@import url("tokens.css?v=88");
+@import url("fonts.css?v=89");
+@import url("tokens.css?v=89");
 
 /* ================================================================= base */
 *, *::before, *::after { box-sizing: border-box; }
@@ -617,9 +617,13 @@ body.hub .scene { position: fixed; inset: 0; z-index: -1; }
 @media (max-width: 480px) { .co2-long { display: none; } .co2-short { display: inline; } }
 
 .hub-stage {
+  /* grands écrans : la carte grandit (zoom) et descend un peu, en gardant
+     le grand titre aligné sur elle ; portable : rien ne change */
+  --deck-zoom: 1;
+  --deck-top: max(var(--sp-5), calc(16vh - 130px));
   position: relative;
   display: grid;
-  grid-template-columns: minmax(0, 400px) 1fr;
+  grid-template-columns: minmax(0, calc(400px * var(--deck-zoom))) 1fr;
   grid-template-areas: "deck claim" "deck note";
   column-gap: var(--sp-7);
   min-height: calc(100dvh - 76px);
@@ -629,9 +633,9 @@ body.hub .scene { position: fixed; inset: 0; z-index: -1; }
   grid-area: claim;
   align-self: start;
   max-width: 11ch;
-  margin: var(--sp-5) 0 0 auto;
+  margin: var(--deck-top) 0 0 auto;
   font-family: var(--display);
-  font-size: clamp(40px, 5.2vw, 76px);
+  font-size: clamp(40px, 5.2vw, calc(76px * var(--deck-zoom)));
   font-weight: 800;
   line-height: .98;
   letter-spacing: -0.04em;
@@ -641,14 +645,19 @@ body.hub .scene { position: fixed; inset: 0; z-index: -1; }
 .claim em { font-style: normal; color: var(--accent-bright); }
 .wallpaper-note { grid-area: note; align-self: end; justify-self: end; max-width: 300px; margin: 0; color: var(--text-faint); font-family: var(--mono); font-size: 10px; line-height: 1.6; letter-spacing: .06em; text-align: right; text-transform: uppercase; }
 
+@media (min-width: 1600px) and (min-height: 900px) { .hub-stage { --deck-zoom: 1.15; } }
+@media (min-width: 2000px) and (min-height: 1100px) { .hub-stage { --deck-zoom: 1.45; --deck-top: calc(24vh - 90px); column-gap: 120px; padding-left: 96px; padding-right: 96px; } }
+@media (min-width: 2800px) and (min-height: 1500px) { .hub-stage { --deck-zoom: 1.8; } }
+
 /* la carte */
 .deck {
   grid-area: deck;
   /* en haut, aligné sur le grand titre (centré, il descendait trop sur
      les grands écrans) */
   align-self: start;
-  margin-top: var(--sp-5);
+  margin-top: calc(var(--deck-top) / var(--deck-zoom));
   width: 100%;
+  zoom: var(--deck-zoom);
   border: 1px solid var(--line-strong);
   border-radius: var(--r-lg);
   background: rgba(22, 20, 27, .97);
