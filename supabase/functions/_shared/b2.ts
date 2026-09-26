@@ -83,7 +83,19 @@ export async function presignGet(b2: B2, key: string, expires: number, downloadN
     );
   }
   const signed = await b2.aws.sign(url.toString(), { method: "GET", aws: { signQuery: true, datetime } });
-  return signed.url;
+  return viaRelay(signed.url);
+}
+
+// Relais Cloudflare (cloudflare/files-worker.js) : avec le secret FILES_BASE
+// (ex. https://files.weshtransfer.fr), le lien signé pour B2 passe par le
+// Worker, qui remet l'hôte B2 et relaie. La signature reste celle de B2 ;
+// la sortie B2 -> Cloudflare est gratuite et le cache Cloudflare absorbe
+// les réécoutes. Sans le secret : lien B2 direct, comme avant.
+function viaRelay(signed: string): string {
+  const base = (Deno.env.get("FILES_BASE") ?? "").replace(/\/+$/, "");
+  if (!/^https:\/\/[a-z0-9.-]+$/.test(base)) return signed;
+  const u = new URL(signed);
+  return base + u.pathname + u.search;
 }
 
 // Tout ce que contient le bucket (admin : comparaison avec la base).
