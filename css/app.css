@@ -1,5 +1,5 @@
-@import url("fonts.css?v=93");
-@import url("tokens.css?v=93");
+@import url("fonts.css?v=94");
+@import url("tokens.css?v=94");
 
 /* ================================================================= base */
 *, *::before, *::after { box-sizing: border-box; }
@@ -815,6 +815,10 @@ body.public .scene { position: fixed; inset: 0; z-index: -1; }
 .tp-space { color: var(--text-faint); font-family: var(--mono); font-size: 11px; text-transform: uppercase; letter-spacing: .1em; }
 .tp-hero h1 { margin-bottom: var(--sp-4); font-size: clamp(26px, 6.5vw, 38px); line-height: 1.1; overflow-wrap: anywhere; }
 .rh-help { position: relative; }
+.rh-offer { display: flex; align-items: center; gap: var(--sp-3); margin: 0 0 var(--sp-4); padding: var(--sp-3) var(--sp-4); border: 1px solid var(--accent-bright); border-radius: var(--r-md); background: var(--surface); }
+.rh-offer > svg { flex: none; color: var(--accent-bright); }
+.rh-offer p { flex: 1; margin: 0; font-size: var(--fs-sm); }
+@media (max-width: 560px) { .rh-offer { flex-wrap: wrap; } .rh-offer p { flex-basis: calc(100% - 40px); } }
 .rh-help h2 { display: flex; align-items: center; gap: var(--sp-2); margin: 0 0 var(--sp-2); padding-right: 40px; font-size: var(--fs-md, 16px); }
 .rh-help-x { position: absolute; top: var(--sp-2); right: var(--sp-2); }
 .tp-burn { display: flex; gap: var(--sp-2); align-items: flex-start; margin: 0 0 var(--sp-4); padding: var(--sp-3); border: 1px solid var(--line-strong); border-radius: var(--r-md); color: var(--text-dim); font-size: var(--fs-sm); }

@@ -399,7 +399,7 @@ export function reviewDigestMail(input) {
     blocks +
     small("Les liens s'ouvrent sur l'appareil avec lequel tu es dans l'espace.", "24px 0 0");
 
-  const footer = `<p style="margin:0;">Tu reçois cet email parce que tu as activé les notifications dans ${LQ}${esc(input.spaceName)}${RQ}. Pour les couper : l'accueil de l'espace, ligne ${LQ}Prévenu par email${RQ}.</p>`;
+  const footer = `<p style="margin:0;">Tu reçois cet email parce que tu as activé les notifications dans ${LQ}${esc(input.spaceName)}${RQ}. Pour les couper : l'icône enveloppe, en haut de l'espace.</p>`;
 
   const html = layout({ site, title: subject, preheader, body, footer });
   const text = tidy([
@@ -605,6 +605,59 @@ export function burnNoticeMail(input) {
     "Comme prévu, le fichier est effacé de nos serveurs.",
     "",
     `Voir mes envois : ${site}/app.html#/transfers`,
+    "",
+    textFooter(site),
+  ]);
+  return { subject, html, text };
+}
+
+// Verdict, côté artiste : l'ingé a déposé de nouvelles versions (un seul
+// email, 10 minutes après son dernier dépôt). input : { site, spaceName,
+// engineer, projects: [{ title, version, label, fixed, replies, link }] }
+export function newVersionsMail(input) {
+  const site = input.site;
+  const who = input.engineer || "L'ingé";
+  const n = input.projects.length;
+  const one = n === 1 ? input.projects[0] : null;
+  const fixed = input.projects.reduce((s, p) => s + (p.fixed || 0), 0);
+
+  const subject = one
+    ? `Nouvelle version de ${LQ}${one.title}${RQ} (${one.version})`
+    : `${n} nouvelles versions dans ${LQ}${input.spaceName}${RQ}`;
+  const preheader = one
+    ? `${who} a déposé la ${one.version} de ${one.title}${one.fixed ? `, ${one.fixed} correction${one.fixed > 1 ? "s" : ""} faite${one.fixed > 1 ? "s" : ""}` : ""}. À toi d'écouter.`
+    : `${who} a déposé ${n} nouvelles versions${fixed ? `, ${fixed} correction${fixed > 1 ? "s" : ""} faite${fixed > 1 ? "s" : ""}` : ""}. À toi d'écouter.`;
+
+  const rows = input.projects.map((p) =>
+    `<tr><td style="padding:14px 0;border-bottom:1px solid ${C.rule};">` +
+      `<div style="font-family:${DISPLAY};font-size:18px;font-weight:700;color:${C.text};">${esc(p.title)} ` +
+        `<span style="display:inline-block;padding:1px 7px;border-radius:99px;background:${C.tile};color:${C.bright};font-family:${MONO};font-size:12px;vertical-align:middle;">${esc(p.version)}</span></div>` +
+      (p.label ? `<div style="margin-top:3px;font-family:${MONO};font-size:11px;letter-spacing:1px;text-transform:uppercase;color:${C.faint};">${esc(p.label)}</div>` : "") +
+      (p.fixed ? `<div style="margin-top:6px;font-family:${SANS};font-size:14px;color:#6FCF8E;">&#10003; ${p.fixed} correction${p.fixed > 1 ? "s" : ""} faite${p.fixed > 1 ? "s" : ""} : à vérifier</div>` : "") +
+      (p.replies ? `<div style="margin-top:4px;font-family:${SANS};font-size:14px;color:${C.faint};">&#8627; ${p.replies} réponse${p.replies > 1 ? "s" : ""} à tes retours</div>` : "") +
+      `<div style="margin-top:8px;"><a href="${esc(p.link)}" style="color:${C.bright};font-family:${SANS};font-size:14px;font-weight:600;text-decoration:none;">Écouter ${esc(p.title)}&nbsp;&rarr;</a></div>` +
+    `</td></tr>`).join("");
+
+  const body =
+    eyebrow("Verdict · " + esc(input.spaceName)) +
+    heading(one ? `La ${esc(one.version)} de ${LQ}${esc(one.title)}${RQ} est là.` : "Du nouveau à écouter.") +
+    para(`${esc(who)} a déposé ${one ? "une nouvelle version" : `${n} nouvelles versions`}. Écoute, vérifie les corrections, et valide ou redemande.`) +
+    button(input.projects[0].link, one ? "Écouter&nbsp;&rarr;" : "Écouter la première&nbsp;&rarr;") +
+    `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:24px 0 0;">${rows}</table>` +
+    small("Les liens s'ouvrent sur l'appareil avec lequel tu es dans l'espace.", "24px 0 0");
+
+  const footer = `<p style="margin:0;">Tu reçois cet email parce que tu participes au verdict ${LQ}${esc(input.spaceName)}${RQ}. Pour ne plus le recevoir : l'icône enveloppe, en haut de l'espace.</p>`;
+
+  const html = layout({ site, title: subject, preheader, body, footer });
+  const text = tidy([
+    `${who} a déposé ${one ? "une nouvelle version" : `${n} nouvelles versions`} dans "${input.spaceName}".`,
+    ...input.projects.map((p) => [
+      "",
+      `== ${p.title} (${p.version})${p.label ? " - " + p.label : ""}`,
+      p.fixed ? `${p.fixed} correction(s) faite(s) : à vérifier.` : "",
+      p.replies ? `${p.replies} réponse(s) à tes retours.` : "",
+      `Écouter : ${p.link}`,
+    ].join("\n")),
     "",
     textFooter(site),
   ]);

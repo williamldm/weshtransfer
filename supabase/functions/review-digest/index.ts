@@ -1,4 +1,9 @@
-// Retours de mix : récapitulatif par email pour l'ingé son.
+// Retours de mix : récapitulatifs par email.
+//   - l'ingé (hôte, ou qui a déposé un mix) : les retours de l'artiste ;
+//   - l'artiste (abonné d'office en acceptant son invitation) : les
+//     nouvelles versions déposées par l'ingé, corrections faites, réponses.
+// Toujours UN email global, envoyé 10 minutes après la dernière action de
+// l'autre (pas un email par retouche).
 //
 // POST (pg_cron, x-cron-secret)            -> envoie les récapitulatifs prêts
 // POST { action: "status", space_id }      -> { email } ou { email: null }
@@ -14,7 +19,7 @@
 // deno-lint-ignore-file no-explicit-any
 import { admin, callerId } from "../_shared/supabase.ts";
 import { json, preflight, readJson } from "../_shared/http.ts";
-import { isVerified, mailConfig, reviewDigestMail, sendEmails, type MailConfig } from "../_shared/email.ts";
+import { isVerified, mailConfig, newVersionsMail, reviewDigestMail, sendEmails, type MailConfig } from "../_shared/email.ts";
 
 const QUIET_MS = 10 * 60e3;
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
@@ -30,10 +35,84 @@ function sameSecret(a: string, b: string): boolean {
 
 const later = (a: string | null, b: string) => !!a && a > b;
 
+// ingé = hôte de l'espace, ou quelqu'un qui y a déposé un fichier
+async function isEngineer(db: any, sub: Sub): Promise<boolean> {
+  const { data: p } = await db.from("participants").select("is_host").eq("id", sub.participant_id).maybeSingle();
+  if (p?.is_host) return true;
+  const { count } = await db.from("files").select("id", { count: "exact", head: true })
+    .eq("space_id", sub.space_id).eq("uploaded_by", sub.participant_id);
+  return (count ?? 0) > 0;
+}
+
+// Côté artiste : nouvelles versions (la plus récente par morceau), avec les
+// corrections marquées faites et les réponses de l'ingé.
+async function artistDigest(db: any, cfg: MailConfig, sub: Sub, space: any, force: boolean): Promise<string> {
+  const since = sub.since;
+  const [{ data: files }, { data: replies }] = await Promise.all([
+    db.from("files").select("id, version_no, label, project_id, created_at, uploader:participants(pseudo), project:projects(title)")
+      .eq("space_id", space.id).eq("status", "ready").gt("created_at", since)
+      .neq("uploaded_by", sub.participant_id).order("version_no", { ascending: false }),
+    db.from("comments").select("id, file_id, created_at, file:files(project_id)")
+      .eq("space_id", space.id).not("parent_id", "is", null).gt("created_at", since)
+      .neq("author_id", sub.participant_id),
+  ]);
+  const fs = (files ?? []) as any[];
+  const rs = (replies ?? []) as any[];
+  if (!fs.length && !rs.length) return "rien";
+
+  // l'ingé est-il encore en train de déposer ?
+  const latest = [...fs.map((f) => f.created_at), ...rs.map((r) => r.created_at)].sort().pop() as string;
+  if (!force && Date.now() - new Date(latest).getTime() < QUIET_MS) return "en cours";
+
+  const byProject = new Map<string, any>();
+  for (const f of fs) {
+    if (byProject.has(f.project_id)) continue;   // trié par version : la plus récente d'abord
+    byProject.set(f.project_id, {
+      fileId: f.id, title: f.project ? f.project.title : "Morceau", version: "v" + f.version_no,
+      label: f.label, engineer: f.uploader ? f.uploader.pseudo : null, fixed: 0, replies: 0,
+    });
+  }
+  // réponses sur un morceau sans nouvelle version : on le cite quand même
+  const missing = [...new Set(rs.map((r) => r.file?.project_id).filter((id) => id && !byProject.has(id)))];
+  if (missing.length) {
+    const { data: lastOf } = await db.from("files").select("id, version_no, label, project_id, project:projects(title)")
+      .in("project_id", missing).eq("status", "ready").order("version_no", { ascending: false });
+    for (const f of (lastOf ?? []) as any[]) {
+      if (byProject.has(f.project_id)) continue;
+      byProject.set(f.project_id, { fileId: f.id, title: f.project ? f.project.title : "Morceau", version: "v" + f.version_no, label: f.label, engineer: null, fixed: 0, replies: 0 });
+    }
+  }
+  for (const r of rs) {
+    const p = byProject.get(r.file?.project_id);
+    if (p) p.replies++;
+  }
+  const newIds = fs.map((f) => f.id);
+  if (newIds.length) {
+    const { data: fixed } = await db.from("comments").select("resolved_in")
+      .in("resolved_in", newIds).is("parent_id", null).not("resolved_at", "is", null);
+    const projectOfFile = new Map(fs.map((f) => [f.id, f.project_id]));
+    for (const c of (fixed ?? []) as any[]) {
+      const p = byProject.get(projectOfFile.get(c.resolved_in));
+      if (p) p.fixed++;
+    }
+  }
+  const list = [...byProject.values()].map((p) => ({ ...p, link: `${cfg.site}/app.html#/f/${p.fileId}` }));
+  if (!list.length) return "rien";
+
+  const engineer = list.find((p) => p.engineer)?.engineer ?? null;
+  const mail = newVersionsMail({ site: cfg.site, spaceName: space.name, engineer, projects: list });
+  const [sent] = await sendEmails(cfg, [{ to: sub.email, subject: mail.subject, html: mail.html, text: mail.text }], { kind: "versions" });
+  if (!sent.ok) return "échec : " + sent.error;
+  const now = new Date().toISOString();
+  await db.from("review_subscriptions").update({ since: now, last_sent_at: now }).eq("participant_id", sub.participant_id);
+  return "envoyé";
+}
+
 async function digest(db: any, cfg: MailConfig, sub: Sub, force: boolean): Promise<string> {
   const since = sub.since;
   const { data: space } = await db.from("spaces").select("id, name, mode").eq("id", sub.space_id).maybeSingle();
   if (!space || space.mode !== "revue") return "hors-sujet";
+  if (!await isEngineer(db, sub)) return artistDigest(db, cfg, sub, space, force);
 
   const [{ data: comments }, { data: approvals }] = await Promise.all([
     db.from("comments")
@@ -148,12 +227,7 @@ Deno.serve(async (req) => {
   if (body.action === "subscribe") {
     const email = String(body.email ?? "").trim().toLowerCase();
     if (!EMAIL_RE.test(email) || email.length > 254) return json({ error: "EMAIL_INVALIDE" }, 400);
-    // réservé à l'ingé : host, ou quelqu'un qui a déposé un mix ici
-    if (!me.is_host) {
-      const { count } = await db.from("files").select("id", { count: "exact", head: true })
-        .eq("space_id", spaceId).eq("uploaded_by", me.id);
-      if (!count) return json({ error: "RESERVE_INGE" }, 403);
-    }
+    // ingé comme artiste : chacun reçoit ce que fait l'autre
     if (!await isVerified(db, uid, email)) return json({ error: "EMAIL_NON_VERIFIE" }, 403);
     const { error } = await db.from("review_subscriptions").upsert({
       participant_id: me.id, space_id: spaceId, email, since: new Date().toISOString(),

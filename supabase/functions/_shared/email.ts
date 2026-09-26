@@ -14,7 +14,7 @@ import { badRecipient, logMails, smtpRoute, spamSignal, trip, type LogRow } from
 import { admin } from "./supabase.ts";
 export {
   esc, formatBytes, formatDate, typeLabel, transferMail, verifyCodeMail, downloadNoticeMail, inviteMail, reviewDigestMail,
-  sentConfirmMail, openNoticeMail, burnNoticeMail,
+  sentConfirmMail, openNoticeMail, burnNoticeMail, newVersionsMail,
 } from "./mail-templates.js";
 
 export type Sender = { name?: string; email: string };

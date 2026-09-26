@@ -6,17 +6,17 @@
 import {
   listProjects, listReviewComments, deleteProject, deleteFile, listParticipants, updateProject,
   reviewNotifyStatus, reviewSubscribe, reviewUnsubscribe, signFiles, cachedDownload
-} from "../api.js?v=93";
-import { saveZip, canStreamToDisk, MEMORY_LIMIT } from "../zip.js?v=93";
-import { mountUploads } from "./uploads.js?v=93";
-import { openUploadSheet } from "./upload-sheet.js?v=93";
-import { stateOf, isEngineerOf } from "./review.js?v=93";
-import { ensureVerified } from "../verify.js?v=93";
-import { accountEmail } from "../session.js?v=93";
-import { albumOf, onCover, setCover, clearCover, setAlbumTitle } from "../cover.js?v=93";
-import { playQueue, onPlayer, isCurrent, state as playerState, toggle, trackFromFile } from "../player.js?v=93";
-import { icon } from "../icons.js?v=93";
-import { esc, h, plural, toast, errorText, formatDuration, actionSheet, confirmSheet, promptSheet, openSheet, triggerDownload } from "../ui.js?v=93";
+} from "../api.js?v=94";
+import { saveZip, canStreamToDisk, MEMORY_LIMIT } from "../zip.js?v=94";
+import { mountUploads } from "./uploads.js?v=94";
+import { openUploadSheet } from "./upload-sheet.js?v=94";
+import { stateOf, isEngineerOf } from "./review.js?v=94";
+import { ensureVerified } from "../verify.js?v=94";
+import { accountEmail } from "../session.js?v=94";
+import { albumOf, onCover, setCover, clearCover, setAlbumTitle } from "../cover.js?v=94";
+import { playQueue, onPlayer, isCurrent, state as playerState, toggle, trackFromFile } from "../player.js?v=94";
+import { icon } from "../icons.js?v=94";
+import { esc, h, plural, toast, errorText, formatDuration, actionSheet, confirmSheet, promptSheet, openSheet, triggerDownload } from "../ui.js?v=94";
 
 // Pochette générée : un aplat dont la teinte dépend du nom, les initiales
 // en grand. Pas de dégradé (identité sobre).
@@ -101,6 +101,7 @@ export async function mountReviewHome(root, ctx) {
         "</div>" +
       "</div>" +
     "</section>" +
+    '<div data-notify-offer></div>' +
     '<div data-help></div>' +
     '<div data-uploads hidden></div>' +
     '<ol class="tracklist" data-list><li class="skeleton"></li><li class="skeleton"></li></ol>';
@@ -112,6 +113,7 @@ export async function mountReviewHome(root, ctx) {
   const coverBox = root.querySelector("[data-cover-box]");
   const coverPick = root.querySelector("[data-cover-pick]");
   const helpBox = root.querySelector("[data-help]");
+  const offerBox = root.querySelector("[data-notify-offer]");
   const dlAll = root.querySelector("[data-dl-all]");
   const helpShow = root.querySelector("[data-help-show]");
   const backdropBox = root.querySelector("[data-backdrop]");
@@ -271,28 +273,55 @@ export async function mountReviewHome(root, ctx) {
     dlAll.innerHTML = label;
   });
 
-  // Actions de l'ingé : déposer un mix, emails (inviter : icône du haut). Une icône chacune.
+  // Actions : déposer un mix (ingé), et l'enveloppe des emails pour tout le
+  // monde. Ingé : un récapitulatif des retours de l'artiste. Artiste : un
+  // email quand l'ingé dépose de nouvelles versions. Toujours un seul email
+  // global, 10 minutes après la dernière action de l'autre.
   let notifyEmail = null;
+  let notifyKnown = false;   // état chargé (sinon on ne propose rien)
+  const OFFER_KEY = "weshtransfer.notifyOffer." + s.id;
+  const mailText = () => engineer
+    ? { on: "Récap des retours activé : ", off: "Recevoir un email quand l'artiste a fait ses retours",
+        offer: "Reçois un email récapitulatif quand l'artiste a laissé ses avis : un seul, 10 minutes après sa dernière retouche.",
+        done: "Tu recevras un email quand l'artiste aura fait ses retours" }
+    : { on: "Emails des nouvelles versions activés : ", off: "Recevoir un email quand l'ingé dépose une nouvelle version",
+        offer: "Reçois un email quand l'ingé dépose une nouvelle version (avec le morceau et les corrections faites).",
+        done: "Tu recevras un email à chaque nouvelle version" };
+
   function drawEngineerActions() {
-    if (!engineer) { engActions.innerHTML = ""; return; }
-    engActions.innerHTML =
-      '<label class="btn">' + icon("upload", 18) + "<span>Déposer</span>" +
-        '<input type="file" multiple hidden data-pick></label>' +
-      '<button class="btn btn-ghost btn-icon' + (notifyEmail ? " is-on" : "") + '" data-notify aria-label="Emails quand l\'artiste a fait ses retours" title="' +
-        (notifyEmail ? "Emails activés : " + esc(notifyEmail) : "Recevoir un email quand l'artiste a fait ses retours") + '">' + icon("mail", 20) + "</button>";
+    const t = mailText();
+    const mail = '<button class="btn btn-ghost btn-icon' + (notifyEmail ? " is-on" : "") + '" data-notify aria-label="' + esc(t.off) + '" title="' +
+      esc(notifyEmail ? t.on + notifyEmail : t.off) + '">' + icon("mail", 20) + "</button>";
+    engActions.innerHTML = engineer
+      ? '<label class="btn">' + icon("upload", 18) + "<span>Déposer</span>" + '<input type="file" multiple hidden data-pick></label>' + mail
+      : mail;
     const pick = engActions.querySelector("[data-pick]");
-    pick.addEventListener("change", (e) => { openUploadSheet(ctx, e.target.files); e.target.value = ""; });
+    if (pick) pick.addEventListener("change", (e) => { openUploadSheet(ctx, e.target.files); e.target.value = ""; });
+    drawOffer();
   }
 
-  engActions.addEventListener("click", async (e) => {
-    if (!e.target.closest("[data-notify]")) return;
-    if (notifyEmail) {
-      const ok = await confirmSheet("Plus d'email récapitulatif pour cet espace ?", { ok: "Couper les emails", title: "Emails" });
-      if (!ok) return;
-      try { await reviewUnsubscribe(s.id); notifyEmail = null; drawEngineerActions(); toast("Emails coupés", "ok"); }
-      catch (err) { toast(errorText(err), "err"); }
-      return;
+  // Proposition bien visible tant que les emails ne sont pas activés (une
+  // croix la range pour de bon sur cet appareil ; l'enveloppe reste)
+  function offerDismissed() { try { return localStorage.getItem(OFFER_KEY) === "1"; } catch (err) { return false; } }
+  function drawOffer() {
+    if (!notifyKnown || notifyEmail || offerDismissed()) { offerBox.innerHTML = ""; return; }
+    offerBox.innerHTML =
+      '<section class="rh-offer">' +
+        icon("mail", 20) +
+        "<p>" + esc(mailText().offer) + "</p>" +
+        '<button type="button" class="btn btn-primary btn-sm" data-offer-on>Activer</button>' +
+        '<button type="button" class="btn btn-ghost btn-icon btn-sm" data-offer-x aria-label="Non merci" title="Non merci">' + icon("x", 16) + "</button>" +
+      "</section>";
+  }
+  offerBox.addEventListener("click", (e) => {
+    if (e.target.closest("[data-offer-on]")) { turnOnEmails(); return; }
+    if (e.target.closest("[data-offer-x]")) {
+      try { localStorage.setItem(OFFER_KEY, "1"); } catch (err) { /* navigation privée */ }
+      drawOffer();
     }
+  });
+
+  async function turnOnEmails() {
     // connecté : l'adresse du compte, déjà vérifiée ; sinon on la demande
     let email = accountEmail();
     if (!email) {
@@ -304,8 +333,20 @@ export async function mountReviewHome(root, ctx) {
       const r = await reviewSubscribe(s.id, email);
       notifyEmail = r.email;
       drawEngineerActions();
-      toast("Tu recevras un email quand l'artiste aura fini ses retours", "ok");
+      toast(mailText().done, "ok");
     } catch (err) { toast(errorText(err), "err"); }
+  }
+
+  engActions.addEventListener("click", async (e) => {
+    if (!e.target.closest("[data-notify]")) return;
+    if (notifyEmail) {
+      const ok = await confirmSheet("Plus d'email pour cet espace ?", { ok: "Couper les emails", title: "Emails" });
+      if (!ok) return;
+      try { await reviewUnsubscribe(s.id); notifyEmail = null; drawEngineerActions(); toast("Emails coupés", "ok"); }
+      catch (err) { toast(errorText(err), "err"); }
+      return;
+    }
+    turnOnEmails();
   });
 
   function tracks() {
@@ -527,7 +568,7 @@ export async function mountReviewHome(root, ctx) {
     hostName = host ? host.pseudo : "";
     drawAlbum();
   }).catch(() => {});
-  if (engineer) reviewNotifyStatus(s.id).then((r) => { notifyEmail = r && r.email; drawEngineerActions(); }).catch(() => {});
+  reviewNotifyStatus(s.id).then((r) => { notifyEmail = r && r.email; notifyKnown = true; drawEngineerActions(); }).catch(() => {});
 
   const offUploads = mountUploads(root.querySelector("[data-uploads]"));
   const offDb = ctx.bus.on("db", (e) => {

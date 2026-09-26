@@ -228,6 +228,15 @@ Deno.serve(async (req) => {
       .update({ accepted_at: new Date().toISOString(), accepted_participant: participant!.id })
       .eq("id", invite.id);
 
+    // Verdict : l'artiste (adresse prouvée par le code) est prévenu par email
+    // des nouvelles versions de l'ingé. Seulement à l'entrée (s'il s'est
+    // désabonné ensuite, on ne le réabonne pas en douce).
+    if (space.mode === "revue" && !already && !invite.accepted_participant) {
+      await db.from("review_subscriptions").upsert({
+        participant_id: participant!.id, space_id: space.id, email: invite.email, since: new Date().toISOString(),
+      }, { onConflict: "participant_id", ignoreDuplicates: true });
+    }
+
     return json({
       space_id: space.id, participant_id: participant!.id, name: space.name, code: space.code,
       mode: space.mode, access: space.access, expires_at: space.expires_at, is_locked: space.is_locked,
