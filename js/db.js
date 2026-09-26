@@ -3,7 +3,7 @@
 // deux URL différentes = deux clients = deux sessions.
 
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.0/+esm";
-import { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from "./config.js?v=94";
+import { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from "./config.js?v=95";
 
 function atobSafe(key) {
   try { return atob(key.split(".")[1] || ""); } catch (err) { return ""; }

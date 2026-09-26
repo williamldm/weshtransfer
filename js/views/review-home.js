@@ -5,18 +5,18 @@
 
 import {
   listProjects, listReviewComments, deleteProject, deleteFile, listParticipants, updateProject,
-  reviewNotifyStatus, reviewSubscribe, reviewUnsubscribe, signFiles, cachedDownload
-} from "../api.js?v=94";
-import { saveZip, canStreamToDisk, MEMORY_LIMIT } from "../zip.js?v=94";
-import { mountUploads } from "./uploads.js?v=94";
-import { openUploadSheet } from "./upload-sheet.js?v=94";
-import { stateOf, isEngineerOf } from "./review.js?v=94";
-import { ensureVerified } from "../verify.js?v=94";
-import { accountEmail } from "../session.js?v=94";
-import { albumOf, onCover, setCover, clearCover, setAlbumTitle } from "../cover.js?v=94";
-import { playQueue, onPlayer, isCurrent, state as playerState, toggle, trackFromFile } from "../player.js?v=94";
-import { icon } from "../icons.js?v=94";
-import { esc, h, plural, toast, errorText, formatDuration, actionSheet, confirmSheet, promptSheet, openSheet, triggerDownload } from "../ui.js?v=94";
+  reviewNotifyStatus, reviewSubscribe, reviewUnsubscribe, signFiles, cachedDownload, myPrefs, savePref
+} from "../api.js?v=95";
+import { saveZip, canStreamToDisk, MEMORY_LIMIT } from "../zip.js?v=95";
+import { mountUploads } from "./uploads.js?v=95";
+import { openUploadSheet } from "./upload-sheet.js?v=95";
+import { stateOf, isEngineerOf } from "./review.js?v=95";
+import { ensureVerified } from "../verify.js?v=95";
+import { accountEmail } from "../session.js?v=95";
+import { albumOf, onCover, setCover, clearCover, setAlbumTitle } from "../cover.js?v=95";
+import { playQueue, onPlayer, isCurrent, state as playerState, toggle, trackFromFile } from "../player.js?v=95";
+import { icon } from "../icons.js?v=95";
+import { esc, h, plural, toast, errorText, formatDuration, actionSheet, confirmSheet, promptSheet, openSheet, triggerDownload } from "../ui.js?v=95";
 
 // Pochette générée : un aplat dont la teinte dépend du nom, les initiales
 // en grand. Pas de dégradé (identité sobre).
@@ -68,8 +68,16 @@ export function backdrop(image, text) {
 
 const HELP_KEY = "weshtransfer.reviewHelp";
 const WELCOME_KEY = "weshtransfer.verdictWelcome.";
+// Aide masquée : choix global (tous les verdicts), mémorisé sur l'appareil
+// ET sur le compte (participants.prefs.help = { v, at }, le plus récent
+// l'emporte), pour suivre la personne d'un appareil à l'autre.
+let helpPref = null;   // { v: "open" | "closed", at }
 function helpClosed() {
-  try { return localStorage.getItem(HELP_KEY) === "closed"; } catch (err) { return false; }
+  let local = null;
+  try { local = JSON.parse(localStorage.getItem(HELP_KEY + ".at") || "null"); } catch (err) { /* privé */ }
+  if (!local) { try { if (localStorage.getItem(HELP_KEY) === "closed") local = { v: "closed", at: "" }; } catch (err) { /* privé */ } }
+  const pick = [local, helpPref].filter(Boolean).sort((a, b) => String(a.at).localeCompare(String(b.at))).pop();
+  return !!pick && pick.v === "closed";
 }
 
 export async function mountReviewHome(root, ctx) {
@@ -238,7 +246,13 @@ export async function mountReviewHome(root, ctx) {
         "<p>Pas besoin de vocabulaire technique, et tu peux demander autant de modifications que tu veux. Télécharge un morceau avec sa flèche, ou tout d'un coup.</p>" +
       "</section>";
   }
-  const setHelp = (v) => { try { localStorage.setItem(HELP_KEY, v); } catch (err) { /* navigation privée */ } drawHelp(); };
+  const setHelp = (v) => {
+    const val = { v, at: new Date().toISOString() };
+    helpPref = val;
+    try { localStorage.setItem(HELP_KEY, v); localStorage.setItem(HELP_KEY + ".at", JSON.stringify(val)); } catch (err) { /* navigation privée */ }
+    if (s.participantId) savePref(s.participantId, "help", val).catch(() => {});
+    drawHelp();
+  };
   helpBox.addEventListener("click", (e) => { if (e.target.closest("[data-help-hide]")) setHelp("closed"); });
   helpShow.addEventListener("click", () => setHelp("open"));
 
@@ -280,13 +294,16 @@ export async function mountReviewHome(root, ctx) {
   let notifyEmail = null;
   let notifyKnown = false;   // état chargé (sinon on ne propose rien)
   const OFFER_KEY = "weshtransfer.notifyOffer." + s.id;
+  let spacePrefs = {};       // préférences de cette place (compte)
   const mailText = () => engineer
     ? { on: "Récap des retours activé : ", off: "Recevoir un email quand l'artiste a fait ses retours",
         offer: "Reçois un email récapitulatif quand l'artiste a laissé ses avis : un seul, 10 minutes après sa dernière retouche.",
-        done: "Tu recevras un email quand l'artiste aura fait ses retours" }
+        done: "Tu recevras un email quand l'artiste aura fait ses retours",
+        auto: "Emails activés : un récap quand l'artiste a laissé ses avis, 10 minutes après sa dernière retouche." }
     : { on: "Emails des nouvelles versions activés : ", off: "Recevoir un email quand l'ingé dépose une nouvelle version",
         offer: "Reçois un email quand l'ingé dépose une nouvelle version (avec le morceau et les corrections faites).",
-        done: "Tu recevras un email à chaque nouvelle version" };
+        done: "Tu recevras un email à chaque nouvelle version",
+        auto: "Emails activés : tu es prévenu à chaque nouvelle version (v2, v3...), avec le morceau et les corrections faites." };
 
   function drawEngineerActions() {
     const t = mailText();
@@ -302,8 +319,27 @@ export async function mountReviewHome(root, ctx) {
 
   // Proposition bien visible tant que les emails ne sont pas activés (une
   // croix la range pour de bon sur cet appareil ; l'enveloppe reste)
-  function offerDismissed() { try { return localStorage.getItem(OFFER_KEY) === "1"; } catch (err) { return false; } }
+  function offerDismissed() {
+    if (spacePrefs.offer === "hidden") return true;
+    try { return localStorage.getItem(OFFER_KEY) === "1"; } catch (err) { return false; }
+  }
+  const keep = (key, value) => {
+    spacePrefs[key] = value;
+    if (s.participantId) savePref(s.participantId, key, value).catch(() => {});
+  };
   function drawOffer() {
+    // abonné d'office (compte avec adresse) : on le dit une fois, avec de
+    // quoi désactiver
+    if (notifyKnown && notifyEmail && spacePrefs.mailNotice !== "seen") {
+      offerBox.innerHTML =
+        '<section class="rh-offer">' +
+          icon("mail", 20) +
+          "<p>" + esc(mailText().auto) + " <span class=\"muted\">(" + esc(notifyEmail) + ")</span></p>" +
+          '<button type="button" class="btn btn-sm" data-offer-off>Désactiver</button>' +
+          '<button type="button" class="btn btn-ghost btn-icon btn-sm" data-notice-x aria-label="OK" title="OK">' + icon("x", 16) + "</button>" +
+        "</section>";
+      return;
+    }
     if (!notifyKnown || notifyEmail || offerDismissed()) { offerBox.innerHTML = ""; return; }
     offerBox.innerHTML =
       '<section class="rh-offer">' +
@@ -313,11 +349,24 @@ export async function mountReviewHome(root, ctx) {
         '<button type="button" class="btn btn-ghost btn-icon btn-sm" data-offer-x aria-label="Non merci" title="Non merci">' + icon("x", 16) + "</button>" +
       "</section>";
   }
-  offerBox.addEventListener("click", (e) => {
+  offerBox.addEventListener("click", async (e) => {
     if (e.target.closest("[data-offer-on]")) { turnOnEmails(); return; }
     if (e.target.closest("[data-offer-x]")) {
       try { localStorage.setItem(OFFER_KEY, "1"); } catch (err) { /* navigation privée */ }
+      keep("offer", "hidden");
       drawOffer();
+      return;
+    }
+    if (e.target.closest("[data-notice-x]")) { keep("mailNotice", "seen"); drawOffer(); return; }
+    if (e.target.closest("[data-offer-off]")) {
+      try {
+        await reviewUnsubscribe(s.id);
+        notifyEmail = null;
+        keep("mailNotice", "seen");
+        keep("offer", "hidden");
+        drawEngineerActions();
+        toast("Emails désactivés. L'enveloppe, en haut, les réactive.", "ok");
+      } catch (err) { toast(errorText(err), "err"); }
     }
   });
 
@@ -342,7 +391,7 @@ export async function mountReviewHome(root, ctx) {
     if (notifyEmail) {
       const ok = await confirmSheet("Plus d'email pour cet espace ?", { ok: "Couper les emails", title: "Emails" });
       if (!ok) return;
-      try { await reviewUnsubscribe(s.id); notifyEmail = null; drawEngineerActions(); toast("Emails coupés", "ok"); }
+      try { await reviewUnsubscribe(s.id); notifyEmail = null; keep("mailNotice", "seen"); keep("offer", "hidden"); drawEngineerActions(); toast("Emails coupés", "ok"); }
       catch (err) { toast(errorText(err), "err"); }
       return;
     }
@@ -568,7 +617,19 @@ export async function mountReviewHome(root, ctx) {
     hostName = host ? host.pseudo : "";
     drawAlbum();
   }).catch(() => {});
-  reviewNotifyStatus(s.id).then((r) => { notifyEmail = r && r.email; notifyKnown = true; drawEngineerActions(); }).catch(() => {});
+  Promise.all([
+    reviewNotifyStatus(s.id),
+    myPrefs().catch(() => [])
+  ]).then(([r, rows]) => {
+    const mine = (rows || []).find((x) => x.id === s.participantId);
+    spacePrefs = Object.assign({}, (mine && mine.prefs) || {});
+    helpPref = (rows || []).map((x) => x.prefs && x.prefs.help).filter((h) => h && h.v)
+      .sort((a, b) => String(a.at).localeCompare(String(b.at))).pop() || null;
+    notifyEmail = r && r.email;
+    notifyKnown = true;
+    drawEngineerActions();
+    drawHelp();
+  }).catch(() => {});
 
   const offUploads = mountUploads(root.querySelector("[data-uploads]"));
   const offDb = ctx.bus.on("db", (e) => {

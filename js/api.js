@@ -1,7 +1,7 @@
 // Accès aux données. Toutes les requêtes de l'appli passent par ici : les
 // vues ne connaissent ni PostgREST ni le Storage.
 
-import { sb, q, invoke, requireClient } from "./db.js?v=94";
+import { sb, q, invoke, requireClient } from "./db.js?v=95";
 
 // Toute requête passe par ici : sans config, message clair plutôt
 // qu'un "Cannot read properties of null".
@@ -426,4 +426,20 @@ export function deleteTransfer(id) {
 // lien court : weshtransfer.fr/t/<jeton>
 export function transferUrl(token) {
   return location.origin + "/t/" + token;
+}
+
+// ---------------------------------------------------------- préférences
+// Choix d'interface mémorisés sur le compte (participants.prefs) : ils
+// suivent la personne sur tous ses appareils. Lecture : toutes ses places
+// (pour les choix globaux, comme l'aide masquée) ; écriture : une place.
+export async function myPrefs() {
+  const { data: auth } = await db().auth.getSession();
+  const uid = auth && auth.session && auth.session.user && auth.session.user.id;
+  if (!uid) return [];
+  return q(db().from("participants").select("id, space_id, prefs").eq("user_id", uid));
+}
+export async function savePref(participantId, key, value) {
+  const row = await q(db().from("participants").select("prefs").eq("id", participantId).maybeSingle());
+  const prefs = Object.assign({}, (row && row.prefs) || {}, { [key]: value });
+  return q(db().from("participants").update({ prefs }).eq("id", participantId).select("id").maybeSingle());
 }

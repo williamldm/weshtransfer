@@ -233,11 +233,14 @@ Deno.serve(async (req) => {
       participant_id: me.id, space_id: spaceId, email, since: new Date().toISOString(),
     }, { onConflict: "participant_id" });
     if (error) return json({ error: "ERREUR_BASE", detail: error.message }, 500);
+    await db.from("participants").update({ mail_optout: false }).eq("id", me.id);
     return json({ email });
   }
 
   if (body.action === "unsubscribe") {
     await db.from("review_subscriptions").delete().eq("participant_id", me.id);
+    // refus mémorisé : plus jamais d'abonnement d'office dans cet espace
+    await db.from("participants").update({ mail_optout: true }).eq("id", me.id);
     return json({ email: null });
   }
 
