@@ -6,6 +6,7 @@
 // règles RLS que dans le navigateur, aucune règle dupliquée ici.
 //
 // POST { action: "config" }
+// POST { action: "delete-project", project_id }   (Verdict : artiste ou ingé)
 // POST { action: "upload-init", project_id, file_id, file_name, size, content_type }
 // POST { action: "upload-parts", key, upload_id, parts: [1, 2, ...] }
 // POST { action: "upload-status", key, upload_id }
@@ -273,6 +274,32 @@ Deno.serve(async (req) => {
         await service.storage.from("seminar").remove([row.storage_path]);
       }
       return json({ ok: true });
+    }
+
+    // ------------------------------- suppression d'un morceau (Verdict)
+    // Dans un espace de retours, l'artiste comme l'ingé peut supprimer un
+    // morceau (toutes ses versions, leurs fichiers, leurs retours).
+    // Ailleurs, la règle reste celle de la base (auteur ou host).
+    if (action === "delete-project") {
+      const projectId = String(body.project_id ?? "");
+      if (!UUID.test(projectId)) return json({ error: "REQUETE_INVALIDE" }, 400);
+      // lu avec la session de l'appelant : la RLS limite aux espaces dont il est membre
+      const { data: project } = await db.from("projects").select("id, space_id, created_by").eq("id", projectId).maybeSingle();
+      if (!project) return json({ error: "SUPPRESSION_REFUSEE" }, 403);
+      const { data: space } = await service.from("spaces").select("mode").eq("id", project.space_id).maybeSingle();
+      const { data: me } = await db.from("participants").select("id, is_host").eq("space_id", project.space_id).eq("user_id", uid).maybeSingle();
+      if (!me) return json({ error: "NON_MEMBRE" }, 403);
+      const allowed = (space?.mode === "revue") || me.is_host || project.created_by === me.id;
+      if (!allowed) return json({ error: "SUPPRESSION_REFUSEE" }, 403);
+
+      const { data: files } = await service.from("files").select("id, storage_path, backend").eq("project_id", projectId);
+      for (const f of (files ?? []) as FileRow[]) {
+        if (f.backend === "b2") { if (b2) await deletePrefix(b2, f.storage_path); }
+        else await service.storage.from("seminar").remove([f.storage_path]);
+      }
+      const { error: delErr } = await service.from("projects").delete().eq("id", projectId);
+      if (delErr) return json({ error: "ERREUR_BASE", detail: delErr.message }, 500);
+      return json({ ok: true, files: (files ?? []).length });
     }
 
     // ---------------------------------------- suppression d'un espace

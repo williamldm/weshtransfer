@@ -4,19 +4,19 @@
 // version) ; toucher sa pochette le joue, et les suivants s'enchaînent.
 
 import {
-  listProjects, listReviewComments, deleteProject, deleteFile, listParticipants, updateProject,
+  listProjects, listReviewComments, deleteProjectFully, listParticipants, updateProject,
   reviewNotifyStatus, reviewSubscribe, reviewUnsubscribe, signFiles, cachedDownload, myPrefs, savePref
-} from "../api.js?v=103";
-import { saveZip, canStreamToDisk, MEMORY_LIMIT } from "../zip.js?v=103";
-import { mountUploads } from "./uploads.js?v=103";
-import { openUploadSheet } from "./upload-sheet.js?v=103";
-import { stateOf, isEngineerOf } from "./review.js?v=103";
-import { ensureVerified } from "../verify.js?v=103";
-import { accountEmail } from "../session.js?v=103";
-import { albumOf, onCover, setCover, clearCover, setAlbumTitle } from "../cover.js?v=103";
-import { playQueue, onPlayer, isCurrent, state as playerState, toggle, trackFromFile } from "../player.js?v=103";
-import { icon } from "../icons.js?v=103";
-import { esc, h, plural, toast, errorText, formatDuration, actionSheet, confirmSheet, promptSheet, openSheet, triggerDownload } from "../ui.js?v=103";
+} from "../api.js?v=104";
+import { saveZip, canStreamToDisk, MEMORY_LIMIT } from "../zip.js?v=104";
+import { mountUploads } from "./uploads.js?v=104";
+import { openUploadSheet } from "./upload-sheet.js?v=104";
+import { stateOf, isEngineerOf } from "./review.js?v=104";
+import { ensureVerified } from "../verify.js?v=104";
+import { accountEmail } from "../session.js?v=104";
+import { albumOf, onCover, setCover, clearCover, setAlbumTitle } from "../cover.js?v=104";
+import { playQueue, onPlayer, isCurrent, state as playerState, toggle, trackFromFile } from "../player.js?v=104";
+import { icon } from "../icons.js?v=104";
+import { esc, h, plural, toast, errorText, formatDuration, actionSheet, confirmSheet, promptSheet, openSheet, triggerDownload } from "../ui.js?v=104";
 
 // Pochette générée : un aplat dont la teinte dépend du nom, les initiales
 // en grand. Pas de dégradé (identité sobre).
@@ -483,15 +483,14 @@ export async function mountReviewHome(root, ctx) {
         i > 0 ? { label: "Monter", icon: "arrowUp", run: () => moveTrack(i, i - 1) } : null,
         i < projects.length - 1 ? { label: "Descendre", icon: "arrowDown", run: () => moveTrack(i, i + 1) } : null,
         { label: "Toutes les versions", icon: "layers", run: () => ctx.navigate("#/p/" + p.id) },
-        !canEditProject(p) ? null : {
-          label: "Supprimer ce morceau et ses versions", icon: "trash", danger: true,
+        {
+          label: "Supprimer ce morceau", icon: "trash", danger: true,
           run: async () => {
-            const ok = await confirmSheet("Toutes les versions, leurs fichiers et leurs retours seront effacés.",
+            const ok = await confirmSheet("Toutes les versions, leurs fichiers et leurs retours seront effacés pour tout le monde. C'est définitif.",
               { ok: "Supprimer", danger: true, title: "Supprimer " + p.title });
             if (!ok) return;
             try {
-              for (const f of p.files || []) await deleteFile({ id: f.id }).catch(() => {});
-              await deleteProject(p.id);
+              await deleteProjectFully(p.id);
               toast(p.title + " supprimé", "ok");
               load();
             } catch (err) { toast(errorText(err), "err"); }
@@ -500,8 +499,6 @@ export async function mountReviewHome(root, ctx) {
       ].filter(Boolean));
     }
   });
-
-  const canEditProject = (p) => p.created_by === s.participantId || s.isHost;
 
   // ---------------------------------------------------- ordre des morceaux
   // Nouvel ordre enregistré morceau par morceau (seuls ceux qui bougent).

@@ -1,7 +1,7 @@
 // Accès aux données. Toutes les requêtes de l'appli passent par ici : les
 // vues ne connaissent ni PostgREST ni le Storage.
 
-import { sb, q, invoke, requireClient } from "./db.js?v=103";
+import { sb, q, invoke, requireClient } from "./db.js?v=104";
 
 // Toute requête passe par ici : sans config, message clair plutôt
 // qu'un "Cannot read properties of null".
@@ -43,6 +43,12 @@ export function updateProject(id, patch) {
 
 export function deleteProject(id) {
   return q(db().from("projects").delete().eq("id", id));
+}
+
+// Suppression d'un morceau entier (fichiers stockés compris), décidée
+// côté serveur : dans un Verdict, l'artiste peut aussi.
+export function deleteProjectFully(id) {
+  return invoke("storage", { action: "delete-project", project_id: id });
 }
 
 // ------------------------------------------------------------ fichiers
