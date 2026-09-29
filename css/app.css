@@ -1,5 +1,5 @@
-@import url("fonts.css?v=101");
-@import url("tokens.css?v=101");
+@import url("fonts.css?v=102");
+@import url("tokens.css?v=102");
 
 /* ================================================================= base */
 *, *::before, *::after { box-sizing: border-box; }
@@ -1571,4 +1571,25 @@ body.admin { min-height: 100vh; background: var(--bg); }
     mask-image: linear-gradient(to top, #000 0%, rgba(0, 0, 0, .6) 45%, transparent 100%);
     pointer-events: none;
   }
+}
+
+/* Logo vivant : au survol (ou au toucher), la flèche du W file vers
+   l'avant et revient, le W se soulève, le nom s'écarte et "Wesh" prend
+   la couleur vive. Rien ne bouge avec "réduire les animations". */
+.logo .monogram, .tp-brand .monogram, .brand-link svg { overflow: visible; }
+.logo .monogram path, .tp-brand .monogram path, .brand-link svg path { transform-box: fill-box; transform-origin: center; }
+.logo .wordmark, .tp-brand .wordmark { display: inline-block; transition: letter-spacing .35s cubic-bezier(.3, 1.4, .5, 1), transform .35s cubic-bezier(.3, 1.4, .5, 1); }
+.logo .wordmark em, .tp-brand .wordmark em { display: inline-block; transition: transform .35s cubic-bezier(.3, 1.4, .5, 1), color .25s; }
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes logo-arrow { 0% { transform: translateX(0); } 35% { transform: translateX(-3px) scale(.92); } 65% { transform: translateX(7px) scale(1.06); } 100% { transform: translateX(0); } }
+  @keyframes logo-w { 0% { transform: translateY(0) rotate(0); } 40% { transform: translateY(-3px) rotate(-4deg); } 100% { transform: translateY(0) rotate(0); } }
+  .logo:hover .monogram path:first-child, .tp-brand:hover .monogram path:first-child, .brand-link:hover svg path:first-child,
+  .logo:focus-visible .monogram path:first-child { animation: logo-w .6s cubic-bezier(.3, 1.4, .5, 1); }
+  .logo:hover .monogram path:last-child, .tp-brand:hover .monogram path:last-child, .brand-link:hover svg path:last-child,
+  .logo:focus-visible .monogram path:last-child { animation: logo-arrow .6s cubic-bezier(.3, 1.2, .5, 1); }
+  .logo:hover .wordmark, .tp-brand:hover .wordmark, .logo:focus-visible .wordmark { letter-spacing: .01em; transform: translateX(2px); }
+  .logo:hover .wordmark em, .tp-brand:hover .wordmark em, .logo:focus-visible .wordmark em { transform: translateY(-1px); color: #fff; }
+}
+@media (hover: none) and (prefers-reduced-motion: no-preference) {
+  .logo:active .monogram path:last-child, .brand-link:active svg path:last-child { animation: logo-arrow .6s cubic-bezier(.3, 1.2, .5, 1); }
 }

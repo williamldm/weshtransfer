@@ -2,12 +2,12 @@
 // Pas de supabase-js ici : un simple appel à l'Edge Function transfer-open,
 // qui vérifie le lien et renvoie des URLs signées. Page légère, rapide en 4G.
 
-import { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from "./config.js?v=101";
-import { Waveform, formatTime } from "./waveform.js?v=101";
-import { saveZip, canStreamToDisk, MEMORY_LIMIT } from "./zip.js?v=101";
-import { icon } from "./icons.js?v=101";
-import { esc, formatBytes, formatDuration, formatDate, plural, toast, triggerDownload, avatar, fileBadge, fileTile } from "./ui.js?v=101";
-import { categoryOf, canPreview } from "./files.js?v=101";
+import { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from "./config.js?v=102";
+import { Waveform, formatTime } from "./waveform.js?v=102";
+import { saveZip, canStreamToDisk, MEMORY_LIMIT } from "./zip.js?v=102";
+import { icon } from "./icons.js?v=102";
+import { esc, formatBytes, formatDuration, formatDate, plural, toast, triggerDownload, avatar, fileBadge, fileTile } from "./ui.js?v=102";
+import { categoryOf, canPreview } from "./files.js?v=102";
 
 const root = document.getElementById("tp");
 // le jeton : lien court /t/<jeton>, ou ancien t.html?k=<jeton>
