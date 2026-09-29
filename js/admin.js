@@ -3,12 +3,12 @@
 // ne décide de rien : c'est la fonction "admin" qui vérifie que le compte
 // connecté fait partie des administrateurs, et qui renvoie les données.
 
-import { invoke } from "./db.js?v=111";
-import { accountEmail, login, logout } from "./session.js?v=111";
-import { ensureVerified } from "./verify.js?v=111";
-import { icon } from "./icons.js?v=111";
-import { esc, toast, errorText, formatBytes, formatDate, timeAgo, plural, fileBadge, confirmSheet } from "./ui.js?v=111";
-import { isAudio, categoryOf } from "./files.js?v=111";
+import { invoke } from "./db.js?v=112";
+import { accountEmail, login, logout } from "./session.js?v=112";
+import { ensureVerified } from "./verify.js?v=112";
+import { icon } from "./icons.js?v=112";
+import { esc, toast, errorText, formatBytes, formatDate, timeAgo, plural, fileBadge, confirmSheet } from "./ui.js?v=112";
+import { isAudio, categoryOf } from "./files.js?v=112";
 
 const root = document.getElementById("adm");
 const who = document.getElementById("who");
@@ -308,10 +308,17 @@ function drawOverview() {
 
 // ------------------------------------------------------------ emails
 
+let alertsState = null;   // alertes email pour l'admin
+
 async function loadMail() {
   mail = { loading: true };
   try {
-    mail = await invoke("admin", { action: "mail" });
+    const [m, a] = await Promise.all([
+      invoke("admin", { action: "mail" }),
+      invoke("admin", { action: "alerts" }).catch(() => null)
+    ]);
+    mail = m;
+    alertsState = a;
   } catch (err) {
     mail = { error: errorText(err) };
   }
@@ -349,6 +356,7 @@ function drawMail() {
         " · sonde SPF/DKIM : " + esc(Array.isArray(chk.probe) ? chk.probe.join(", ") : (chk.probe || "en attente")) +
         (chk.imap_error ? " · boîte : " + esc(chk.imap_error) : "") + "</p>" +
     "</div>" +
+    drawAlertsCard() +
     '<div class="adm-card"><div class="adm-card-head"><h2>Test anti-spam <small>mail-tester.com</small></h2>' +
         '<button class="btn btn-sm" data-mail-test' + (mailTest && mailTest.state === "loading" ? " disabled" : "") + (mail.smtp_configured ? "" : " disabled") + ">" +
           (mailTest && mailTest.state === "loading" ? "Test en cours…" : "Tester la délivrabilité") + "</button></div>" +
@@ -357,6 +365,19 @@ function drawMail() {
     "</div>" +
     (mail.events.length ? '<div class="adm-card"><h2>Historique</h2><ul class="adm-events">' + mail.events.map((e) =>
       "<li>" + when(e.created_at) + " · <b>" + esc(EVENT[e.kind] || e.kind) + "</b> " + esc(e.detail || "") + "</li>").join("") + "</ul></div>" : "");
+}
+
+// Alertes par email : ce que le contrôle horaire surveille, ce qu'il voit
+function drawAlertsCard() {
+  const a = alertsState;
+  const cur = a ? a.current : [];
+  return '<div class="adm-card"><div class="adm-card-head"><h2>Alertes par email <small>' + esc(a && a.to.length ? a.to.join(", ") : "") + "</small></h2>" +
+      '<button class="btn btn-sm" data-alert-test>' + icon("mail", 16) + "<span>M'envoyer un test</span></button></div>" +
+    (cur.length
+      ? '<ul class="adm-alerts">' + cur.map((x) => '<li class="' + (x.level === "crit" ? "is-err" : "is-warn") + '"><span class="dot"></span><span><b>' + esc(x.title) + "</b> " + esc(x.detail || "") + "</span></li>").join("") + "</ul>"
+      : '<ul class="adm-alerts"><li><span class="dot"></span><span><b>Rien à signaler en ce moment.</b></span></li></ul>') +
+    '<p class="adm-note">Contrôle toutes les heures : stockage (80 %), base de données, voie o2switch coupée, liste noire, emails refusés, quota Brevo, pic de bande passante. Un email groupé à l\'apparition d\'une alerte, un rappel par 24 h tant qu\'elle dure, et un mot quand c\'est réglé.</p>' +
+  "</div>";
 }
 
 function drawMailTest() {
@@ -721,6 +742,16 @@ window.addEventListener("resize", () => {
 root.addEventListener("pointerleave", () => { const t = root.querySelector("[data-tip]"); if (t) t.hidden = true; });
 
 root.addEventListener("click", async (e) => {
+  const at = e.target.closest("[data-alert-test]");
+  if (at) {
+    at.disabled = true;
+    try {
+      const r = await invoke("admin", { action: "alerts-test" });
+      toast(r.sent ? "Email de test envoyé (" + plural(r.count, "alerte", "alertes") + " en cours)" : "Email non parti : " + (r.reason || "voir l'onglet Emails"), r.sent ? "ok" : "err");
+    } catch (err) { toast(errorText(err), "err"); }
+    at.disabled = false;
+    return;
+  }
   if (e.target.closest("[data-mail-reload]")) { loadMail(); return; }
   if (e.target.closest("[data-mail-test]")) {
     try {

@@ -9,6 +9,8 @@
 // POST { action: "delete-transfer", transfer_id, with_files }
 // POST { action: "delete-orphans" }          -> fichiers B2 sans fiche, envois abandonnés
 // POST { action: "delete-space", space_id }  -> espace entier, fichiers compris
+// POST { action: "alerts" }                 -> alertes en cours (email à l'admin)
+// POST { action: "alerts-test" }            -> envoie un email de test à l'admin connecté
 // POST { action: "bandwidth", days }        -> bande passante servie / reçue, stockage
 // POST { action: "mail-test-start" }         -> lance un test mail-tester.com (voie o2switch)
 // POST { action: "mail-test-check", id }     -> lit son score une fois traité
@@ -23,6 +25,7 @@ import { json, preflight, readJson } from "../_shared/http.ts";
 import { abortMultipart, b2Config, deletePrefix, listObjects, listUploads, presignGet } from "../_shared/b2.ts";
 import { smtpConfig, smtpSendAll } from "../_shared/smtp.ts";
 import { verifyCodeMail } from "../_shared/email.ts";
+import { currentAlerts, runAlerts } from "../_shared/alerts.ts";
 import { wipeSpace } from "../_shared/wipe.ts";
 
 type Row = Record<string, unknown>;
@@ -184,6 +187,20 @@ Deno.serve(async (req) => {
     } catch (err) {
       return json({ error: "ERREUR_STOCKAGE", detail: (err as Error).message.slice(0, 300) }, 502);
     }
+  }
+
+  // ------------------------------------------------- alertes email
+  if (body.action === "alerts") {
+    const [{ data: known }, now] = await Promise.all([
+      db.from("admin_alerts").select("key, level, title, detail, first_at, last_sent_at"),
+      currentAlerts(db),
+    ]);
+    return json({ current: now, known: known ?? [], to: (Deno.env.get("ADMIN_EMAILS") ?? "").split(",").map((x) => x.trim()).filter(Boolean) });
+  }
+  if (body.action === "alerts-test") {
+    // uniquement à l'admin qui clique (pas aux autres administrateurs)
+    const r = await runAlerts(db, { test: true, to: [email] });
+    return json({ sent: r.sent, count: r.alerts.length, reason: (r as { reason?: string }).reason ?? null });
   }
 
   // ------------------------------------------------- bande passante

@@ -663,3 +663,53 @@ export function newVersionsMail(input) {
   ]);
   return { subject, html, text };
 }
+
+// Alerte pour l'admin : ce qui demande son attention (stockage, emails,
+// liste noire, bande passante...), et ce qui est rentré dans l'ordre.
+// input : { site, alerts: [{ level: "crit" | "warn", title, detail, isNew }], resolved: [title], test }
+export function adminAlertMail(input) {
+  const site = input.site;
+  const alerts = input.alerts || [];
+  const resolved = input.resolved || [];
+  const crit = alerts.filter((a) => a.level === "crit").length;
+  const subject = input.test
+    ? "WeshTransfer : test des alertes"
+    : alerts.length === 1 ? `WeshTransfer : ${alerts[0].title}`
+    : alerts.length ? `WeshTransfer : ${alerts.length} alertes${crit ? " dont " + crit + " critique" + (crit > 1 ? "s" : "") : ""}`
+    : "WeshTransfer : tout est rentré dans l'ordre";
+  const preheader = alerts.length ? alerts.map((a) => a.title).join(" · ") : "Plus rien à signaler.";
+  const COLORS = { crit: "#EF7B7B", warn: "#E2B55A", ok: "#6FCF8E" };
+  const row = (color, label, title, detail) =>
+    `<tr><td style="padding:14px 0;border-bottom:1px solid ${C.rule};font-family:${SANS};">` +
+      `<div style="margin-bottom:4px;"><span style="display:inline-block;padding:2px 8px;border-radius:99px;border:1px solid ${color};color:${color};font-family:${MONO};font-size:10px;letter-spacing:1px;text-transform:uppercase;">${label}</span></div>` +
+      `<div style="font-size:16px;line-height:1.4;font-weight:600;color:${C.text};">${esc(title)}</div>` +
+      (detail ? `<div style="margin-top:3px;font-size:14px;line-height:1.5;color:${C.soft};">${esc(detail)}</div>` : "") +
+    `</td></tr>`;
+  const rows = alerts.map((a) => row(COLORS[a.level] || COLORS.warn, (a.level === "crit" ? "Critique" : "Attention") + (a.isNew ? "" : " · toujours"), a.title, a.detail)).join("") +
+    resolved.map((t) => row(COLORS.ok, "Réglé", t, "")).join("");
+
+  const body =
+    eyebrow("Admin") +
+    heading(input.test ? "Les alertes marchent." : alerts.length ? "Ça demande ton attention." : "Tout est rentré dans l'ordre.") +
+    para(input.test
+      ? "Ceci est un test. Voilà ce que le contrôle voit en ce moment :"
+      : "Le contrôle horaire du site a relevé ceci :") +
+    (rows ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:18px 0 0;">${rows}</table>`
+      : small("Rien à signaler pour l'instant.", "18px 0 0")) +
+    button(`${site}/admin.html`, "Ouvrir l'admin&nbsp;&rarr;") +
+    small("Une alerte n'est renvoyée que si elle dure encore 24 h plus tard.");
+
+  const footer = `<p style="margin:0;">Tu reçois cet email parce que ton adresse fait partie des administrateurs de WeshTransfer.</p>`;
+  const html = layout({ site, title: subject, preheader, body, footer });
+  const text = tidy([
+    input.test ? "Test des alertes WeshTransfer." : "Alertes WeshTransfer :",
+    ...alerts.map((a) => `- [${a.level === "crit" ? "CRITIQUE" : "ATTENTION"}] ${a.title}${a.detail ? " : " + a.detail : ""}`),
+    ...resolved.map((t) => `- [RÉGLÉ] ${t}`),
+    alerts.length || resolved.length ? "" : "Rien à signaler.",
+    "",
+    `Admin : ${site}/admin.html`,
+    "",
+    textFooter(site),
+  ]);
+  return { subject, html, text };
+}
