@@ -1,5 +1,5 @@
-@import url("fonts.css?v=98");
-@import url("tokens.css?v=98");
+@import url("fonts.css?v=99");
+@import url("tokens.css?v=99");
 
 /* ================================================================= base */
 *, *::before, *::after { box-sizing: border-box; }
@@ -1530,7 +1530,7 @@ body.admin { min-height: 100vh; background: var(--bg); }
   /* liste des morceaux : plus d'air, icônes discrètes */
   .tracklist { border-top: none; }
   .track { gap: var(--sp-2); min-height: 64px; padding: 6px 0; border-bottom-color: rgba(255, 255, 255, .06); }
-  .track-num { width: 30px; }
+  .track-num { width: 34px; height: 34px; flex: none; aspect-ratio: 1; }
   .track-title { font-size: 15px; }
   .track .btn-icon.btn-sm { min-width: 34px; width: 34px; color: var(--text-faint); }
   .track-drag { width: 26px; }
