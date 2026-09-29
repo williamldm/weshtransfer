@@ -1,5 +1,5 @@
-@import url("fonts.css?v=96");
-@import url("tokens.css?v=96");
+@import url("fonts.css?v=97");
+@import url("tokens.css?v=97");
 
 /* ================================================================= base */
 *, *::before, *::after { box-sizing: border-box; }
@@ -1129,8 +1129,6 @@ body.app .app-header { view-transition-name: topbar; }
 @media (max-width: 559px) {
   .rh-hero { align-items: center; text-align: center; }
   .rh-info .eyebrow { margin-left: auto; margin-right: auto; }
-  .rh-actions { flex-wrap: nowrap; justify-content: center; }
-  .rh-actions > .btn:not(.btn-icon), .rh-actions [data-engineer-actions] > .btn:not(.btn-icon) { flex: 1 1 0; min-width: 0; }
 }
 .rv-inge { margin-bottom: var(--sp-4); }
 .rv-inge .rv-changelog-text { margin: var(--sp-3) 0 0; color: var(--text-dim); font-size: var(--fs-sm); }
@@ -1487,3 +1485,56 @@ body.admin { min-height: 100vh; background: var(--bg); }
 .track-drag:hover { color: var(--text); }
 .tracklist .track { transition: transform .18s ease, background .15s; }
 .tracklist .track.is-dragging { position: relative; z-index: 5; background: var(--surface-3); box-shadow: 0 14px 34px rgba(0, 0, 0, .45); transition: none; cursor: grabbing; }
+
+/* ------------------------------------------------------------------
+   Verdict, téléphone : en-tête centré façon lecteur d'album (pochette
+   large, titre, deux boutons égaux, actions secondaires en dessous).
+   Rien ne dépasse de l'écran : le bloc prend toute la largeur. */
+@media (max-width: 559px) {
+  .rh-hero.rv-hero { gap: var(--sp-4); margin-bottom: var(--sp-3); padding: var(--sp-6) var(--sp-4) var(--sp-4); }
+  .rh-cover { align-self: center; }
+  .cover-xl { width: min(62vw, 240px); height: min(62vw, 240px); border-radius: 18px; font-size: 72px; box-shadow: 0 30px 60px -12px rgba(0, 0, 0, .7), 0 0 0 .5px rgba(255, 255, 255, .08); }
+  .rh-cover-edit { right: 10px; bottom: 10px; width: 30px; height: 30px; background: rgba(0, 0, 0, .45); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
+  .rh-info { width: 100%; display: flex; flex-direction: column; align-items: center; }
+  .rh-info .eyebrow { margin: 0 0 6px; font-size: 11px; letter-spacing: .16em; }
+  .rh-title { justify-content: center; flex-wrap: wrap; max-width: 100%; gap: 6px; }
+  .rh-info h1 { font-size: clamp(26px, 8vw, 34px); line-height: 1.1; letter-spacing: -0.025em; text-align: center; }
+  .rh-title-edit { padding: 5px; }
+  .rh-title-edit svg { width: 14px; height: 14px; }
+  .rh-meta { margin: 6px 0 var(--sp-5); color: rgba(255, 255, 255, .55); font-size: 14px; }
+
+  .rh-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; width: 100%; }
+  .rh-actions > .btn, .rh-actions [data-engineer-actions] > .btn { min-height: 48px; border-radius: 12px; font-size: 15px; font-weight: 600; }
+  .rh-actions > [data-play-all], .rh-actions > [data-dl-all] { flex: 1 1 calc(50% - 5px); min-width: 0; }
+  .rh-actions > [data-dl-all], .rh-actions [data-engineer-actions] > .btn:not(.btn-primary) {
+    border-color: transparent; background: rgba(255, 255, 255, .1); color: #fff;
+    backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+  }
+  .rh-actions > .btn span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* deuxième ligne : Déposer (ingé) s'étire, les icônes restent rondes */
+  .rh-actions [data-engineer-actions] > label.btn { flex: 1 1 auto; order: 3; }
+  .rh-actions > .btn-icon, .rh-actions [data-engineer-actions] > .btn-icon { order: 4; flex: none; width: 48px; min-width: 48px; border-radius: 50%; border-color: transparent; background: rgba(255, 255, 255, .1); color: rgba(255, 255, 255, .85); }
+  .rh-actions .btn-icon.is-on { background: var(--accent-soft); color: var(--accent-bright); }
+  .rh-actions .btn-icon[hidden] { display: none; }
+
+  /* bandeaux : cartes douces, texte lisible, boutons alignés */
+  .rh-offer, .rh-help { margin: 0 0 var(--sp-4); padding: var(--sp-4); border: 1px solid var(--line); border-radius: 16px; background: var(--surface-2); }
+  .rh-offer { position: relative; display: grid; grid-template-columns: auto 1fr; align-items: start; gap: 4px var(--sp-3); }
+  .rh-offer > svg { grid-row: span 2; width: 36px; height: 36px; padding: 8px; border-radius: 50%; background: var(--accent-soft); }
+  .rh-offer p { padding-right: 28px; font-size: 14px; line-height: 1.45; }
+  .rh-offer .muted { display: block; margin-top: 2px; font-size: 12px; }
+  .rh-offer .btn:not(.btn-icon) { grid-column: 2; justify-self: start; min-height: 36px; margin-top: var(--sp-2); border-radius: 99px; }
+  .rh-offer .btn-icon { position: absolute; top: 8px; right: 8px; min-width: 32px; width: 32px; min-height: 32px; border-radius: 50%; }
+  .rh-help-x { top: 8px; right: 8px; }
+
+  /* liste des morceaux : plus d'air, icônes discrètes */
+  .tracklist { border-top: none; }
+  .track { gap: var(--sp-2); min-height: 64px; padding: 6px 0; border-bottom-color: rgba(255, 255, 255, .06); }
+  .track-num { width: 30px; }
+  .track-title { font-size: 15px; }
+  .track .btn-icon.btn-sm { min-width: 34px; width: 34px; color: var(--text-faint); }
+  .track-drag { width: 26px; }
+}
+@media (max-width: 359px) {
+  .rh-actions > .btn, .rh-actions [data-engineer-actions] > .btn { padding: 0 10px; font-size: 14px; gap: 6px; }
+}

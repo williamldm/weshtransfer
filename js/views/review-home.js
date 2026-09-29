@@ -1,22 +1,22 @@
 // Accueil d'un espace de retours, présenté comme un album : grande
-// pochette, "Tout écouter", liste des morceaux avec un seul statut chacun.
+// pochette, "Lecture", liste des morceaux avec un seul statut chacun.
 // Toucher un morceau ouvre directement sa page de retours (dernière
 // version) ; toucher sa pochette le joue, et les suivants s'enchaînent.
 
 import {
   listProjects, listReviewComments, deleteProject, deleteFile, listParticipants, updateProject,
   reviewNotifyStatus, reviewSubscribe, reviewUnsubscribe, signFiles, cachedDownload, myPrefs, savePref
-} from "../api.js?v=96";
-import { saveZip, canStreamToDisk, MEMORY_LIMIT } from "../zip.js?v=96";
-import { mountUploads } from "./uploads.js?v=96";
-import { openUploadSheet } from "./upload-sheet.js?v=96";
-import { stateOf, isEngineerOf } from "./review.js?v=96";
-import { ensureVerified } from "../verify.js?v=96";
-import { accountEmail } from "../session.js?v=96";
-import { albumOf, onCover, setCover, clearCover, setAlbumTitle } from "../cover.js?v=96";
-import { playQueue, onPlayer, isCurrent, state as playerState, toggle, trackFromFile } from "../player.js?v=96";
-import { icon } from "../icons.js?v=96";
-import { esc, h, plural, toast, errorText, formatDuration, actionSheet, confirmSheet, promptSheet, openSheet, triggerDownload } from "../ui.js?v=96";
+} from "../api.js?v=97";
+import { saveZip, canStreamToDisk, MEMORY_LIMIT } from "../zip.js?v=97";
+import { mountUploads } from "./uploads.js?v=97";
+import { openUploadSheet } from "./upload-sheet.js?v=97";
+import { stateOf, isEngineerOf } from "./review.js?v=97";
+import { ensureVerified } from "../verify.js?v=97";
+import { accountEmail } from "../session.js?v=97";
+import { albumOf, onCover, setCover, clearCover, setAlbumTitle } from "../cover.js?v=97";
+import { playQueue, onPlayer, isCurrent, state as playerState, toggle, trackFromFile } from "../player.js?v=97";
+import { icon } from "../icons.js?v=97";
+import { esc, h, plural, toast, errorText, formatDuration, actionSheet, confirmSheet, promptSheet, openSheet, triggerDownload } from "../ui.js?v=97";
 
 // Pochette générée : un aplat dont la teinte dépend du nom, les initiales
 // en grand. Pas de dégradé (identité sobre).
@@ -102,8 +102,8 @@ export async function mountReviewHome(root, ctx) {
           '<button type="button" class="rh-title-edit" data-edit-title aria-label="Renommer l\'album" title="Renommer l\'album">' + icon("edit", 16) + "</button></h1>" +
         '<p class="rh-meta" data-meta></p>' +
         '<div class="rh-actions">' +
-          '<button class="btn btn-primary" data-play-all disabled>' + icon("play", 18) + "<span>Tout écouter</span></button>" +
-          '<button class="btn" data-dl-all disabled>' + icon("download", 18) + "<span>Tout télécharger</span></button>" +
+          '<button class="btn btn-primary" data-play-all disabled>' + icon("play", 18) + "<span>Lecture</span></button>" +
+          '<button class="btn" data-dl-all disabled>' + icon("download", 18) + "<span>Télécharger</span></button>" +
           '<button class="btn btn-ghost btn-icon" data-help-show hidden aria-label="Comment ça marche ?" title="Comment ça marche ?">' + icon("comment", 18) + "</button>" +
           '<span data-engineer-actions></span>' +
         "</div>" +
@@ -226,7 +226,7 @@ export async function mountReviewHome(root, ctx) {
   });
 
   // Mode d'emploi pour l'artiste : une croix le cache (mémorisé sur cet
-  // appareil), le bouton "?" à côté de "Tout écouter" le réaffiche.
+  // appareil), le bouton "?" à côté de "Lecture" le réaffiche.
   function drawHelp() {
     if (engineer || helpClosed()) {
       helpBox.innerHTML = "";
@@ -334,7 +334,7 @@ export async function mountReviewHome(root, ctx) {
       offerBox.innerHTML =
         '<section class="rh-offer">' +
           icon("mail", 20) +
-          "<p>" + esc(mailText().auto) + " <span class=\"muted\">(" + esc(notifyEmail) + ")</span></p>" +
+          "<p>" + esc(mailText().auto) + " <span class=\"muted\">" + esc(notifyEmail) + "</span></p>" +
           '<button type="button" class="btn btn-sm" data-offer-off>Désactiver</button>' +
           '<button type="button" class="btn btn-ghost btn-icon btn-sm" data-notice-x aria-label="OK" title="OK">' + icon("x", 16) + "</button>" +
         "</section>";
