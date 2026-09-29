@@ -1,14 +1,14 @@
-// Espace admin (admin.html, liée nulle part) : tous les transferts,
-// utilisateurs et espaces, en lecture seule. La page ne décide de rien :
-// c'est la fonction "admin" qui vérifie que le compte connecté fait partie
-// des administrateurs, et qui renvoie les données.
+// Espace admin (admin.html, liée nulle part) : tableau de bord. Aperçu,
+// envois, espaces, fichiers, utilisateurs, bande passante, emails. La page
+// ne décide de rien : c'est la fonction "admin" qui vérifie que le compte
+// connecté fait partie des administrateurs, et qui renvoie les données.
 
-import { invoke } from "./db.js?v=104";
-import { accountEmail, login, logout } from "./session.js?v=104";
-import { ensureVerified } from "./verify.js?v=104";
-import { icon } from "./icons.js?v=104";
-import { esc, toast, errorText, formatBytes, formatDate, timeAgo, plural, fileBadge, confirmSheet } from "./ui.js?v=104";
-import { isAudio, categoryOf } from "./files.js?v=104";
+import { invoke } from "./db.js?v=105";
+import { accountEmail, login, logout } from "./session.js?v=105";
+import { ensureVerified } from "./verify.js?v=105";
+import { icon } from "./icons.js?v=105";
+import { esc, toast, errorText, formatBytes, formatDate, timeAgo, plural, fileBadge, confirmSheet } from "./ui.js?v=105";
+import { isAudio, categoryOf } from "./files.js?v=105";
 
 const root = document.getElementById("adm");
 const who = document.getElementById("who");
@@ -16,18 +16,33 @@ const who = document.getElementById("who");
 const MODES = { envoi: "Envois", seminaire: "Séminaire", revue: "Verdict" };
 const STATUS = { pending: "en attente", sent: "envoyé", failed: "échec", bounced: "rejeté" };
 
+// Les sections : identifiant, nom, icône, phrase sous le titre
+const NAV = [
+  ["overview", "Aperçu", "sparkle", "Ce qui se passe, et ce qui demande ton attention."],
+  ["transfers", "Envois", "send", "Chaque envoi, ses destinataires, ses ouvertures."],
+  ["spaces", "Espaces", "layers", "Envois, séminaires et verdicts."],
+  ["files", "Fichiers", "file", "Tout ce qui est stocké, écoutable, supprimable."],
+  ["users", "Utilisateurs", "users", "Comptes et appareils anonymes."],
+  ["bandwidth", "Bande passante", "download", "Ce que le site sert, et ce que ça coûte."],
+  ["mail", "Emails", "mail", "Voies d'envoi, surveillance et test anti-spam."]
+];
+const SEARCHABLE = new Set(["transfers", "spaces", "files", "users"]);
+
 let data = null;
-let tab = "transfers";
+let tab = NAV.some((n) => n[0] === location.hash.slice(1)) ? location.hash.slice(1) : "overview";
 let query = "";
+let modeFilter = "all";
 let fileSort = "recent";
 let storage = null;      // résultat de la vérification B2
 let mail = null;         // état des voies d'envoi (o2switch / Brevo)
+let bw = null;           // bande passante et stockage
+let bwDays = 14;
 const selected = new Set();   // fichiers cochés (suppression groupée)
 
 function drawWho() {
   const email = accountEmail();
   who.innerHTML = email
-    ? esc(email) + ' <button class="btn btn-ghost btn-sm" data-logout>' + icon("logout", 16) + "<span>Déconnexion</span></button>"
+    ? '<span class="adm-email">' + esc(email) + "</span>" + ' <button class="btn btn-ghost btn-sm" data-logout>' + icon("logout", 16) + "<span>Déconnexion</span></button>"
     : "";
 }
 
@@ -70,6 +85,9 @@ async function load() {
   try {
     data = await invoke("admin", { action: "overview" });
     draw();
+    // le reste de l'aperçu (emails, bande passante) arrive en arrière-plan
+    loadMail();
+    loadBandwidth();
   } catch (err) {
     const code = String(err && err.message);
     if (code === "INTERDIT") drawLogin(accountEmail() ? "Le compte " + accountEmail() + " n'a pas accès à cette page." : "");
@@ -80,10 +98,351 @@ async function load() {
 
 const matches = (obj) => !query || JSON.stringify(obj).toLowerCase().includes(query);
 const when = (iso) => (iso ? '<span title="' + esc(formatDate(iso, true)) + '">' + esc(timeAgo(iso)) + "</span>" : "jamais");
+const pct = (a, b) => (b > 0 ? Math.round((a / b) * 100) : 0);
+const listOf = (html) => '<div class="adm-list">' + html + "</div>";
 
-function stat(label, value, sub) {
-  return '<div class="adm-stat"><b>' + esc(String(value)) + "</b><span>" + esc(label) + "</span>" + (sub ? "<small>" + esc(sub) + "</small>" : "") + "</div>";
+// ------------------------------------------------------------ bande passante
+
+async function loadBandwidth() {
+  bw = { loading: true };
+  try {
+    bw = await invoke("admin", { action: "bandwidth", days: 30 });
+  } catch (err) {
+    bw = { error: errorText(err) };
+  }
+  if (tab === "overview" || tab === "bandwidth") drawBody();
 }
+
+// les 'n' derniers jours, un objet par jour (les jours sans trafic à zéro)
+function bwSeries(n) {
+  const byDay = new Map();
+  for (const r of bw.rows) {
+    const d = byDay.get(r.day) || { day: r.day, delivered: 0, origin: 0, requests: 0, upload: 0 };
+    if (r.kind === "upload") d.upload += r.delivered;
+    else { d.delivered += r.delivered; d.origin += r.origin; d.requests += r.requests; }
+    byDay.set(r.day, d);
+  }
+  const out = [];
+  for (let i = n - 1; i >= 0; i--) {
+    const day = new Date(Date.now() - i * 86400e3).toLocaleDateString("sv-SE", { timeZone: "Europe/Paris" });
+    out.push(byDay.get(day) || { day, delivered: 0, origin: 0, requests: 0, upload: 0 });
+  }
+  return out;
+}
+
+const shortDay = (iso) => iso.slice(8, 10) + "/" + iso.slice(5, 7);
+
+// Barres empilées par jour : servi par le cache (bleu, en bas) et tiré de
+// B2 (orange, au-dessus). Survol : détail du jour.
+function bwChart(days) {
+  // largeur réelle du conteneur : le texte du graphique garde sa taille sur téléphone
+  const box = root.querySelector("[data-list]");
+  const W = Math.round(Math.min(720, Math.max(300, (box ? box.clientWidth : 720) - 42))), H = W < 500 ? 200 : 236, L = 50, R = 6, T = 10, B = 26;
+  const pw = W - L - R, ph = H - T - B;
+  const max = Math.max(1, ...days.map((d) => d.delivered));
+  // plafond "rond" : 1, 2, 2,5 ou 5 x 10^n
+  const mag = 10 ** Math.floor(Math.log10(max));
+  const top = [1, 2, 2.5, 5, 10].map((m) => m * mag).find((v) => v >= max) || max;
+  const y = (v) => T + ph - (v / top) * ph;
+  const band = pw / days.length;
+  const bw_ = Math.min(30, band * 0.62);
+  const ticks = [0, top / 2, top];
+  const every = days.length > 16 ? 4 : days.length > 8 ? 2 : 1;
+  let g = "";
+  for (const t of ticks) {
+    g += '<line class="grid" x1="' + L + '" x2="' + (W - R) + '" y1="' + y(t) + '" y2="' + y(t) + '"/>' +
+      '<text x="' + (L - 8) + '" y="' + (y(t) + 3) + '" text-anchor="end">' + esc(t ? formatBytes(t) : "0") + "</text>";
+  }
+  days.forEach((d, i) => {
+    const cx = L + band * i + band / 2, x = cx - bw_ / 2;
+    const cache = Math.max(0, d.delivered - d.origin);
+    const hc = (cache / top) * ph, ho = (d.origin / top) * ph;
+    // segments séparés par 2 px, dessus arrondi
+    if (hc > 0) g += '<rect x="' + x + '" y="' + (T + ph - hc) + '" width="' + bw_ + '" height="' + hc + '" rx="' + (ho > 0 ? 0 : 4) + '" fill="var(--viz-1)"/>';
+    if (ho > 0) g += '<rect x="' + x + '" y="' + (T + ph - hc - ho - (hc > 0 ? 2 : 0)) + '" width="' + bw_ + '" height="' + ho + '" rx="4" fill="var(--viz-2)"/>';
+    if (i % every === 0 || i === days.length - 1) g += '<text x="' + cx + '" y="' + (H - 6) + '" text-anchor="middle">' + shortDay(d.day) + "</text>";
+    g += '<rect class="col" data-i="' + i + '" x="' + (cx - band / 2) + '" y="' + T + '" width="' + band + '" height="' + ph + '"/>';
+  });
+  return '<div class="adm-plot" style="position:relative">' +
+    '<svg class="adm-chart" viewBox="0 0 ' + W + " " + H + '" role="img" aria-label="Bande passante servie par jour">' + g + "</svg>" +
+    '<div class="adm-tip" data-tip hidden></div></div>';
+}
+
+function bwTip(d) {
+  const cache = Math.max(0, d.delivered - d.origin);
+  return "<b>" + esc(shortDay(d.day)) + "</b>" +
+    '<i style="background:var(--viz-1)"></i>Servi par le cache : ' + esc(formatBytes(cache)) + "<br>" +
+    '<i style="background:var(--viz-2)"></i>Tiré de B2 : ' + esc(formatBytes(d.origin)) + "<br>" +
+    "Reçu (envois) : " + esc(formatBytes(d.upload)) + " · " + d.requests + " requête" + (d.requests > 1 ? "s" : "");
+}
+
+function drawBandwidth() {
+  if (!bw || bw.loading) return '<div class="skeleton tall"></div>';
+  if (bw.error) return '<p class="adm-error">' + esc(bw.error) + "</p>";
+  const days = bwSeries(bwDays);
+  const sum = (k) => days.reduce((n, d) => n + d[k], 0);
+  const delivered = sum("delivered"), origin = sum("origin"), uploaded = sum("upload");
+  const cached = delivered - origin;
+  const s = bw.storage;
+  const usedPct = pct(s.used, s.cap);
+  const kinds = {};
+  for (const r of bw.rows) {
+    if (r.kind === "upload" || r.day < days[0].day) continue;
+    const k = kinds[r.kind] || (kinds[r.kind] = { delivered: 0, origin: 0, requests: 0 });
+    k.delivered += r.delivered; k.origin += r.origin; k.requests += r.requests;
+  }
+  const KIND = { audio: "Audio", video: "Vidéo", image: "Images", fichier: "Fichiers (zip, documents...)" };
+  const empty = !bw.rows.length;
+  return '<div class="adm-chips" role="group" aria-label="Période">' +
+      [7, 14, 30].map((n) => '<button data-bwdays="' + n + '" aria-pressed="' + (bwDays === n) + '">' + n + " jours</button>").join("") +
+    "</div>" +
+    '<div class="adm-kpis">' +
+      kpi("Servi aux visiteurs", formatBytes(delivered), "par Cloudflare, sur " + bwDays + " jours") +
+      kpi("Tiré de B2", formatBytes(origin), "sortie B2 vers Cloudflare : gratuite") +
+      kpi("Absorbé par le cache", delivered ? pct(cached, delivered) + " %" : "—", delivered ? formatBytes(cached) + " qui n'ont pas touché B2" : "en attente de trafic") +
+      kpi("Reçu (envois)", formatBytes(uploaded), "fichiers déposés sur B2") +
+    "</div>" +
+    '<div class="adm-card adm-viz" style="margin-top:var(--sp-4)">' +
+      '<div class="adm-card-head"><h2>Servi par jour</h2>' +
+        '<div class="adm-legend" style="margin:0"><span><i style="background:var(--viz-1)"></i>Cache</span><span><i style="background:var(--viz-2)"></i>B2</span></div></div>' +
+      (empty ? '<p class="adm-empty">Mesure démarrée le 29/09/2026 : les chiffres apparaissent dès la première écoute ou le premier téléchargement.</p>' : bwChart(days)) +
+      '<details style="margin-top:var(--sp-3)"><summary class="adm-link">Voir en tableau</summary>' +
+        '<table class="adm-table"><thead><tr><th>Jour</th><th>Servi</th><th>B2</th><th>Reçu</th><th>Req.</th></tr></thead><tbody>' +
+        days.slice().reverse().filter((d) => d.delivered || d.upload).map((d) =>
+          "<tr><td>" + esc(shortDay(d.day)) + "</td><td>" + esc(formatBytes(d.delivered)) + "</td><td>" + esc(formatBytes(d.origin)) + "</td><td>" + esc(formatBytes(d.upload)) + "</td><td>" + d.requests + "</td></tr>").join("") +
+        "</tbody></table></details>" +
+    "</div>" +
+    '<div class="adm-grid">' +
+      '<div class="adm-card"><h2>Par type de contenu</h2>' +
+        (Object.keys(kinds).length
+          ? '<table class="adm-table"><thead><tr><th>Type</th><th>Servi</th><th>B2</th><th>Req.</th></tr></thead><tbody>' +
+            Object.entries(kinds).sort((a, b) => b[1].delivered - a[1].delivered).map(([k, v]) =>
+              "<tr><td>" + esc(KIND[k] || k) + "</td><td>" + esc(formatBytes(v.delivered)) + "</td><td>" + esc(formatBytes(v.origin)) + "</td><td>" + v.requests + "</td></tr>").join("") + "</tbody></table>"
+          : '<p class="adm-empty" style="padding:0">Rien encore.</p>') +
+      "</div>" +
+      '<div class="adm-card"><h2>Stockage B2 <small>gratuit jusqu\'à ' + esc(formatBytes(s.free_tier)) + "</small></h2>" +
+        '<div class="adm-kpi" style="border:0;padding:0;min-height:0;background:none"><b>' + esc(formatBytes(s.used)) + "</b><small>sur " + esc(formatBytes(s.cap)) + " autorisés par le site (" + usedPct + " %)</small></div>" +
+        '<div class="adm-bar ' + (usedPct >= 90 ? "is-danger" : usedPct >= 70 ? "is-warn" : "") + '" style="margin-top:var(--sp-3)"><i style="width:' + Math.min(100, usedPct) + '%"></i></div>' +
+        '<p class="adm-note">Au-delà, les nouveaux envois sont refusés jusqu\'à ce que des fichiers expirent. Limites par personne : ' +
+          esc(formatBytes(bw.limits.user_day)) + " par appareil et par adresse IP, sur 24 h ; " + esc(formatBytes(bw.limits.global_day)) + " pour tout le site.</p>" +
+      "</div>" +
+    "</div>" +
+    '<p class="adm-note">Ne compte que ce qui passe par files.weshtransfer.fr (écoutes, téléchargements, aperçus) ; les envois sont comptés à la fin du dépôt. Mesure démarrée le ' +
+      esc(bw.since ? bw.since.slice(8, 10) + "/" + bw.since.slice(5, 7) + "/" + bw.since.slice(0, 4) : "29/09/2026") + ".</p>";
+}
+
+// ------------------------------------------------------------ aperçu
+
+function kpi(label, value, sub, extra) {
+  return '<div class="adm-kpi' + ((extra && extra.warn) ? " is-warn" : "") + '"><span>' + esc(label) + "</span><b>" + esc(String(value)) + "</b>" +
+    (sub ? "<small>" + esc(sub) + "</small>" : "") + ((extra && extra.bar) || "") + "</div>";
+}
+
+function alerts() {
+  const out = [];
+  if (mail && !mail.loading && !mail.error) {
+    const r = mail.route || {};
+    const paused = r.smtp_paused_until && new Date(r.smtp_paused_until) > new Date();
+    if (!mail.smtp_configured) out.push(["is-warn", "Emails", "o2switch n'est pas configuré : tout part par Brevo (300 par jour)."]);
+    else if (paused) out.push(["is-warn", "Voie o2switch coupée", (r.manual ? "à la main" : r.reason || "") + " : tout part par Brevo."]);
+    const bl = r.last_check && r.last_check.blacklists;
+    if (bl && bl.length) out.push(["is-err", "Liste noire", bl.join(", ")]);
+  }
+  if (bw && !bw.loading && !bw.error) {
+    const p = pct(bw.storage.used, bw.storage.cap);
+    if (p >= 70) out.push([p >= 90 ? "is-err" : "is-warn", "Stockage à " + p + " %", formatBytes(bw.storage.used) + " sur " + formatBytes(bw.storage.cap) + " : les nouveaux envois seront refusés au plafond."]);
+  }
+  const week = Date.now() - 7 * 86400e3;
+  const failed = data.transfers.filter((t) => new Date(t.created_at) > week).reduce((n, t) => n + t.recipients.filter((r) => r.status === "failed").length, 0);
+  if (failed) out.push(["is-warn", plural(failed, "email en échec", "emails en échec"), "sur les envois des 7 derniers jours."]);
+  if (data.stats.truncated) out.push(["is-warn", "Listes tronquées", "Les listes sont limitées à 5000 lignes."]);
+  return out;
+}
+
+function drawOverview() {
+  const st = data.stats;
+  const day = Date.now() - 864e5;
+  const sent24 = data.transfers.filter((t) => new Date(t.created_at) > day).length;
+  const b = bw && !bw.loading && !bw.error ? bw : null;
+  const usedPct = b ? pct(b.storage.used, b.storage.cap) : 0;
+  const days7 = b ? bwSeries(7) : [];
+  const dl7 = days7.reduce((n, d) => n + d.delivered, 0);
+  const or7 = days7.reduce((n, d) => n + d.origin, 0);
+  const m = mail && !mail.loading && !mail.error ? mail : null;
+  const d = (m && m.day) || {};
+  const ok = (via) => (d[via] ? d[via].ok : 0);
+  const items = alerts();
+  const recentFiles = data.files.slice().sort((a, c) => String(c.created_at).localeCompare(String(a.created_at))).slice(0, 5);
+  const modes = Object.entries(st.spaces_by_mode).map(([k, n]) => n + " " + (MODES[k] || k).toLowerCase()).join(" · ");
+  return '<div class="adm-kpis">' +
+      kpi("Stockage", b ? formatBytes(b.storage.used) : "…", b ? "sur " + formatBytes(b.storage.cap) + " (" + usedPct + " %)" : "calcul en cours",
+        { warn: usedPct >= 70, bar: b ? '<div class="adm-bar ' + (usedPct >= 90 ? "is-danger" : usedPct >= 70 ? "is-warn" : "") + '"><i style="width:' + Math.min(100, usedPct) + '%"></i></div>' : "" }) +
+      kpi("Bande passante 7 j", b ? formatBytes(dl7) : "…", b ? (dl7 ? pct(dl7 - or7, dl7) + " % absorbés par le cache" : "aucun trafic mesuré") : "calcul en cours") +
+      kpi("Emails, 24 h", m ? ok("smtp") + ok("brevo") : "…", m ? "o2switch " + ok("smtp") + " · Brevo " + ok("brevo") : "calcul en cours") +
+      kpi("Envois, 24 h", sent24, plural(st.users, "utilisateur", "utilisateurs") + " · " + plural(st.spaces, "espace", "espaces")) +
+    "</div>" +
+    '<div class="adm-card" style="margin-top:var(--sp-4)"><h2>À surveiller</h2><ul class="adm-alerts">' +
+      (items.length ? items.map(([cls, t, sub]) => '<li class="' + cls + '"><span class="dot"></span><span><b>' + esc(t) + "</b> " + esc(sub) + "</span></li>").join("")
+        : '<li><span class="dot"></span><span><b>Rien à signaler.</b> Emails, stockage et envois sont dans le vert.</span></li>') +
+    "</ul></div>" +
+    '<div class="adm-grid">' +
+      '<div class="adm-card"><div class="adm-card-head"><h2>Derniers envois</h2><button class="adm-link" data-go="transfers">Tout voir</button></div><ul class="adm-mini">' +
+        (data.transfers.slice(0, 5).map((t) => '<li><span class="t"><b>' + esc(t.title || "Sans titre") + "</b><small>" + esc(t.sender || "?") + " · " + plural(t.files.length, "fichier", "fichiers") + " · " + esc(formatBytes(t.size)) + '</small></span><span class="r">' + when(t.created_at) + "</span></li>").join("") || '<li><span class="r">Aucun envoi.</span></li>') +
+      "</ul></div>" +
+      '<div class="adm-card"><div class="adm-card-head"><h2>Derniers fichiers</h2><button class="adm-link" data-go="files">Tout voir</button></div><ul class="adm-mini">' +
+        (recentFiles.map((f) => '<li><span class="t"><b>' + esc(f.name) + "</b><small>" + esc(f.space || "?") + " · " + esc(f.uploader || "?") + " · " + esc(formatBytes(f.size)) + '</small></span><span class="r">' + when(f.created_at) + "</span></li>").join("") || '<li><span class="r">Aucun fichier.</span></li>') +
+      "</ul></div>" +
+    "</div>" +
+    '<p class="adm-strip"><span><b>' + st.users + "</b> utilisateurs (" + st.accounts + " avec compte)</span><span><b>" + st.spaces + "</b> espaces : " + esc(modes) +
+      "</span><span><b>" + st.transfers + "</b> envois · " + st.recipients + " destinataires · " + st.downloads + " téléchargements</span><span><b>" + st.files + "</b> fichiers · " + esc(formatBytes(st.bytes)) + "</span></p>";
+}
+
+// ------------------------------------------------------------ emails
+
+async function loadMail() {
+  mail = { loading: true };
+  try {
+    mail = await invoke("admin", { action: "mail" });
+  } catch (err) {
+    mail = { error: errorText(err) };
+  }
+  if (tab === "overview" || tab === "mail") drawBody();
+}
+
+const EVENT = { pause: "Coupure", resume: "Reprise", blacklist: "Liste noire", bounce: "Rebond", engagement: "Ouvertures", probe: "Sonde", error: "Erreur", diagnostic: "Test" };
+let mailTest = null;   // { id, state: "loading" | "ready" | "timeout" | "err", score, issues, report_url }
+
+function drawMail() {
+  if (!mail || mail.loading) return '<div class="skeleton tall"></div>';
+  if (mail.error) return '<p class="adm-error">' + esc(mail.error) + "</p>";
+  const r = mail.route || {};
+  const paused = r.smtp_paused_until && new Date(r.smtp_paused_until) > new Date();
+  const state = !mail.smtp_configured ? "non configurée (tout part par Brevo)"
+    : paused ? (r.manual ? "coupée à la main" : "coupée jusqu'au " + formatDate(r.smtp_paused_until, true)) : "active";
+  const d = mail.day || {};
+  const line = (via, label) => {
+    const x = d[via] || { ok: 0, failed: 0, bounced: 0 };
+    return kpi(label + ", 24 h", x.ok, x.failed + " refusés · " + x.bounced + " rebonds");
+  };
+  const chk = r.last_check || {};
+  const opens = chk.opens ? "o2switch " + chk.opens.smtp.opened + "/" + chk.opens.smtp.n + " · Brevo " + chk.opens.brevo.opened + "/" + chk.opens.brevo.n : "pas encore mesuré";
+  return '<div class="adm-card">' +
+      '<div class="adm-card-head"><span class="adm-state ' + (!mail.smtp_configured ? "is-warn" : paused ? "is-off" : "") + '"><i></i>Voie o2switch : ' + esc(state) + "</span>" +
+        '<span class="adm-tools">' + (paused
+          ? '<button class="btn btn-sm" data-mail-resume>Rétablir o2switch</button>'
+          : '<button class="btn btn-sm" data-mail-pause' + (mail.smtp_configured ? "" : " disabled") + ">Tout envoyer par Brevo</button>") +
+        ' <button class="btn btn-sm btn-ghost" data-mail-reload>' + icon("retry", 16) + "<span>Actualiser</span></button></span></div>" +
+      (paused && r.reason ? '<p class="adm-note" style="margin:0 0 var(--sp-3)">' + esc(r.reason) + "</p>" : "") +
+      '<div class="adm-kpis" style="grid-template-columns:repeat(3,minmax(0,1fr))">' + line("smtp", "o2switch") + line("brevo", "Brevo") + line("none", "Non partis") + "</div>" +
+      '<p class="adm-note">Dernier contrôle : ' + (r.checked_at ? when(r.checked_at) : "jamais") +
+        " · listes noires : " + esc(chk.blacklists ? (chk.blacklists.length ? chk.blacklists.join(", ") : "aucune") : "?") +
+        " · liens ouverts : " + esc(opens) +
+        " · sonde SPF/DKIM : " + esc(Array.isArray(chk.probe) ? chk.probe.join(", ") : (chk.probe || "en attente")) +
+        (chk.imap_error ? " · boîte : " + esc(chk.imap_error) : "") + "</p>" +
+    "</div>" +
+    '<div class="adm-card"><div class="adm-card-head"><h2>Test anti-spam <small>mail-tester.com</small></h2>' +
+        '<button class="btn btn-sm" data-mail-test' + (mailTest && mailTest.state === "loading" ? " disabled" : "") + (mail.smtp_configured ? "" : " disabled") + ">" +
+          (mailTest && mailTest.state === "loading" ? "Test en cours…" : "Tester la délivrabilité") + "</button></div>" +
+      '<p class="adm-note" style="margin:0">Envoie un vrai email par o2switch vers une adresse jetable et note son contenu sur 10 (SPF, DKIM, listes noires, mots à risque). Évite de relancer plusieurs fois de suite : le service limite les essais rapprochés.</p>' +
+      drawMailTest() +
+    "</div>" +
+    (mail.events.length ? '<div class="adm-card"><h2>Historique</h2><ul class="adm-events">' + mail.events.map((e) =>
+      "<li>" + when(e.created_at) + " · <b>" + esc(EVENT[e.kind] || e.kind) + "</b> " + esc(e.detail || "") + "</li>").join("") + "</ul></div>" : "");
+}
+
+function drawMailTest() {
+  if (!mailTest) return "";
+  if (mailTest.state === "loading") return '<p class="adm-note">Email de test envoyé, analyse dans ~30 s...</p>';
+  if (mailTest.state === "err") return '<p class="adm-error">' + esc(mailTest.error) + "</p>";
+  if (mailTest.state === "timeout") return '<p class="adm-note">Pas encore analysé après 2 minutes. <a href="' + esc(mailTest.report_url) + '" target="_blank" rel="noopener">Voir la page</a> (elle se termine toute seule).</p>';
+  const score = mailTest.score;
+  const cls = score == null ? "" : score >= 8 ? "st-ok" : score >= 5 ? "" : "st-bad";
+  return '<div class="adm-mailtest">' +
+    '<p style="margin:0"><b class="' + cls + '">Score : ' + (score != null ? score + " / 10" : "?") + "</b> — " +
+      '<a href="' + esc(mailTest.report_url) + '" target="_blank" rel="noopener">rapport complet&nbsp;&rarr;</a></p>' +
+    (mailTest.issues.length ? '<ul class="adm-events" style="margin-top:var(--sp-2)">' + mailTest.issues.map((t) => "<li>" + esc(t) + "</li>").join("") + "</ul>"
+      : '<p class="adm-note">Rien à améliorer trouvé.</p>') +
+  "</div>";
+}
+
+async function pollMailTest(id, triesLeft) {
+  let r;
+  try { r = await invoke("admin", { action: "mail-test-check", id }); }
+  catch (err) { mailTest = { id, state: "err", error: errorText(err) }; drawBody(); return; }
+  if (r.ready) {
+    mailTest = { id, state: "ready", score: r.score, issues: r.issues, report_url: r.report_url };
+    drawBody();
+    return;
+  }
+  if (triesLeft <= 0) {
+    mailTest = { id, state: "timeout", report_url: "https://www.mail-tester.com/" + id };
+    drawBody();
+    return;
+  }
+  setTimeout(() => pollMailTest(id, triesLeft - 1), 8000);
+}
+
+// ------------------------------------------------------------ coque
+
+function setTab(next, push) {
+  if (!NAV.some((n) => n[0] === next)) next = "overview";
+  tab = next;
+  query = "";
+  try { history.replaceState(null, "", "#" + next); } catch (err) { /* privé */ }
+  if (push !== false) window.scrollTo(0, 0);
+  drawShell();
+}
+
+function counts() {
+  return { transfers: data.transfers.length, spaces: data.spaces.length, files: data.files.length, users: data.users.length };
+}
+
+function drawShell() {
+  const c = counts();
+  const cur = NAV.find((n) => n[0] === tab);
+  root.innerHTML =
+    '<div class="adm-shell">' +
+      '<nav class="adm-nav" aria-label="Sections">' +
+        NAV.map(([k, label, ic]) => '<button data-tab="' + k + '"' + (tab === k ? ' aria-current="page"' : "") + ">" + icon(ic, 18) + "<span>" + label + "</span>" + (c[k] != null ? '<span class="n">' + c[k] + "</span>" : "") + "</button>").join("") +
+      "</nav>" +
+      "<section>" +
+        '<div class="adm-page-head"><div><h1>' + esc(cur[1]) + "</h1><p>" + esc(cur[3]) + (tab === "overview" ? " Données du " + esc(formatDate(data.generated_at, true)) + "." : "") + "</p></div>" +
+          '<div class="adm-tools">' +
+            (SEARCHABLE.has(tab) ? '<input class="input adm-search" type="search" placeholder="Rechercher…" value="' + esc(query) + '" data-search>' : "") +
+            '<button class="btn btn-sm" data-reload>' + icon("retry", 16) + "<span>Actualiser</span></button></div></div>" +
+        '<div data-list></div>' +
+      "</section>" +
+    "</div>";
+  drawBody();
+}
+
+function draw() { drawShell(); }
+
+function drawBody() {
+  const el = root.querySelector("[data-list]");
+  if (!el || !data) return;
+  if (tab === "mail" && !mail) loadMail();
+  if (tab === "bandwidth" && !bw) loadBandwidth();
+  let html;
+  if (tab === "overview") html = drawOverview();
+  else if (tab === "transfers") html = listOf(drawTransfers());
+  else if (tab === "spaces") html = drawSpacesPage();
+  else if (tab === "files") html = drawFiles();
+  else if (tab === "users") html = listOf(drawUsers());
+  else if (tab === "bandwidth") html = drawBandwidth();
+  else html = drawMail();
+  el.innerHTML = html;
+  drawSelection();
+}
+
+function drawSpacesPage() {
+  const modes = ["all", ...Object.keys(MODES)];
+  return '<div class="adm-chips" role="group" aria-label="Type">' +
+    modes.map((m) => '<button data-mode="' + m + '" aria-pressed="' + (modeFilter === m) + '">' + (m === "all" ? "Tous" : MODES[m]) + "</button>").join("") + "</div>" +
+    listOf(drawSpaces());
+}
+
+// ------------------------------------------------------------ envois, espaces, utilisateurs
 
 function drawTransfers() {
   const list = data.transfers.filter(matches);
@@ -138,7 +497,7 @@ function drawUsers() {
 }
 
 function drawSpaces() {
-  const list = data.spaces.filter(matches);
+  const list = data.spaces.filter((s) => (modeFilter === "all" || s.mode === modeFilter) && matches(s));
   if (!list.length) return '<p class="adm-empty">Aucun espace.</p>';
   return list.map((s) =>
     '<div class="adm-row is-flat">' +
@@ -155,12 +514,12 @@ const FILE_STATUS = { ready: "", uploading: "en cours d'envoi", failed: "échec"
 
 function drawStorage() {
   if (!storage) {
-    return '<div class="adm-storage"><span class="muted small">Ce que contient vraiment le stockage B2, comparé à la base : fichiers orphelins (sur B2 sans fiche), fiches sans fichier, envois inachevés.</span>' +
-      '<button class="btn btn-sm" data-storage>' + icon("layers", 16) + "<span>Vérifier le stockage B2</span></button></div>";
+    return '<div class="adm-card adm-storage"><div class="adm-card-head"><h2>Contrôle du stockage B2</h2><button class="btn btn-sm" data-storage>' + icon("layers", 16) + "<span>Vérifier</span></button></div>" +
+      '<p class="adm-note" style="margin:0">Compare ce que contient vraiment B2 à la base : fichiers orphelins (sur B2 sans fiche), fiches sans fichier, envois inachevés.</p></div>';
   }
-  if (storage.loading) return '<div class="adm-storage"><span class="muted small">Lecture du bucket B2...</span></div>';
+  if (storage.loading) return '<div class="adm-card adm-storage"><p class="adm-note" style="margin:0">Lecture du bucket B2...</p></div>';
   const s = storage;
-  return '<div class="adm-storage is-done">' +
+  return '<div class="adm-card adm-storage"><div class="adm-card-head"><h2>Contrôle du stockage B2</h2></div>' +
     '<div class="adm-storage-nums">' +
       "<span><b>" + s.objects + "</b> objets sur B2 · " + esc(formatBytes(s.bytes)) + "</span>" +
       '<span class="' + (s.orphan_count ? "is-warn" : "") + '"><b>' + s.orphan_count + "</b> orphelin" + (s.orphan_count > 1 ? "s" : "") + (s.orphan_count ? " · " + esc(formatBytes(s.orphan_bytes)) : "") + "</span>" +
@@ -198,7 +557,7 @@ function drawFiles() {
         '<span class="muted small">' + plural(list.length, "fichier", "fichiers") + " · " + esc(formatBytes(total)) + "</span></label>" +
       '<select class="input adm-sort" data-sort><option value="recent"' + (fileSort === "recent" ? " selected" : "") + '>Plus récents</option>' +
         '<option value="size"' + (fileSort === "size" ? " selected" : "") + ">Plus lourds</option></select></div>" +
-    (list.length ? list.map((f) =>
+    (list.length ? listOf(list.map((f) =>
       '<div class="adm-row adm-file-row' + (selected.has(f.id) ? " is-selected" : "") + '">' +
         '<label class="adm-check" aria-label="Sélectionner ' + esc(f.name) + '"><input type="checkbox" data-sel="' + esc(f.id) + '"' + (selected.has(f.id) ? " checked" : "") + "></label>" +
         '<details data-file="' + esc(f.id) + '">' +
@@ -216,7 +575,7 @@ function drawFiles() {
           '<div class="adm-detail" data-preview><p class="muted small">Chargement...</p></div>' +
         "</details>" +
         '<button class="btn btn-ghost btn-icon btn-sm adm-trash" data-del-file="' + esc(f.id) + '" aria-label="Supprimer ' + esc(f.name) + '" title="Supprimer">' + icon("trash", 16) + "</button>" +
-      "</div>").join("") : '<p class="adm-empty">Aucun fichier.</p>');
+      "</div>").join("")) : '<p class="adm-empty">Aucun fichier.</p>');
 }
 
 // Barre du bas quand des fichiers sont cochés
@@ -230,7 +589,7 @@ function drawSelection() {
     bar.setAttribute("data-selbar", "");
     document.body.appendChild(bar);
     bar.addEventListener("click", (e) => {
-      if (e.target.closest("[data-sel-none]")) { selected.clear(); drawList(); drawSelection(); }
+      if (e.target.closest("[data-sel-none]")) { selected.clear(); drawBody(); drawSelection(); }
       if (e.target.closest("[data-sel-delete]")) deleteFiles([...selected]);
     });
   }
@@ -303,100 +662,54 @@ async function openPreview(row) {
 
 async function checkStorage() {
   storage = { loading: true };
-  drawList();
+  drawBody();
   try {
     storage = await invoke("admin", { action: "storage" });
   } catch (err) {
     storage = null;
     toast(errorText(err), "err");
   }
-  drawList();
+  drawBody();
 }
 
-// ------------------------------------------------------------ emails
 
-async function loadMail() {
-  mail = { loading: true };
-  try {
-    mail = await invoke("admin", { action: "mail" });
-  } catch (err) {
-    mail = { error: errorText(err) };
-  }
-  drawList();
-}
+// ------------------------------------------------------------ événements
 
-const EVENT = { pause: "Coupure", resume: "Reprise", blacklist: "Liste noire", bounce: "Rebond", engagement: "Ouvertures", probe: "Sonde", error: "Erreur", diagnostic: "Test" };
-let mailTest = null;   // { id, state: "loading" | "ready" | "timeout" | "err", score, issues, report_url }
+root.addEventListener("click", (e) => {
+  if (e.target.closest("[data-reload]")) { load(); return; }
+  const t = e.target.closest("[data-tab]") || e.target.closest("[data-go]");
+  if (t) { setTab(t.dataset.tab || t.dataset.go); return; }
+  const m = e.target.closest("[data-mode]");
+  if (m) { modeFilter = m.dataset.mode; drawBody(); return; }
+  const d = e.target.closest("[data-bwdays]");
+  if (d) { bwDays = Number(d.dataset.bwdays); drawBody(); return; }
+  if (e.target.closest("[data-storage]")) checkStorage();
+});
 
-function drawMail() {
-  if (!mail || mail.loading) return '<div class="skeleton tall"></div>';
-  if (mail.error) return '<p class="adm-error">' + esc(mail.error) + "</p>";
-  const r = mail.route || {};
-  const paused = r.smtp_paused_until && new Date(r.smtp_paused_until) > new Date();
-  const state = !mail.smtp_configured ? "non configurée (tout part par Brevo)"
-    : paused ? (r.manual ? "coupée à la main" : "coupée jusqu'au " + formatDate(r.smtp_paused_until, true)) : "active";
-  const d = mail.day || {};
-  const line = (via, label) => {
-    const x = d[via] || { ok: 0, failed: 0, bounced: 0 };
-    return stat(label + " (24 h)", x.ok, x.failed + " refusés · " + x.bounced + " rebonds");
-  };
-  const chk = r.last_check || {};
-  const opens = chk.opens ? "o2switch " + chk.opens.smtp.opened + "/" + chk.opens.smtp.n + " · Brevo " + chk.opens.brevo.opened + "/" + chk.opens.brevo.n : "pas encore mesuré";
-  return '<div class="adm-mail">' +
-    '<p><b>Voie o2switch : ' + esc(state) + "</b>" + (paused && r.reason ? '<br><span class="muted small">' + esc(r.reason) + "</span>" : "") + "</p>" +
-    '<div class="adm-stats">' + line("smtp", "o2switch") + line("brevo", "Brevo") + line("none", "Non partis") + "</div>" +
-    '<p class="muted small">Dernier contrôle : ' + (r.checked_at ? when(r.checked_at) : "jamais") +
-      " · listes noires : " + esc(chk.blacklists ? (chk.blacklists.length ? chk.blacklists.join(", ") : "aucune") : "?") +
-      " · liens ouverts : " + esc(opens) +
-      " · sonde SPF/DKIM : " + esc(Array.isArray(chk.probe) ? chk.probe.join(", ") : (chk.probe || "en attente")) +
-      (chk.imap_error ? " · boîte : " + esc(chk.imap_error) : "") + "</p>" +
-    "<p>" + (paused
-      ? '<button class="btn btn-sm" data-mail-resume>Rétablir o2switch</button>'
-      : '<button class="btn btn-sm" data-mail-pause' + (mail.smtp_configured ? "" : " disabled") + ">Tout envoyer par Brevo</button>") +
-    ' <button class="btn btn-sm btn-ghost" data-mail-reload>' + icon("retry", 16) + "<span>Actualiser</span></button>" +
-    ' <button class="btn btn-sm btn-ghost" data-mail-test' + (mailTest && mailTest.state === "loading" ? " disabled" : "") + (mail.smtp_configured ? "" : " disabled") + ">" +
-      (mailTest && mailTest.state === "loading" ? "Test en cours (mail-tester.com)…" : "Tester la délivrabilité (mail-tester.com)") + "</button></p>" +
-    drawMailTest() +
-    (mail.events.length ? "<h3>Historique</h3><ul class=\"adm-events\">" + mail.events.map((e) =>
-      "<li>" + when(e.created_at) + " · <b>" + esc(EVENT[e.kind] || e.kind) + "</b> " + esc(e.detail || "") + "</li>").join("") + "</ul>" : "") +
-  "</div>";
-}
-
-// Score réel de délivrabilité (mail-tester.com) : contenu, listes noires,
-// SPF/DKIM/DMARC, vus par un vrai serveur destinataire. Adresse jetable à
-// chaque clic, aucun compte requis. Toujours envoyé par o2switch : c'est
-// cette voie qu'on veut évaluer, jamais Brevo.
-function drawMailTest() {
-  if (!mailTest) return "";
-  if (mailTest.state === "loading") return '<p class="muted small">Email de test envoyé, analyse dans ~30 s...</p>';
-  if (mailTest.state === "err") return '<p class="adm-error small">' + esc(mailTest.error) + "</p>";
-  if (mailTest.state === "timeout") return '<p class="muted small">Pas encore analysé après 2 minutes. <a href="' + esc(mailTest.report_url) + '" target="_blank" rel="noopener">Voir la page</a> (elle se termine toute seule).</p>';
-  const score = mailTest.score;
-  const cls = score == null ? "" : score >= 8 ? "st-ok" : score >= 5 ? "" : "st-bad";
-  return '<div class="adm-mailtest">' +
-    '<p><b class="' + cls + '">Score : ' + (score != null ? score + " / 10" : "?") + "</b> — " +
-      '<a href="' + esc(mailTest.report_url) + '" target="_blank" rel="noopener">rapport complet&nbsp;&rarr;</a></p>' +
-    (mailTest.issues.length ? "<ul class=\"adm-events\">" + mailTest.issues.map((t) => "<li>" + esc(t) + "</li>").join("") + "</ul>"
-      : '<p class="muted small">Rien à améliorer trouvé.</p>') +
-  "</div>";
-}
-
-async function pollMailTest(id, triesLeft) {
-  let r;
-  try { r = await invoke("admin", { action: "mail-test-check", id }); }
-  catch (err) { mailTest = { id, state: "err", error: errorText(err) }; drawList(); return; }
-  if (r.ready) {
-    mailTest = { id, state: "ready", score: r.score, issues: r.issues, report_url: r.report_url };
-    drawList();
-    return;
-  }
-  if (triesLeft <= 0) {
-    mailTest = { id, state: "timeout", report_url: "https://www.mail-tester.com/" + id };
-    drawList();
-    return;
-  }
-  setTimeout(() => pollMailTest(id, triesLeft - 1), 8000);
-}
+// graphique : détail du jour au survol
+root.addEventListener("pointermove", (e) => {
+  const col = e.target.closest && e.target.closest(".adm-chart .col");
+  const plot = root.querySelector(".adm-plot");
+  const tip = plot && plot.querySelector("[data-tip]");
+  if (!tip) return;
+  if (!col) { tip.hidden = true; return; }
+  const days = bwSeries(bwDays);
+  const d = days[Number(col.dataset.i)];
+  const svg = plot.querySelector("svg");
+  const box = svg.getBoundingClientRect();
+  const c = col.getBoundingClientRect();
+  tip.innerHTML = bwTip(d);
+  tip.hidden = false;
+  const left = Math.min(Math.max(c.left + c.width / 2 - box.left, 90), box.width - 90);
+  tip.style.left = left + "px";
+  tip.style.top = Math.max(0, (e.clientY - box.top) - 12) + "px";
+});
+let resizeTimer = null;
+window.addEventListener("resize", () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => { if (tab === "bandwidth" && data) drawBody(); }, 150);
+});
+root.addEventListener("pointerleave", () => { const t = root.querySelector("[data-tip]"); if (t) t.hidden = true; });
 
 root.addEventListener("click", async (e) => {
   if (e.target.closest("[data-mail-reload]")) { loadMail(); return; }
@@ -404,7 +717,7 @@ root.addEventListener("click", async (e) => {
     try {
       const r = await invoke("admin", { action: "mail-test-start" });
       mailTest = { id: r.id, state: "loading" };
-      drawList();
+      drawBody();
       setTimeout(() => pollMailTest(r.id, 12), r.wait_seconds * 1000);
     } catch (err) { toast(errorText(err), "err"); }
     return;
@@ -418,57 +731,6 @@ root.addEventListener("click", async (e) => {
     toast(pause ? "o2switch coupée" : "o2switch rétablie", "ok");
     loadMail();
   } catch (err) { toast(errorText(err), "err"); }
-});
-
-function draw() {
-  const st = data.stats;
-  const modes = Object.entries(st.spaces_by_mode).map(([m, n]) => n + " " + (MODES[m] || m).toLowerCase()).join(", ");
-  const counts = { transfers: data.transfers.length, users: data.users.length, spaces: data.spaces.length, files: data.files.length, mail: "" };
-  root.innerHTML =
-    '<div class="adm-head"><h1>Vue d\'ensemble</h1>' +
-      '<button class="btn btn-sm" data-reload>' + icon("retry", 16) + "<span>Actualiser</span></button></div>" +
-    '<p class="muted small">Données du ' + esc(formatDate(data.generated_at, true)) + (st.truncated ? " · listes tronquées à 5000 lignes" : "") + "</p>" +
-    '<div class="adm-stats">' +
-      stat("utilisateurs", st.users, st.accounts + " avec compte") +
-      stat("transferts", st.transfers, st.recipients + " destinataires") +
-      stat("téléchargements", st.downloads) +
-      stat("espaces", st.spaces, modes) +
-      stat("fichiers", st.files) +
-      stat("stockage", formatBytes(st.bytes)) +
-    "</div>" +
-    '<div class="adm-bar">' +
-      '<div class="deck-tabs adm-tabs" role="tablist">' +
-        [["transfers", "Transferts"], ["users", "Utilisateurs"], ["spaces", "Espaces"], ["files", "Fichiers"], ["mail", "Emails"]].map(([k, l]) =>
-          '<button role="tab" data-tab="' + k + '" aria-selected="' + (tab === k) + '">' + l + " <span>" + counts[k] + "</span></button>").join("") +
-      "</div>" +
-      '<input class="input adm-search" type="search" placeholder="Rechercher (email, blaze, fichier...)" value="' + esc(query) + '" data-search>' +
-    "</div>" +
-    '<div class="adm-list" data-list></div>';
-  drawList();
-}
-
-function drawList() {
-  const el = root.querySelector("[data-list]");
-  if (!el) return;
-  if (tab === "mail" && !mail) loadMail();
-  el.innerHTML = tab === "users" ? drawUsers() : tab === "spaces" ? drawSpaces() : tab === "files" ? drawFiles() :
-    tab === "mail" ? drawMail() : drawTransfers();
-  drawSelection();
-}
-
-// ------------------------------------------------------------ événements
-
-root.addEventListener("click", (e) => {
-  if (e.target.closest("[data-reload]")) { load(); return; }
-  const t = e.target.closest("[data-tab]");
-  if (t) {
-    tab = t.dataset.tab;
-    for (const b of root.querySelectorAll("[data-tab]")) b.setAttribute("aria-selected", String(b === t));
-    drawList();
-  }
-});
-root.addEventListener("click", (e) => {
-  if (e.target.closest("[data-storage]")) checkStorage();
 });
 
 // Retraits (contenu illicite, abus) : définitifs, fichiers B2 compris.
@@ -502,7 +764,7 @@ root.addEventListener("change", (e) => {
   }
   if (e.target.matches("[data-sel-all]")) {
     for (const f of visibleFiles()) { if (e.target.checked) selected.add(f.id); else selected.delete(f.id); }
-    drawList();
+    drawBody();
   }
 });
 
@@ -541,12 +803,12 @@ root.addEventListener("click", async (e) => {
 root.addEventListener("change", (e) => {
   if (!e.target.matches("[data-sort]")) return;
   fileSort = e.target.value;
-  drawList();
+  drawBody();
 });
 root.addEventListener("input", (e) => {
   if (!e.target.matches("[data-search]")) return;
   query = e.target.value.trim().toLowerCase();
-  drawList();
+  drawBody();
 });
 who.addEventListener("click", async (e) => {
   if (!e.target.closest("[data-logout]")) return;

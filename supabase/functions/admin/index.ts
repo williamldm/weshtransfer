@@ -9,6 +9,7 @@
 // POST { action: "delete-transfer", transfer_id, with_files }
 // POST { action: "delete-orphans" }          -> fichiers B2 sans fiche, envois abandonnés
 // POST { action: "delete-space", space_id }  -> espace entier, fichiers compris
+// POST { action: "bandwidth", days }        -> bande passante servie / reçue, stockage
 // POST { action: "mail-test-start" }         -> lance un test mail-tester.com (voie o2switch)
 // POST { action: "mail-test-check", id }     -> lit son score une fois traité
 //
@@ -183,6 +184,31 @@ Deno.serve(async (req) => {
     } catch (err) {
       return json({ error: "ERREUR_STOCKAGE", detail: (err as Error).message.slice(0, 300) }, 502);
     }
+  }
+
+  // ------------------------------------------------- bande passante
+  // Ce que le relais Cloudflare a servi, jour par jour (table bw_daily,
+  // alimentée à partir du 29/09/2026), avec les envois reçus, et la place
+  // occupée par rapport au plafond de stockage.
+  if (body.action === "bandwidth") {
+    const days = Math.min(Math.max(Number(body.days) || 30, 7), 90);
+    const from = new Date(Date.now() - days * 86400e3).toISOString().slice(0, 10);
+    const [{ data: rows }, { data: used }] = await Promise.all([
+      db.from("bw_daily").select("day, kind, delivered_bytes, origin_bytes, requests").gte("day", from).order("day", { ascending: true }),
+      db.rpc("storage_used"),
+    ]);
+    const cap = Number(Deno.env.get("STORAGE_TOTAL_GB") || 9) * 1024 ** 3;
+    const first = await db.from("bw_daily").select("day").order("day", { ascending: true }).limit(1).maybeSingle();
+    return json({
+      rows: (rows ?? []).map((r: any) => ({ day: r.day, kind: r.kind, delivered: Number(r.delivered_bytes), origin: Number(r.origin_bytes), requests: r.requests })),
+      since: first.data ? first.data.day : null,
+      storage: { used: Number(used) || 0, cap, free_tier: 10 * 1024 ** 3 },
+      limits: {
+        user_day: Number(Deno.env.get("UPLOAD_USER_DAY_GB") || 3) * 1024 ** 3,
+        ip_day: Number(Deno.env.get("UPLOAD_IP_DAY_GB") || 3) * 1024 ** 3,
+        global_day: Number(Deno.env.get("UPLOAD_GLOBAL_DAY_GB") || 200) * 1024 ** 3,
+      },
+    });
   }
 
   // --------------------------------- emails : voie o2switch / Brevo

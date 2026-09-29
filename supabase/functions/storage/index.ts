@@ -208,6 +208,8 @@ Deno.serve(async (req) => {
         const size = await completeMultipart(b2, key, uploadId);
         await service.from("upload_sessions")
           .update({ completed_at: new Date().toISOString(), size_bytes: size }).eq("id", session.id);
+        // journal de bande passante (admin) : octets reçus, au mieux
+        await service.rpc("bw_add", { p_kind: "upload", p_delivered: size, p_origin: 0, p_reqs: 1 }).then(() => {}, () => {});
         return json({ ok: true, size });
       }
 

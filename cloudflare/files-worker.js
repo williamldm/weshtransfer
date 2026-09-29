@@ -18,6 +18,10 @@ const UPSTREAM = "https://s3.eu-central-003.backblazeb2.com";
 // fichier. Le jeton est retiré avant B2 (il ne fait pas partie de la
 // signature) et vérifié côté Supabase (HMAC) : le Worker n'a aucun secret.
 const COMPLETE_URL = "https://mqjzzcnzbsbhololiiyw.supabase.co/functions/v1/transfer-open";
+// Compteur de bande passante (admin) : octets réellement envoyés au
+// visiteur, et part venue de B2 (le cache Cloudflare absorbe le reste).
+// Secret BW_SECRET partagé avec la fonction "bandwidth" (jamais dans le code).
+const BW_URL = "https://mqjzzcnzbsbhololiiyw.supabase.co/functions/v1/bandwidth";
 const BUCKET = "/weshtransfer/";
 
 const cors = {
@@ -61,22 +65,29 @@ function reachesEnd(res) {
   return 0;
 }
 
-function watchCompletion(body, expected, wt, ctx) {
-  let seen = 0;
-  const counter = new TransformStream({
-    transform(chunk, controller) { seen += chunk.byteLength; controller.enqueue(chunk); },
-    flush() {
-      // flush n'arrive que si tout a été lu : un téléchargement annulé ne compte pas
-      if (seen === expected) {
-        ctx.waitUntil(fetch(COMPLETE_URL, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action: "complete", wt }),
-        }).catch(() => {}));
-      }
+// Compte les octets qui partent vers le visiteur. `done(n, complet)` est
+// appelé une seule fois : à la fin du fichier (complet = true) ou quand le
+// visiteur interrompt (complet = false, n = ce qui est déjà parti).
+function metered(body, done) {
+  const reader = body.getReader();
+  let n = 0, over = false;
+  const finish = (complete) => { if (!over) { over = true; done(n, complete); } };
+  return new ReadableStream({
+    async pull(controller) {
+      const { done: end, value } = await reader.read();
+      if (end) { finish(true); controller.close(); return; }
+      n += value.byteLength;
+      controller.enqueue(value);
     },
+    cancel(reason) { finish(false); return reader.cancel(reason); },
   });
-  return body.pipeThrough(counter);
+}
+
+function kindOf(type) {
+  if (/^audio\//i.test(type)) return "audio";
+  if (/^video\//i.test(type)) return "video";
+  if (/^image\//i.test(type)) return "image";
+  return "fichier";
 }
 
 export default {
@@ -113,7 +124,29 @@ export default {
       });
 
     const expected = burn && res.body ? reachesEnd(res) : 0;
-    const out = new Response(expected ? watchCompletion(res.body, expected, wt, ctx) : res.body, res);
+    const fromOrigin = !/^(HIT|STALE|REVALIDATED)$/i.test(res.headers.get("cf-cache-status") || "");
+    const kind = kindOf(res.headers.get("Content-Type") || "");
+    let body = res.body;
+    if (body && res.ok && request.method === "GET") {
+      body = metered(body, (n, complete) => {
+        if (env.BW_SECRET && n > 0) {
+          ctx.waitUntil(fetch(BW_URL, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "x-bw-secret": env.BW_SECRET },
+            body: JSON.stringify({ kind, delivered: n, origin: fromOrigin ? n : 0 }),
+          }).catch(() => {}));
+        }
+        // "jusqu'au premier téléchargement" : seulement si tout est parti
+        if (expected && complete && n === expected) {
+          ctx.waitUntil(fetch(COMPLETE_URL, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action: "complete", wt }),
+          }).catch(() => {}));
+        }
+      });
+    }
+    const out = new Response(body, res);
     for (const [k, v] of Object.entries(cors)) out.headers.set(k, v);
     for (const [k, v] of Object.entries(hardening)) out.headers.set(k, v);
     // "sandbox" empêcherait le lecteur PDF du navigateur de s'ouvrir
