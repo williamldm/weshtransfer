@@ -2,12 +2,12 @@
 // Pas de supabase-js ici : un simple appel à l'Edge Function transfer-open,
 // qui vérifie le lien et renvoie des URLs signées. Page légère, rapide en 4G.
 
-import { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from "./config.js?v=100";
-import { Waveform, formatTime } from "./waveform.js?v=100";
-import { saveZip, canStreamToDisk, MEMORY_LIMIT } from "./zip.js?v=100";
-import { icon } from "./icons.js?v=100";
-import { esc, formatBytes, formatDuration, formatDate, plural, toast, triggerDownload, avatar, fileBadge, fileTile } from "./ui.js?v=100";
-import { categoryOf, canPreview } from "./files.js?v=100";
+import { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from "./config.js?v=101";
+import { Waveform, formatTime } from "./waveform.js?v=101";
+import { saveZip, canStreamToDisk, MEMORY_LIMIT } from "./zip.js?v=101";
+import { icon } from "./icons.js?v=101";
+import { esc, formatBytes, formatDuration, formatDate, plural, toast, triggerDownload, avatar, fileBadge, fileTile } from "./ui.js?v=101";
+import { categoryOf, canPreview } from "./files.js?v=101";
 
 const root = document.getElementById("tp");
 // le jeton : lien court /t/<jeton>, ou ancien t.html?k=<jeton>
@@ -195,7 +195,7 @@ function render(d) {
     '<a class="tp-cta" href="index.html"><span><strong>Toi aussi, gaspille de la bande passante.</strong>' +
       "<br>Envoie tes fichiers avec WeshTransfer, sans compte.</span>" + icon("chevron", 20) + "</a>" +
     '<p class="tp-foot">WeshTransfer, le transfert le moins écoresponsable du marché. ' +
-      "(En vrai, tes fichiers sont supprimés automatiquement à expiration.)</p>";
+      "(En vrai, tes fichiers sont supprimés automatiquement à expiration.)<br>Fait par le WYP, pour le WYP.</p>";
 
   const cs = getComputedStyle(document.documentElement);
   for (const f of groups.audio) {
