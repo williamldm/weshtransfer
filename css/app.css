@@ -1,5 +1,5 @@
-@import url("fonts.css?v=108");
-@import url("tokens.css?v=108");
+@import url("fonts.css?v=109");
+@import url("tokens.css?v=109");
 
 /* ================================================================= base */
 *, *::before, *::after { box-sizing: border-box; }
@@ -1513,3 +1513,9 @@ body.app .app-header { view-transition-name: topbar; }
 @media (hover: none) and (prefers-reduced-motion: no-preference) {
   .logo:active .monogram path:last-child, .brand-link:active svg path:last-child { animation: logo-arrow .6s cubic-bezier(.3, 1.2, .5, 1); }
 }
+
+/* accueil : "ajoute d'abord un fichier" */
+@keyframes nudge { 0%, 100% { transform: translateX(0); } 20% { transform: translateX(-6px); } 40% { transform: translateX(6px); } 60% { transform: translateX(-4px); } 80% { transform: translateX(3px); } }
+.add-files.is-nudge { animation: nudge .45s ease; }
+.add-files.is-nudge .add-circle { background: var(--accent-hover); box-shadow: 0 0 0 6px var(--accent-soft); }
+@media (prefers-reduced-motion: reduce) { .add-files.is-nudge { animation: none; } }

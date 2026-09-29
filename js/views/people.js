@@ -1,9 +1,9 @@
 // Feuille "Participants" : qui est là, inviter, réglages du host.
 
-import { listParticipants, updateSpace, deleteSpace, inviteByEmail, listInvites, deleteInvite, listContacts, suggestContacts, senderEmail, rememberContactsLocal } from "../api.js?v=108";
-import { icon } from "../icons.js?v=108";
-import { esc, h, openSheet, avatar, shareLink, copyText, toast, errorText, formatDate, confirmSheet, canShare, promptSheet } from "../ui.js?v=108";
-import { leaveSpace, knownSpaces, switchTo, forgetSpace, renameMe, accountEmail, logout } from "../session.js?v=108";
+import { listParticipants, updateSpace, deleteSpace, inviteByEmail, listInvites, deleteInvite, listContacts, suggestContacts, senderEmail, rememberContactsLocal } from "../api.js?v=109";
+import { icon } from "../icons.js?v=109";
+import { esc, h, openSheet, avatar, shareLink, copyText, toast, errorText, formatDate, confirmSheet, canShare, promptSheet } from "../ui.js?v=109";
+import { leaveSpace, knownSpaces, switchTo, forgetSpace, renameMe, accountEmail, logout } from "../session.js?v=109";
 
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 

@@ -1,6 +1,7 @@
 // Purge des espaces dont la date de suppression est passée, des sons
 // de séminaire (jam) arrivés à 5 jours, et des fichiers d'envois "jusqu'au
-// premier téléchargement" déjà récupérés en entier (files.burned_at).
+// premier téléchargement" déjà récupérés en entier (files.burned_at), et
+// des espaces d'envoi qui n'ont jamais rien envoyé.
 // Un espace qui abrite encore un tel fichier en attente n'est pas purgé :
 // ses autres fichiers sont effacés, lui est repoussé de 7 jours. Appelée toutes les heures par
 // pg_cron (via pg_net), qui n'envoie pas de JWT : déployée avec
@@ -82,6 +83,14 @@ Deno.serve(async (req) => {
       report.push({ space: space.name, files: 0, ok: false, error: (err as Error).message });
     }
   }
+  // Espaces d'envoi qui n'ont jamais rien envoyé (voir la migration
+  // 20260929000002) : effacés, fichiers compris.
+  const { data: abandoned } = await db.rpc("abandoned_envoi_spaces", { p_limit: 100 });
+  let abandonedCount = 0;
+  for (const sp of (abandoned ?? []) as { id: string; name: string }[]) {
+    try { await wipeSpace(db, sp.id); abandonedCount++; } catch { /* retenté à l'heure suivante */ }
+  }
+
   // Envois "jusqu'au premier téléchargement" : fichiers déjà récupérés
   const { data: burned } = await db.from("files").select("id, storage_path, backend")
     .not("burned_at", "is", null).limit(500);
@@ -134,5 +143,6 @@ Deno.serve(async (req) => {
     jam: { files: jamFiles, errors: jamErr ? [jamErr.message] : jamErrors },
     versions: trashed,
     downloaded: burnedFiles,
+    abandoned_envoi: abandonedCount,
   });
 });
