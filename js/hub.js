@@ -3,12 +3,12 @@
 // les espaces déjà ouverts sur cet appareil (ouvrir, oublier, supprimer).
 // session.js / api.js ne sont chargés qu'au moment d'agir.
 
-import { icon } from "./icons.js?v=107";
-import { esc, h, errorText, formatBytes, plural, actionSheet, confirmSheet, toast } from "./ui.js?v=107";
-import { isBlocked, FILE_MAX } from "./files.js?v=107";
-import { putPending, MAX_BYTES } from "./pending.js?v=107";
-import { mountWallpaperNote } from "./wallpapers.js?v=107";
-import { mountClaim } from "./claim-fx.js?v=107";
+import { icon } from "./icons.js?v=108";
+import { esc, h, errorText, formatBytes, plural, actionSheet, confirmSheet, toast } from "./ui.js?v=108";
+import { isBlocked, FILE_MAX } from "./files.js?v=108";
+import { putPending, MAX_BYTES } from "./pending.js?v=108";
+import { mountWallpaperNote } from "./wallpapers.js?v=108";
+import { mountClaim } from "./claim-fx.js?v=108";
 
 const PSEUDO_KEY = "seminaire.pseudo";
 const MODE_LABEL = { envoi: "Envois", seminaire: "Séminaire", revue: "Verdict" };
@@ -30,8 +30,13 @@ function savePseudo(p) {
 function known() {
   try { return JSON.parse(localStorage.getItem("seminaire.spaces")) || []; } catch (err) { return []; }
 }
+// L'espace actif est retenu par onglet (sessionStorage, voir session.js) ET
+// comme "dernier utilisé" (localStorage) : il faut écrire les deux, sinon
+// l'appli rouvre l'espace précédent de cet onglet au lieu de celui choisi.
 function goTo(space) {
-  try { localStorage.setItem("seminaire.space", JSON.stringify(space)); } catch (err) { /* privé */ }
+  const json = JSON.stringify(space);
+  try { sessionStorage.setItem("seminaire.space", json); } catch (err) { /* privé */ }
+  try { localStorage.setItem("seminaire.space", json); } catch (err) { /* privé */ }
   location.href = "app.html#/projects";
 }
 
@@ -62,9 +67,9 @@ async function ensureAccount(form, fail) {
     fail("Ton email sert de compte (sans mot de passe) : on en a besoin.");
     return false;
   }
-  const session = await import("./session.js?v=107");
+  const session = await import("./session.js?v=108");
   await session.ensureAuth();
-  const { ensureVerified } = await import("./verify.js?v=107");
+  const { ensureVerified } = await import("./verify.js?v=108");
   if (await ensureVerified(email, { optional: false }) !== "ok") return false;
   await session.login(email);
   try { localStorage.setItem("seminaire.replyTo", email); } catch (err) { /* privé */ }
@@ -236,7 +241,7 @@ function spaceMenu(k) {
     {
       label: "Oublier sur cet appareil", icon: "logout",
       run: async () => {
-        const session = await import("./session.js?v=107");
+        const session = await import("./session.js?v=108");
         session.forgetSpace(k.id);
         toast("\"" + k.name + "\" n'apparaît plus ici. Rien n'a été supprimé.", "ok");
         drawSpacesLink();
@@ -251,9 +256,9 @@ function spaceMenu(k) {
           { ok: "Tout supprimer", danger: true, title: "Supprimer l'espace" });
         if (!ok) return;
         try {
-          const session = await import("./session.js?v=107");
+          const session = await import("./session.js?v=108");
           await session.ensureAuth();
-          const api = await import("./api.js?v=107");
+          const api = await import("./api.js?v=108");
           await api.deleteSpace(k.id);
           session.forgetSpace(k.id);
           toast("\"" + k.name + "\" a été supprimé.", "ok");
@@ -312,7 +317,7 @@ deck.addEventListener("submit", async (e) => {
     if (mine) {
       // nouveau blaze : dans l'espace d'envoi, et dans son nom "Envois de ..."
       if (renaming && pseudo !== pseudoBefore) {
-        const session = await import("./session.js?v=107");
+        const session = await import("./session.js?v=108");
         await session.renameMe(mine.id, pseudo);
         if (/^Envois de /.test(mine.name)) await session.renameSpace(mine.id, "Envois de " + pseudo).catch(() => {});
       }
@@ -321,13 +326,13 @@ deck.addEventListener("submit", async (e) => {
       return;
     }
 
-    const session = await import("./session.js?v=107");
+    const session = await import("./session.js?v=108");
     if (kind === "join") await session.joinSpace(val("code"), pseudo);
     else if (kind === "salon") await session.createSpace(val("name"), "seminaire", pseudo);
     else if (kind === "revue") {
       const created = await session.createSpace(val("project"), "revue", pseudo);
       if (form.querySelector("[name=keep]").checked) {
-        const api = await import("./api.js?v=107");
+        const api = await import("./api.js?v=108");
         await api.updateSpace(created.id, { purge_at: null }).catch((err) => {
           try { sessionStorage.setItem("seminaire.flash", errorText(err)); } catch (e3) { /* privé */ }
         });
@@ -350,7 +355,7 @@ document.addEventListener("click", async (e) => {
     const ok = await confirmSheet("Rien n'est supprimé : tu retrouveras tout en te reconnectant avec ton email.",
       { ok: "Se déconnecter", title: "Se déconnecter de cet appareil" });
     if (!ok) return;
-    const session = await import("./session.js?v=107");
+    const session = await import("./session.js?v=108");
     await session.logout();
     drawSpacesLink();
     show("send");
@@ -372,7 +377,7 @@ document.addEventListener("click", async (e) => {
 async function openInvite(token) {
   show("invite");
   const box = deck.querySelector("[data-invite-view]");
-  const session = await import("./session.js?v=107");
+  const session = await import("./session.js?v=108");
   let info;
   try {
     info = await session.inviteInfo(token);
@@ -522,7 +527,7 @@ for (const el of document.querySelectorAll("[data-icon]")) el.innerHTML = icon(e
 
 // Connecté : "Mes espaces" à jour depuis le serveur (autres appareils)
 if (accountEmail()) {
-  import("./session.js?v=107").then((m) => m.syncSpaces()).then(() => {
+  import("./session.js?v=108").then((m) => m.syncSpaces()).then(() => {
     drawSpacesLink();
     if (tab === "spaces") show("spaces");
   }).catch(() => {});
