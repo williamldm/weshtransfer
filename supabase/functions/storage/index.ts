@@ -120,6 +120,9 @@ Deno.serve(async (req) => {
           .select("id, space_id, space:spaces(max_file_bytes)")
           .eq("id", projectId).maybeSingle();
         if (!project) return json({ error: "NON_MEMBRE" }, 403);
+        // "écoute seule" (lien de partage) : pas de dépôt
+        const { data: dep } = await db.from("participants").select("viewer").eq("space_id", project.space_id).eq("user_id", uid).maybeSingle();
+        if (!dep || dep.viewer) return json({ error: dep ? "ECOUTE_SEULE" : "NON_MEMBRE" }, 403);
         const spaceMax = (project as unknown as { space: { max_file_bytes: number } }).space?.max_file_bytes ?? 0;
         const max = spaceMax ? Math.min(spaceMax, FILE_MAX) : FILE_MAX;
         if (size > max) return json({ error: "TROP_LOURD" }, 413);
@@ -289,8 +292,8 @@ Deno.serve(async (req) => {
       const { data: project } = await db.from("projects").select("id, space_id, created_by").eq("id", projectId).maybeSingle();
       if (!project) return json({ error: "SUPPRESSION_REFUSEE" }, 403);
       const { data: space } = await service.from("spaces").select("mode").eq("id", project.space_id).maybeSingle();
-      const { data: me } = await db.from("participants").select("id, is_host").eq("space_id", project.space_id).eq("user_id", uid).maybeSingle();
-      if (!me) return json({ error: "NON_MEMBRE" }, 403);
+      const { data: me } = await db.from("participants").select("id, is_host, viewer").eq("space_id", project.space_id).eq("user_id", uid).maybeSingle();
+      if (!me || me.viewer) return json({ error: me ? "ECOUTE_SEULE" : "NON_MEMBRE" }, 403);
       const allowed = (space?.mode === "revue") || me.is_host || project.created_by === me.id;
       if (!allowed) return json({ error: "SUPPRESSION_REFUSEE" }, 403);
 

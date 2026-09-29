@@ -3,7 +3,7 @@
 // mot de passe), il partage le compte de cette adresse : les mêmes espaces,
 // envois et blazes sur tous ses appareils.
 
-import { sb, q, invoke, requireClient } from "./db.js?v=114";
+import { sb, q, invoke, requireClient } from "./db.js?v=115";
 
 const SPACE_KEY = "seminaire.space";      // espace actif
 const KNOWN_KEY = "seminaire.spaces";     // tous les espaces rejoints sur cet appareil
@@ -104,6 +104,7 @@ function toSpace(s, pseudo) {
     mode: s.mode || "seminaire",
     access: s.access || "code",
     isHost: s.is_host,
+    viewer: !!s.viewer,   // entré par un lien de partage : écoute seule
     isLocked: s.is_locked,
     expiresAt: s.expires_at,
     maxFileBytes: s.max_file_bytes,
@@ -263,7 +264,7 @@ export async function restore() {
       .eq("id", space.id)
       .maybeSingle(),
     sb.from("participants")
-      .select("id, pseudo, is_host")
+      .select("id, pseudo, is_host, viewer")
       .eq("space_id", space.id)
       .eq("user_id", data.session.user.id)
       .maybeSingle()
@@ -283,7 +284,8 @@ export async function restore() {
     maxFileBytes: spaceRes.data.max_file_bytes,
     participantId: meRes.data.id,
     pseudo: meRes.data.pseudo,
-    isHost: meRes.data.is_host
+    isHost: meRes.data.is_host,
+    viewer: !!meRes.data.viewer
   });
   setSpace(space);
   return space;

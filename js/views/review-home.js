@@ -6,17 +6,17 @@
 import {
   listProjects, listReviewComments, deleteProjectFully, listParticipants, updateProject,
   reviewNotifyStatus, reviewSubscribe, reviewUnsubscribe, signFiles, cachedDownload, myPrefs, savePref
-} from "../api.js?v=114";
-import { saveZip, canStreamToDisk, MEMORY_LIMIT } from "../zip.js?v=114";
-import { mountUploads } from "./uploads.js?v=114";
-import { openUploadSheet } from "./upload-sheet.js?v=114";
-import { stateOf, isEngineerOf } from "./review.js?v=114";
-import { ensureVerified } from "../verify.js?v=114";
-import { accountEmail } from "../session.js?v=114";
-import { albumOf, onCover, setCover, clearCover, setAlbumTitle } from "../cover.js?v=114";
-import { playQueue, onPlayer, isCurrent, state as playerState, toggle, trackFromFile } from "../player.js?v=114";
-import { icon } from "../icons.js?v=114";
-import { esc, h, plural, toast, errorText, formatDuration, actionSheet, confirmSheet, promptSheet, openSheet, triggerDownload } from "../ui.js?v=114";
+} from "../api.js?v=115";
+import { saveZip, canStreamToDisk, MEMORY_LIMIT } from "../zip.js?v=115";
+import { mountUploads } from "./uploads.js?v=115";
+import { openUploadSheet } from "./upload-sheet.js?v=115";
+import { stateOf, isEngineerOf } from "./review.js?v=115";
+import { ensureVerified } from "../verify.js?v=115";
+import { accountEmail } from "../session.js?v=115";
+import { albumOf, onCover, setCover, clearCover, setAlbumTitle } from "../cover.js?v=115";
+import { playQueue, onPlayer, isCurrent, state as playerState, toggle, trackFromFile } from "../player.js?v=115";
+import { icon } from "../icons.js?v=115";
+import { esc, h, plural, toast, errorText, formatDuration, actionSheet, confirmSheet, promptSheet, openSheet, triggerDownload } from "../ui.js?v=115";
 
 // Pochette générée : un aplat dont la teinte dépend du nom, les initiales
 // en grand. Pas de dégradé (identité sobre).
@@ -120,6 +120,7 @@ export async function mountReviewHome(root, ctx) {
         '<h1 class="rh-title"><span data-album-title>' + esc(s.name) + '</span>' +
           '<button type="button" class="rh-title-edit" data-edit-title aria-label="Renommer l\'album" title="Renommer l\'album">' + icon("edit", 16) + "</button></h1>" +
         '<p class="rh-meta" data-meta></p>' +
+        (s.viewer ? '<p class="rh-viewer">' + icon("headphones", 14) + "<span>Écoute seule : tu écoutes et télécharges, sans rien modifier.</span></p>" : "") +
         '<div class="rh-actions">' +
           '<button class="btn btn-primary" data-play-all disabled>' + icon("play", 18) + "<span>Lecture</span></button>" +
           '<button class="btn" data-dl-all disabled>' + icon("download", 18) + "<span>Télécharger</span></button>" +
@@ -163,6 +164,7 @@ export async function mountReviewHome(root, ctx) {
 
   // Accueil de l'artiste, la première fois : titre de l'album et pochette
   function welcomed() {
+    if (s.viewer) return true;   // écoute seule : pas de pochette ni de titre à choisir
     try { return localStorage.getItem(WELCOME_KEY + s.id) === "1"; } catch (err) { return false; }
   }
   function openWelcome() {
@@ -351,6 +353,7 @@ export async function mountReviewHome(root, ctx) {
     if (s.participantId) savePref(s.participantId, key, value).catch(() => {});
   };
   function drawOffer() {
+    if (s.viewer) { offerBox.innerHTML = ""; return; }
     // abonné d'office (compte avec adresse) : on le dit une fois, avec de
     // quoi désactiver
     if (notifyKnown && notifyEmail && spacePrefs.mailNotice !== "seen") {
@@ -411,7 +414,7 @@ export async function mountReviewHome(root, ctx) {
 
   engActions.addEventListener("click", async (e) => {
     if (e.target.closest("[data-share-verdict]")) {
-      const { openShareSheet } = await import("./people.js?v=114");
+      const { openShareSheet } = await import("./people.js?v=115");
       openShareSheet(ctx);
       return;
     }

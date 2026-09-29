@@ -1,7 +1,7 @@
 // Briques d'interface partagées : DOM, messages, formatage, feuilles.
 
-import { icon } from "./icons.js?v=114";
-import { CATEGORY, categoryOf, extOf } from "./files.js?v=114";
+import { icon } from "./icons.js?v=115";
+import { CATEGORY, categoryOf, extOf } from "./files.js?v=115";
 
 // ------------------------------------------------------------------ DOM
 
@@ -38,6 +38,7 @@ const ERRORS = {
   CODE_INVALIDE: "Ce code ne correspond à aucun espace.",
   CONNEXION_ECHEC: "La connexion à ton compte a échoué. Réessaie.",
   INVITATION_REQUISE: "Cet espace est sur invitation : demande à l'hôte de t'inviter par email.",
+  ECOUTE_SEULE: "Tu es en écoute seule sur ce projet : demande à l'ingé de t'inviter par email pour pouvoir le modifier.",
   INVITATION_PLEINE: "Ce lien de partage a déjà servi le nombre de fois prévu. Demande-en un nouveau.",
   INVITATION_INCONNUE: "Cette invitation n'existe pas, ou a été remplacée par une plus récente.",
   INVITATION_EXPIREE: "Cette invitation a expiré. Demande à l'hôte de t'en renvoyer une.",

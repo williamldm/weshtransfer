@@ -1,5 +1,5 @@
-@import url("fonts.css?v=114");
-@import url("tokens.css?v=114");
+@import url("fonts.css?v=115");
+@import url("tokens.css?v=115");
 
 /* ================================================================= base */
 *, *::before, *::after { box-sizing: border-box; }
@@ -1554,3 +1554,15 @@ body.app .app-header { view-transition-name: topbar; }
 .share-url { font-size: 15px; text-align: center; }
 .share-link .row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-2); }
 .share-link .small { margin: 0; text-align: center; }
+
+/* écoute seule (entré par un lien de partage) : les commandes qui
+   modifient le projet sont masquées ; la base les refuse de toute façon */
+.rh-viewer { display: inline-flex; align-items: center; gap: 6px; margin: 0 0 var(--sp-4); padding: 5px 12px; border-radius: 99px; background: rgba(255, 255, 255, .1); color: rgba(255, 255, 255, .85); font-size: 13px; }
+body.is-viewer [data-edit-title], body.is-viewer [data-menu], body.is-viewer [data-drag],
+body.is-viewer .rh-cover-edit, body.is-viewer .cover-cta, body.is-viewer [data-help-show],
+body.is-viewer [data-rv-form], body.is-viewer [data-quickbox], body.is-viewer [data-rv-approve], body.is-viewer [data-approve],
+body.is-viewer [data-resolve], body.is-viewer [data-unresolve], body.is-viewer [data-reopen], body.is-viewer [data-ok],
+body.is-viewer [data-reply], body.is-viewer [data-reply-form], body.is-viewer [data-del], body.is-viewer [data-rv-flush],
+body.is-viewer [data-behalf], body.is-viewer [data-more], body.is-viewer [data-goto-verify], body.is-viewer [data-rv-update],
+body.is-viewer [data-help] { display: none !important; }
+body.is-viewer .rh-cover-btn { pointer-events: none; }

@@ -1,9 +1,9 @@
 // Feuille "Participants" : qui est là, inviter, réglages du host.
 
-import { shareInviteLink, listParticipants, updateSpace, deleteSpace, inviteByEmail, listInvites, deleteInvite, listContacts, suggestContacts, senderEmail, rememberContactsLocal } from "../api.js?v=114";
-import { icon } from "../icons.js?v=114";
-import { esc, h, openSheet, avatar, shareLink, copyText, toast, errorText, formatDate, confirmSheet, canShare, promptSheet } from "../ui.js?v=114";
-import { leaveSpace, knownSpaces, switchTo, forgetSpace, renameMe, accountEmail, logout } from "../session.js?v=114";
+import { shareInviteLink, listParticipants, updateSpace, deleteSpace, inviteByEmail, listInvites, deleteInvite, listContacts, suggestContacts, senderEmail, rememberContactsLocal } from "../api.js?v=115";
+import { icon } from "../icons.js?v=115";
+import { esc, h, openSheet, avatar, shareLink, copyText, toast, errorText, formatDate, confirmSheet, canShare, promptSheet } from "../ui.js?v=115";
+import { leaveSpace, knownSpaces, switchTo, forgetSpace, renameMe, accountEmail, logout } from "../session.js?v=115";
 
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
@@ -18,7 +18,7 @@ export async function openShareSheet(ctx) {
   const what = s.mode === "revue" ? "ton verdict" : "ton séminaire";
   const body = h(
     '<div class="share-link">' +
-      '<p class="muted">Un lien court à coller sur WhatsApp ou par SMS : qui l\'ouvre donne son email, le vérifie avec un code, puis entre dans ' + what + ".</p>" +
+      '<p class="muted">Un lien court à coller sur WhatsApp ou par SMS : qui l\'ouvre choisit un blaze et entre dans ' + what + " en écoute seule (écouter, télécharger), sans rien pouvoir modifier. Pour qu\'un artiste donne ses retours, invite-le par email.</p>" +
       '<div data-share-box><div class="skeleton"></div></div>' +
     "</div>"
   );

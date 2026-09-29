@@ -1,23 +1,23 @@
 // Coquille de l'appli : démarrage, routeur à hash, en-tête, bus
 // d'événements, temps réel. Chaque vue est un module avec mount().
 
-import { restore, getSpace, leaveSpace, switchTo } from "./session.js?v=114";
-import { requireClient } from "./db.js?v=114";
-import { connectSpace } from "./realtime.js?v=114";
-import { startJam } from "./jam.js?v=114";
-import { bindPlayerBar } from "./player.js?v=114";
-import { activeCount, onUploads } from "./upload.js?v=114";
-import { openPeopleSheet } from "./views/people.js?v=114";
-import { openUploadSheet } from "./views/upload-sheet.js?v=114";
-import { icon } from "./icons.js?v=114";
-import { monogram } from "./brand.js?v=114";
-import { toast, errorText, esc } from "./ui.js?v=114";
+import { restore, getSpace, leaveSpace, switchTo } from "./session.js?v=115";
+import { requireClient } from "./db.js?v=115";
+import { connectSpace } from "./realtime.js?v=115";
+import { startJam } from "./jam.js?v=115";
+import { bindPlayerBar } from "./player.js?v=115";
+import { activeCount, onUploads } from "./upload.js?v=115";
+import { openPeopleSheet } from "./views/people.js?v=115";
+import { openUploadSheet } from "./views/upload-sheet.js?v=115";
+import { icon } from "./icons.js?v=115";
+import { monogram } from "./brand.js?v=115";
+import { toast, errorText, esc } from "./ui.js?v=115";
 
-import * as home from "./views/home.js?v=114";
-import * as project from "./views/project.js?v=114";
-import * as file from "./views/file.js?v=114";
-import * as send from "./views/send.js?v=114";
-import * as transfers from "./views/transfers.js?v=114";
+import * as home from "./views/home.js?v=115";
+import * as project from "./views/project.js?v=115";
+import * as file from "./views/file.js?v=115";
+import * as send from "./views/send.js?v=115";
+import * as transfers from "./views/transfers.js?v=115";
 
 // L'accueil dépend du mode de l'espace : morceaux (séminaire) ou
 // directement le composeur d'envoi (espace dédié aux envois).
@@ -218,7 +218,7 @@ function bindDrop() {
     const files = e.dataTransfer.files;
     if (!files || !files.length) return;
     if (dropHandler) dropHandler(files);
-    else openUploadSheet(ctx, files);
+    else if (!ctx.space.viewer) openUploadSheet(ctx, files);
   });
 }
 
@@ -250,6 +250,9 @@ async function boot() {
 
   const bus = createBus();
   ctx = { space, bus, navigate, setTitle, setBack, setDrop, online: new Set([space.participantId]) };
+  // écoute seule (lien de partage) : les commandes de modification sont
+  // masquées (la base les refuse de toute façon)
+  document.body.classList.toggle("is-viewer", !!space.viewer);
 
   bus.on("presence", (ids) => {
     ctx.online = new Set(ids.length ? ids : [space.participantId]);
@@ -296,7 +299,7 @@ async function boot() {
   window.addEventListener("hashchange", routeSmoothly);
 
   // compte : "Mes espaces" à jour depuis le serveur (autres appareils)
-  import("./session.js?v=114").then((m) => m.syncSpaces()).catch(() => {});
+  import("./session.js?v=115").then((m) => m.syncSpaces()).catch(() => {});
 
   // message laissé par l'accueil (ex. réglage refusé à la création)
   try {

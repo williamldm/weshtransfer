@@ -195,9 +195,8 @@ Deno.serve(async (req) => {
   // lien ouvert : l'adresse est celle que donne l'invité (à vérifier)
   const open = invite.email === null;
   const givenEmail = String(body.email ?? "").trim().toLowerCase();
-  if (open && (body.action === "send-code" || body.action === "accept") && (!EMAIL_RE.test(givenEmail) || givenEmail.length > 254)) {
-    return json({ error: "EMAIL_INVALIDE" }, 400);
-  }
+  // lien ouvert : pas d'email, on entre en "écoute seule" (voir accept)
+  if (open && body.action === "send-code") return json({ error: "ACTION_INCONNUE" }, 400);
   const inviteEmail = open ? givenEmail : (invite.email as string);
   if (open && invite.max_uses != null && invite.uses >= invite.max_uses && body.action !== "info") {
     return json({ error: "INVITATION_PLEINE" }, 410);
@@ -245,6 +244,32 @@ Deno.serve(async (req) => {
     const r = await requestCode(db, cfg, req, uid, inviteEmail, `pour rejoindre ${what(space.mode)} ${space.name}`);
     if (!r.ok) return json({ error: r.error, detail: r.detail }, r.status);
     return json(r.verified ? { verified: true } : { sent: true });
+  }
+
+  // lien de partage : on entre en "écoute seule", sans email ni code.
+  // On écoute et télécharge ; aucune modification (voir participants.viewer).
+  if (body.action === "accept" && open) {
+    const { data: already } = await db.from("participants").select("id, pseudo, viewer")
+      .eq("space_id", space.id).eq("user_id", uid).maybeSingle();
+    let participant = already;
+    if (!participant) {
+      const pseudo = String(body.pseudo ?? "").trim();
+      if (pseudo.length < 2 || pseudo.length > 24) return json({ error: "PSEUDO_INVALIDE" }, 400);
+      const { count } = await db.from("participants").select("id", { count: "exact", head: true }).eq("space_id", space.id);
+      if ((count ?? 0) >= 200) return json({ error: "ESPACE_PLEIN" }, 409);
+      if (!(await db.rpc("use_open_invite", { p_invite: invite.id })).data) return json({ error: "INVITATION_PLEINE" }, 410);
+      const { data: created, error } = await db.from("participants")
+        .insert({ space_id: space.id, user_id: uid, pseudo, is_host: false, viewer: true })
+        .select("id, pseudo, viewer").single();
+      if (error) return json({ error: error.code === "23505" ? "PSEUDO_PRIS" : "ERREUR_BASE", detail: error.message }, 409);
+      participant = created;
+    }
+    return json({
+      space_id: space.id, participant_id: participant!.id, name: space.name, code: space.code,
+      mode: space.mode, access: space.access, expires_at: space.expires_at, is_locked: space.is_locked,
+      max_file_bytes: space.max_file_bytes, is_host: false, pseudo: participant!.pseudo, viewer: !!participant!.viewer,
+      account: null,
+    });
   }
 
   if (body.action === "accept") {
