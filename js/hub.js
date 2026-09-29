@@ -3,12 +3,12 @@
 // les espaces déjà ouverts sur cet appareil (ouvrir, oublier, supprimer).
 // session.js / api.js ne sont chargés qu'au moment d'agir.
 
-import { icon } from "./icons.js?v=113";
-import { esc, h, errorText, formatBytes, plural, actionSheet, confirmSheet, toast } from "./ui.js?v=113";
-import { isBlocked, FILE_MAX } from "./files.js?v=113";
-import { putPending, MAX_BYTES } from "./pending.js?v=113";
-import { mountWallpaperNote } from "./wallpapers.js?v=113";
-import { mountClaim } from "./claim-fx.js?v=113";
+import { icon } from "./icons.js?v=114";
+import { esc, h, errorText, formatBytes, plural, actionSheet, confirmSheet, toast } from "./ui.js?v=114";
+import { isBlocked, FILE_MAX } from "./files.js?v=114";
+import { putPending, MAX_BYTES } from "./pending.js?v=114";
+import { mountWallpaperNote } from "./wallpapers.js?v=114";
+import { mountClaim } from "./claim-fx.js?v=114";
 
 const PSEUDO_KEY = "seminaire.pseudo";
 const MODE_LABEL = { envoi: "Envois", seminaire: "Séminaire", revue: "Verdict" };
@@ -67,9 +67,9 @@ async function ensureAccount(form, fail) {
     fail("Ton email sert de compte (sans mot de passe) : on en a besoin.");
     return false;
   }
-  const session = await import("./session.js?v=113");
+  const session = await import("./session.js?v=114");
   await session.ensureAuth();
-  const { ensureVerified } = await import("./verify.js?v=113");
+  const { ensureVerified } = await import("./verify.js?v=114");
   if (await ensureVerified(email, { optional: false }) !== "ok") return false;
   await session.login(email);
   try { localStorage.setItem("seminaire.replyTo", email); } catch (err) { /* privé */ }
@@ -241,7 +241,7 @@ function spaceMenu(k) {
     {
       label: "Oublier sur cet appareil", icon: "logout",
       run: async () => {
-        const session = await import("./session.js?v=113");
+        const session = await import("./session.js?v=114");
         session.forgetSpace(k.id);
         toast("\"" + k.name + "\" n'apparaît plus ici. Rien n'a été supprimé.", "ok");
         drawSpacesLink();
@@ -256,9 +256,9 @@ function spaceMenu(k) {
           { ok: "Tout supprimer", danger: true, title: "Supprimer l'espace" });
         if (!ok) return;
         try {
-          const session = await import("./session.js?v=113");
+          const session = await import("./session.js?v=114");
           await session.ensureAuth();
-          const api = await import("./api.js?v=113");
+          const api = await import("./api.js?v=114");
           await api.deleteSpace(k.id);
           session.forgetSpace(k.id);
           toast("\"" + k.name + "\" a été supprimé.", "ok");
@@ -323,7 +323,7 @@ deck.addEventListener("submit", async (e) => {
     if (mine) {
       // nouveau blaze : dans l'espace d'envoi, et dans son nom "Envois de ..."
       if (renaming && pseudo !== pseudoBefore) {
-        const session = await import("./session.js?v=113");
+        const session = await import("./session.js?v=114");
         await session.renameMe(mine.id, pseudo);
         if (/^Envois de /.test(mine.name)) await session.renameSpace(mine.id, "Envois de " + pseudo).catch(() => {});
       }
@@ -332,13 +332,13 @@ deck.addEventListener("submit", async (e) => {
       return;
     }
 
-    const session = await import("./session.js?v=113");
+    const session = await import("./session.js?v=114");
     if (kind === "join") await session.joinSpace(val("code"), pseudo);
     else if (kind === "salon") await session.createSpace(val("name"), "seminaire", pseudo);
     else if (kind === "revue") {
       const created = await session.createSpace(val("project"), "revue", pseudo);
       if (form.querySelector("[name=keep]").checked) {
-        const api = await import("./api.js?v=113");
+        const api = await import("./api.js?v=114");
         await api.updateSpace(created.id, { purge_at: null }).catch((err) => {
           try { sessionStorage.setItem("seminaire.flash", errorText(err)); } catch (e3) { /* privé */ }
         });
@@ -361,7 +361,7 @@ document.addEventListener("click", async (e) => {
     const ok = await confirmSheet("Rien n'est supprimé : tu retrouveras tout en te reconnectant avec ton email.",
       { ok: "Se déconnecter", title: "Se déconnecter de cet appareil" });
     if (!ok) return;
-    const session = await import("./session.js?v=113");
+    const session = await import("./session.js?v=114");
     await session.logout();
     drawSpacesLink();
     show("send");
@@ -383,7 +383,7 @@ document.addEventListener("click", async (e) => {
 async function openInvite(token) {
   show("invite");
   const box = deck.querySelector("[data-invite-view]");
-  const session = await import("./session.js?v=113");
+  const session = await import("./session.js?v=114");
   let info;
   try {
     info = await session.inviteInfo(token);
@@ -394,16 +394,32 @@ async function openInvite(token) {
   }
   const revue = info.mode === "revue";
   const back = info.returning || info.member;
+  // lien de partage ouvert : l'invité donne son adresse (ou celle de son compte)
+  const open = !!info.open;
+  if (open && info.full && !back) {
+    box.innerHTML = '<p class="form-error">Ce lien a déjà servi le nombre de fois prévu. Demande un nouveau lien à ' + esc(info.host || "l'hôte") + ".</p>";
+    return;
+  }
+  const knownEmail = open ? (info.account_email || "") : "";
+  let remembered = "";
+  try { remembered = localStorage.getItem("seminaire.replyTo") || ""; } catch (err) { /* privé */ }
+  const openVerified = open && !!info.account_email && info.verified;
   box.innerHTML =
     '<form data-form="invite" novalidate>' +
       '<p class="invite-kind">' + (revue ? "Verdict" : "Séminaire") + "</p>" +
       '<h2 class="invite-title">' + esc(info.space_name) + "</h2>" +
       '<p class="deck-lead">' + (info.host ? "<strong>" + esc(info.host) + "</strong> t'invite. " : "") +
-        "Invitation pour <strong>" + esc(info.email) + "</strong>." + "</p>" +
+        (open ? (revue ? "Écoute ses mix et donne ton verdict." : "Rejoins le séminaire.")
+          : "Invitation pour <strong>" + esc(info.email) + "</strong>.") + "</p>" +
+      (open && !back
+        ? (knownEmail
+          ? '<p class="as-who">Connecté : <strong>' + esc(knownEmail) + "</strong></p>"
+          : field("email", "Ton email", 'type="text" inputmode="email" autocomplete="email" autocapitalize="off" spellcheck="false" maxlength="254" placeholder="pour recevoir ton code"', remembered))
+        : "") +
       (back
         ? '<p class="as-who">Tu y es déjà, sous le blaze <strong>' + esc(back) + "</strong>." + (info.verified ? "" : " Vérifie ton email pour y entrer depuis cet appareil.") + "</p>"
         : pseudoField()) +
-      (info.verified
+      (info.verified || openVerified
         ? ""
         : '<div class="invite-codebox" data-code-box hidden>' +
             '<label class="field"><span class="label">Code reçu par email</span>' +
@@ -411,8 +427,9 @@ async function openInvite(token) {
             '<p class="deck-note" data-code-note></p>' +
           "</div>") +
       '<p class="form-error" data-err hidden></p>' +
-      '<button class="btn btn-primary btn-block btn-xl" type="submit" data-go>' + (info.verified ? "Entrer" : "Recevoir mon code") + "</button>" +
-      (info.verified ? '<p class="deck-note">Adresse déjà vérifiée sur cet appareil.</p>'
+      '<button class="btn btn-primary btn-block btn-xl" type="submit" data-go>' + (info.verified || openVerified ? "Entrer" : "Recevoir mon code") + "</button>" +
+      (info.verified || openVerified ? '<p class="deck-note">Adresse déjà vérifiée sur cet appareil.</p>'
+        : open ? '<p class="deck-note">Ton email devient ton compte, sans mot de passe : tu retrouves le projet sur tous tes appareils.</p>'
         : '<p class="deck-note">Le code part à l\'adresse invitée : seul son propriétaire peut entrer.</p>') +
     "</form>";
 
@@ -422,6 +439,13 @@ async function openInvite(token) {
   const codeBox = form.querySelector("[data-code-box]");
   let codeSent = false;
   const fail = (m) => { err.textContent = m; err.hidden = false; };
+  // adresse de l'invité (lien ouvert) : compte de l'appareil ou champ
+  const emailOf = () => {
+    if (!open) return "";
+    if (knownEmail) return knownEmail;
+    const i = form.querySelector("[name=email]");
+    return i ? i.value.trim().toLowerCase() : "";
+  };
 
   const enter = async () => {
     const pseudoInput = form.querySelector("[name=pseudo]");
@@ -433,7 +457,8 @@ async function openInvite(token) {
     go.innerHTML = '<span class="spinner"></span><span>Un instant…</span>';
     try {
       if (pseudo) savePseudo(pseudo);
-      await session.acceptInvite(token, code, pseudo);
+      await session.acceptInvite(token, code, pseudo, emailOf());
+      if (open && emailOf()) { try { localStorage.setItem("seminaire.replyTo", emailOf()); } catch (e3) { /* privé */ } }
       location.href = "app.html#/projects";
     } catch (e2) {
       fail(errorText(e2));
@@ -445,14 +470,19 @@ async function openInvite(token) {
   const sendCode = async () => {
     const pseudoInput = form.querySelector("[name=pseudo]");
     if (pseudoInput && pseudoInput.value.trim().length < 2) { pseudoInput.focus(); return fail("Choisis d'abord ton blaze."); }
+    if (open && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(emailOf())) {
+      const i = form.querySelector("[name=email]");
+      if (i) i.focus();
+      return fail("Donne ton email : le code y part.");
+    }
     go.disabled = true;
     go.innerHTML = '<span class="spinner"></span><span>Envoi du code…</span>';
     try {
-      const r = await session.inviteSendCode(token);
+      const r = await session.inviteSendCode(token, emailOf());
       if (r && r.verified) return enter();
       codeSent = true;
       codeBox.hidden = false;
-      form.querySelector("[data-code-note]").innerHTML = "Envoyé à " + esc(info.email) +
+      form.querySelector("[data-code-note]").innerHTML = "Envoyé à " + esc(open ? emailOf() : info.email) +
         ' (regarde aussi les spams). <button type="button" class="link-btn" data-resend>Renvoyer</button>';
       go.disabled = false;
       go.textContent = "Entrer";
@@ -472,7 +502,9 @@ async function openInvite(token) {
   form.addEventListener("submit", (e) => {
     e.preventDefault();
     err.hidden = true;
-    if (info.verified || codeSent) enter();
+    // lien de partage, déjà membre avec ce compte : on y va directement
+    if (open && info.space_id) { goTo({ id: info.space_id, name: info.space_name, mode: info.mode }); return; }
+    if (info.verified || openVerified || codeSent) enter();
     else sendCode();
   });
   form.addEventListener("click", (e) => {
@@ -533,7 +565,7 @@ for (const el of document.querySelectorAll("[data-icon]")) el.innerHTML = icon(e
 
 // Connecté : "Mes espaces" à jour depuis le serveur (autres appareils)
 if (accountEmail()) {
-  import("./session.js?v=113").then((m) => m.syncSpaces()).then(() => {
+  import("./session.js?v=114").then((m) => m.syncSpaces()).then(() => {
     drawSpacesLink();
     if (tab === "spaces") show("spaces");
   }).catch(() => {});

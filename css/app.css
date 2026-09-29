@@ -1,5 +1,5 @@
-@import url("fonts.css?v=113");
-@import url("tokens.css?v=113");
+@import url("fonts.css?v=114");
+@import url("tokens.css?v=114");
 
 /* ================================================================= base */
 *, *::before, *::after { box-sizing: border-box; }
@@ -1547,3 +1547,10 @@ body.app .app-header { view-transition-name: topbar; }
 .rh-cover-btn:hover .cover-cta { background: var(--accent-hover); }
 .rh-cover-btn.is-empty { margin-bottom: 16px; }
 .rh-cover-btn.is-empty .cover-art-text { bottom: 19%; }
+
+/* lien de partage (WhatsApp...) */
+.share-link { display: grid; gap: var(--sp-3); }
+.share-link [data-share-box] { display: grid; gap: var(--sp-3); }
+.share-url { font-size: 15px; text-align: center; }
+.share-link .row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-2); }
+.share-link .small { margin: 0; text-align: center; }

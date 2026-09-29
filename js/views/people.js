@@ -1,14 +1,68 @@
 // Feuille "Participants" : qui est là, inviter, réglages du host.
 
-import { listParticipants, updateSpace, deleteSpace, inviteByEmail, listInvites, deleteInvite, listContacts, suggestContacts, senderEmail, rememberContactsLocal } from "../api.js?v=113";
-import { icon } from "../icons.js?v=113";
-import { esc, h, openSheet, avatar, shareLink, copyText, toast, errorText, formatDate, confirmSheet, canShare, promptSheet } from "../ui.js?v=113";
-import { leaveSpace, knownSpaces, switchTo, forgetSpace, renameMe, accountEmail, logout } from "../session.js?v=113";
+import { shareInviteLink, listParticipants, updateSpace, deleteSpace, inviteByEmail, listInvites, deleteInvite, listContacts, suggestContacts, senderEmail, rememberContactsLocal } from "../api.js?v=114";
+import { icon } from "../icons.js?v=114";
+import { esc, h, openSheet, avatar, shareLink, copyText, toast, errorText, formatDate, confirmSheet, canShare, promptSheet } from "../ui.js?v=114";
+import { leaveSpace, knownSpaces, switchTo, forgetSpace, renameMe, accountEmail, logout } from "../session.js?v=114";
 
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
 export function inviteUrl(code) {
   return location.origin + "/c/" + encodeURIComponent(code);
+}
+
+// Lien de partage (WhatsApp, SMS...) d'un espace sur invitation : ouvert,
+// mais chacun vérifie son email avant d'entrer. L'hôte seul le gère.
+export async function openShareSheet(ctx) {
+  const s = ctx.space;
+  const what = s.mode === "revue" ? "ton verdict" : "ton séminaire";
+  const body = h(
+    '<div class="share-link">' +
+      '<p class="muted">Un lien court à coller sur WhatsApp ou par SMS : qui l\'ouvre donne son email, le vérifie avec un code, puis entre dans ' + what + ".</p>" +
+      '<div data-share-box><div class="skeleton"></div></div>' +
+    "</div>"
+  );
+  openSheet({ title: "Lien de partage", body });
+  const box = body.querySelector("[data-share-box]");
+  const msg = () => (s.mode === "revue" ? "Écoute mes mix et donne ton verdict : " : "Rejoins le séminaire : ");
+  function draw(r) {
+    if (!r.url) {
+      box.innerHTML = '<p class="muted">Lien coupé : plus personne ne peut entrer avec.</p>' +
+        '<button class="btn btn-primary btn-block" data-renew>' + icon("link", 18) + " Créer un lien</button>";
+      return;
+    }
+    const wa = "https://wa.me/?text=" + encodeURIComponent(msg() + r.url);
+    box.innerHTML =
+      '<input class="input mono share-url" readonly value="' + esc(r.url) + '" data-url>' +
+      '<div class="row-2">' +
+        '<button class="btn btn-block" data-copy-link>' + icon("copy", 18) + " Copier</button>" +
+        (canShare() ? '<button class="btn btn-primary btn-block" data-share-link>' + icon("share", 18) + " Partager</button>"
+          : '<a class="btn btn-primary btn-block" href="' + esc(wa) + '" target="_blank" rel="noopener">' + icon("send", 18) + " WhatsApp</a>") +
+      "</div>" +
+      '<p class="muted small">' + r.uses + " / " + r.max_uses + " entrées · valable jusqu'au " + esc(formatDate(r.expires_at)) + "</p>" +
+      '<div class="row-2"><button class="btn btn-ghost btn-sm" data-renew>' + icon("retry", 16) + " Nouveau lien</button>" +
+        '<button class="btn btn-ghost btn-sm" data-off>' + icon("x", 16) + " Couper le lien</button></div>";
+    box.querySelector("[data-url]").addEventListener("focus", (e) => e.target.select());
+    box.querySelector("[data-copy-link]").onclick = async () => toast(await copyText(r.url) ? "Lien copié" : "Copie impossible", "ok");
+    const sh = box.querySelector("[data-share-link]");
+    if (sh) sh.onclick = () => shareLink({ title: s.name, text: msg(), url: r.url });
+  }
+  async function load(opts) {
+    try { draw(await shareInviteLink(s.id, opts)); }
+    catch (err) { box.innerHTML = '<p class="form-error">' + esc(errorText(err)) + "</p>"; }
+  }
+  box.addEventListener("click", async (e) => {
+    if (e.target.closest("[data-renew]")) {
+      const had = box.querySelector("[data-url]");
+      if (had && !await confirmSheet("L'ancien lien ne marchera plus. Ceux qui sont déjà entrés restent.", { ok: "Nouveau lien", title: "Nouveau lien" })) return;
+      load({ renew: true });
+    }
+    if (e.target.closest("[data-off]")) {
+      if (!await confirmSheet("Plus personne ne pourra entrer avec ce lien. Ceux qui sont déjà entrés restent.", { ok: "Couper", danger: true, title: "Couper le lien" })) return;
+      load({ off: true });
+    }
+  });
+  load();
 }
 
 export async function openPeopleSheet(ctx) {
@@ -30,6 +84,7 @@ export async function openPeopleSheet(ctx) {
                   '<button class="btn btn-primary" type="submit">' + icon("send", 16) + " Inviter</button></div>" +
                   '<p class="muted">Chacun reçoit un lien personnel et vérifie son adresse avec un code avant d\'entrer : un lien transféré ne suffit pas.</p>' +
                 "</form>" +
+                '<button type="button" class="btn btn-block" data-open-share>' + icon("link", 18) + " Lien à partager (WhatsApp, SMS…)</button>" +
                 '<div class="recents" data-iv-recents hidden></div>' +
                 '<ul class="invites" data-invites></ul>'
               : '<p class="muted">' + icon("lock", 14) + " Cet espace est sur invitation. Demande à l'hôte d'inviter quelqu'un par email.</p>") +
@@ -62,6 +117,8 @@ export async function openPeopleSheet(ctx) {
   );
 
   openSheet({ title: "Participants", body });
+  const openShare = body.querySelector("[data-open-share]");
+  if (openShare) openShare.onclick = () => openShareSheet(ctx);
 
   const copyBtn = body.querySelector("[data-copy]");
   if (copyBtn) {

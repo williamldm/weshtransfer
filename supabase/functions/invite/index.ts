@@ -4,6 +4,9 @@
 // POST { action: "info", token }         -> espace, adresse masquée, déjà vérifié ?
 // POST { action: "send-code", token }    -> code à 6 chiffres envoyé à l'adresse invitée
 // POST { action: "accept", token, code?, pseudo }  -> entre dans l'espace
+// POST { action: "link", space_id, renew?, off? }  (host) -> lien de partage
+//   ouvert (WhatsApp...) : sans adresse, l'invité donne la sienne et la
+//   vérifie ; send-code et accept prennent alors { email } en plus.
 //
 // Le lien porte un jeton de 128 bits (seul son sha256 est stocké). Il ne
 // suffit pas : il faut aussi le code reçu à l'adresse invitée, sauf sur un
@@ -26,7 +29,7 @@ const PER_USER_DAY = 40; // par appareil / compte, tous espaces confondus
 const PER_IP_DAY = 60;   // par IP
 
 type Invite = {
-  id: string; space_id: string; email: string; expires_at: string;
+  id: string; space_id: string; email: string | null; expires_at: string; max_uses: number | null; uses: number;
   accepted_participant: string | null; invited_by: string | null;
 };
 type Space = {
@@ -59,6 +62,8 @@ function mask(email: string): string {
 }
 
 const what = (mode: string) => (mode === "revue" ? "le verdict" : "le séminaire");
+const OPEN_MAX_USES = 25;
+const linkOf = (site: string, token: string) => (shortLinks() ? `${site}/i/${token}` : `${site}/index.html?i=${token}`);
 
 Deno.serve(async (req) => {
   const early = preflight(req);
@@ -147,13 +152,56 @@ Deno.serve(async (req) => {
     });
   }
 
+  // ------------------------------------------ lien de partage (hôte)
+  if (body.action === "link") {
+    const spaceId = String(body.space_id ?? "");
+    const { data: me } = await db.from("participants").select("id, is_host")
+      .eq("space_id", spaceId).eq("user_id", uid).maybeSingle();
+    if (!me || !me.is_host) return json({ error: "SEUL_LE_HOST" }, 403);
+    const { data: space } = await db.from("spaces").select("id, mode, purge_at").eq("id", spaceId).maybeSingle();
+    if (!space || space.mode === "envoi") return json({ error: "ESPACE_INCONNU" }, 404);
+    const site = (Deno.env.get("SITE_URL") ?? "https://weshtransfer.fr").replace(/\/+$/, "");
+
+    const { data: current } = await db.from("space_invites").select("id, open_token, expires_at, uses, max_uses")
+      .eq("space_id", spaceId).is("email", null).maybeSingle();
+    if (body.off) {
+      if (current) await db.from("space_invites").delete().eq("id", current.id);
+      return json({ url: null });
+    }
+    const alive = current && current.open_token && new Date(current.expires_at) > new Date() && current.uses < (current.max_uses ?? Infinity);
+    if (alive && !body.renew) {
+      return json({ url: linkOf(site, current.open_token), expires_at: current.expires_at, uses: current.uses, max_uses: current.max_uses });
+    }
+    // nouveau lien : l'ancien ne marche plus
+    if (current) await db.from("space_invites").delete().eq("id", current.id);
+    const until = Date.now() + INVITE_DAYS * 86400e3;
+    const expires = new Date(space.purge_at ? Math.min(until, new Date(space.purge_at).getTime()) : until).toISOString();
+    const token = newToken();
+    const { error } = await db.from("space_invites").insert({
+      space_id: spaceId, email: null, token_hash: await sha256(token), open_token: token, invited_by: me.id, invited_user: uid,
+      created_at: new Date().toISOString(), expires_at: expires, max_uses: OPEN_MAX_USES, uses: 0,
+    });
+    if (error) return json({ error: "ERREUR_BASE", detail: error.message }, 500);
+    return json({ url: linkOf(site, token), expires_at: expires, uses: 0, max_uses: OPEN_MAX_USES });
+  }
+
   // -------------------------------------------- côté invité : le lien
   const token = String(body.token ?? "");
   if (!TOKEN_RE.test(token)) return json({ error: "INVITATION_INCONNUE" }, 404);
   const { data: invite } = await db.from("space_invites")
-    .select("id, space_id, email, expires_at, accepted_participant, invited_by")
+    .select("id, space_id, email, expires_at, accepted_participant, invited_by, max_uses, uses")
     .eq("token_hash", await sha256(token)).maybeSingle<Invite>();
   if (!invite) return json({ error: "INVITATION_INCONNUE" }, 404);
+  // lien ouvert : l'adresse est celle que donne l'invité (à vérifier)
+  const open = invite.email === null;
+  const givenEmail = String(body.email ?? "").trim().toLowerCase();
+  if (open && (body.action === "send-code" || body.action === "accept") && (!EMAIL_RE.test(givenEmail) || givenEmail.length > 254)) {
+    return json({ error: "EMAIL_INVALIDE" }, 400);
+  }
+  const inviteEmail = open ? givenEmail : (invite.email as string);
+  if (open && invite.max_uses != null && invite.uses >= invite.max_uses && body.action !== "info") {
+    return json({ error: "INVITATION_PLEINE" }, 410);
+  }
   const { data: space } = await db.from("spaces")
     .select("id, name, code, mode, access, expires_at, purge_at, is_locked, max_file_bytes")
     .eq("id", invite.space_id).maybeSingle<Space>();
@@ -172,9 +220,21 @@ Deno.serve(async (req) => {
       const { data: p } = await db.from("participants").select("pseudo").eq("id", invite.accepted_participant).maybeSingle();
       returning = p ? p.pseudo : null;
     }
+    if (open) {
+      // l'adresse du compte de cet appareil, si elle est vérifiée : pas de code
+      const { data: who } = await db.auth.admin.getUserById(uid);
+      const acc = who?.user && !who.user.is_anonymous && who.user.email_confirmed_at ? (who.user.email || "").toLowerCase() : "";
+      return json({
+        space_name: space.name, mode: space.mode, host: host ? host.pseudo : null, open: true,
+        email: null, account_email: acc || null, verified: acc ? await isVerified(db, uid, acc) : false,
+        member: already ? already.pseudo : null, returning: null,
+        space_id: already ? space.id : null,   // déjà dedans : on y va directement
+        full: invite.max_uses != null && invite.uses >= invite.max_uses,
+      });
+    }
     return json({
       space_name: space.name, mode: space.mode, host: host ? host.pseudo : null,
-      email: mask(invite.email), verified: await isVerified(db, uid, invite.email),
+      email: mask(invite.email as string), verified: await isVerified(db, uid, invite.email as string),
       member: already ? already.pseudo : null, returning,
     });
   }
@@ -182,20 +242,20 @@ Deno.serve(async (req) => {
   if (body.action === "send-code") {
     const cfg = mailConfig();
     if (!cfg) return json({ error: "EMAIL_INDISPONIBLE" }, 503);
-    const r = await requestCode(db, cfg, req, uid, invite.email, `pour rejoindre ${what(space.mode)} ${space.name}`);
+    const r = await requestCode(db, cfg, req, uid, inviteEmail, `pour rejoindre ${what(space.mode)} ${space.name}`);
     if (!r.ok) return json({ error: r.error, detail: r.detail }, r.status);
     return json(r.verified ? { verified: true } : { sent: true });
   }
 
   if (body.action === "accept") {
-    const check = await confirmCode(db, uid, invite.email, body.code);
+    const check = await confirmCode(db, uid, inviteEmail, body.code);
     if (!check.ok) return json({ error: check.error }, check.status);
 
     // L'adresse invitée est prouvée : c'est son compte qui entre (créé au
     // besoin ; l'appareil anonyme y apporte ses autres espaces).
     let login;
     try {
-      login = await loginAccount(db, uid, invite.email);
+      login = await loginAccount(db, uid, inviteEmail);
     } catch (err) {
       return json({ error: "CONNEXION_ECHEC", detail: (err as Error).message.slice(0, 200) }, 500);
     }
@@ -206,7 +266,7 @@ Deno.serve(async (req) => {
       .eq("space_id", space.id).eq("user_id", owner).maybeSingle();
     if (already) {
       participant = already;
-    } else if (invite.accepted_participant) {
+    } else if (!open && invite.accepted_participant) {
       // déjà entrée(e) depuis un autre appareil : on reprend sa place
       const { data: moved } = await db.from("participants")
         .update({ user_id: owner, last_seen_at: new Date().toISOString() })
@@ -214,6 +274,10 @@ Deno.serve(async (req) => {
       participant = moved;
     }
     if (!participant) {
+      // lien ouvert : une place de plus, dans la limite du lien
+      if (open && !(await db.rpc("use_open_invite", { p_invite: invite.id })).data) {
+        return json({ error: "INVITATION_PLEINE" }, 410);
+      }
       const pseudo = String(body.pseudo ?? "").trim();
       if (pseudo.length < 2 || pseudo.length > 24) return json({ error: "PSEUDO_INVALIDE" }, 400);
       const { count } = await db.from("participants").select("id", { count: "exact", head: true }).eq("space_id", space.id);
@@ -224,16 +288,18 @@ Deno.serve(async (req) => {
       if (error) return json({ error: error.code === "23505" ? "PSEUDO_PRIS" : "ERREUR_BASE", detail: error.message }, 409);
       participant = created;
     }
-    await db.from("space_invites")
-      .update({ accepted_at: new Date().toISOString(), accepted_participant: participant!.id })
-      .eq("id", invite.id);
+    if (!open) {
+      await db.from("space_invites")
+        .update({ accepted_at: new Date().toISOString(), accepted_participant: participant!.id })
+        .eq("id", invite.id);
+    }
 
     // Verdict : l'artiste (adresse prouvée par le code) est prévenu par email
     // des nouvelles versions de l'ingé. Seulement à l'entrée (s'il s'est
     // désabonné ensuite, on ne le réabonne pas en douce).
-    if (space.mode === "revue" && !already && !invite.accepted_participant) {
+    if (space.mode === "revue" && !already && (open || !invite.accepted_participant)) {
       await db.from("review_subscriptions").upsert({
-        participant_id: participant!.id, space_id: space.id, email: invite.email, since: new Date().toISOString(),
+        participant_id: participant!.id, space_id: space.id, email: inviteEmail, since: new Date().toISOString(),
       }, { onConflict: "participant_id", ignoreDuplicates: true });
     }
 
@@ -241,7 +307,7 @@ Deno.serve(async (req) => {
       space_id: space.id, participant_id: participant!.id, name: space.name, code: space.code,
       mode: space.mode, access: space.access, expires_at: space.expires_at, is_locked: space.is_locked,
       max_file_bytes: space.max_file_bytes, is_host: false, pseudo: participant!.pseudo,
-      account: { email: invite.email, token_hash: login.token },
+      account: { email: inviteEmail, token_hash: login.token },
     });
   }
 

@@ -1,7 +1,7 @@
 // Accès aux données. Toutes les requêtes de l'appli passent par ici : les
 // vues ne connaissent ni PostgREST ni le Storage.
 
-import { sb, q, invoke, requireClient } from "./db.js?v=113";
+import { sb, q, invoke, requireClient } from "./db.js?v=114";
 
 // Toute requête passe par ici : sans config, message clair plutôt
 // qu'un "Cannot read properties of null".
@@ -194,7 +194,14 @@ export function listInvites(spaceId) {
   return q(db().from("space_invites")
     .select("id, email, created_at, expires_at, accepted_at")
     .eq("space_id", spaceId)
+    .not("email", "is", null)
     .order("created_at", { ascending: false }));
+}
+
+// Lien de partage ouvert (WhatsApp...) : { url, expires_at, uses, max_uses }
+// renew : nouveau lien (l'ancien ne marche plus) ; off : plus de lien.
+export function shareInviteLink(spaceId, opts) {
+  return invoke("invite", Object.assign({ action: "link", space_id: spaceId }, opts || {}));
 }
 
 export function deleteInvite(id) {

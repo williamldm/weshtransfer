@@ -3,7 +3,7 @@
 // mot de passe), il partage le compte de cette adresse : les mêmes espaces,
 // envois et blazes sur tous ses appareils.
 
-import { sb, q, invoke, requireClient } from "./db.js?v=113";
+import { sb, q, invoke, requireClient } from "./db.js?v=114";
 
 const SPACE_KEY = "seminaire.space";      // espace actif
 const KNOWN_KEY = "seminaire.spaces";     // tous les espaces rejoints sur cet appareil
@@ -140,12 +140,13 @@ export async function inviteInfo(token) {
   return invoke("invite", { action: "info", token });
 }
 
-export function inviteSendCode(token) {
-  return invoke("invite", { action: "send-code", token });
+// email : seulement pour un lien de partage ouvert (l'invité donne le sien)
+export function inviteSendCode(token, email) {
+  return invoke("invite", { action: "send-code", token, email: email || undefined });
 }
 
-export async function acceptInvite(token, code, pseudo) {
-  const s = await invoke("invite", { action: "accept", token, code, pseudo });
+export async function acceptInvite(token, code, pseudo, email) {
+  const s = await invoke("invite", { action: "accept", token, code, pseudo, email: email || undefined });
   // l'adresse invitée est prouvée : l'appareil passe sur son compte
   await openAccountSession(s.account && s.account.token_hash);
   const space = toSpace(s, s.pseudo);

@@ -6,17 +6,17 @@
 import {
   listProjects, listReviewComments, deleteProjectFully, listParticipants, updateProject,
   reviewNotifyStatus, reviewSubscribe, reviewUnsubscribe, signFiles, cachedDownload, myPrefs, savePref
-} from "../api.js?v=113";
-import { saveZip, canStreamToDisk, MEMORY_LIMIT } from "../zip.js?v=113";
-import { mountUploads } from "./uploads.js?v=113";
-import { openUploadSheet } from "./upload-sheet.js?v=113";
-import { stateOf, isEngineerOf } from "./review.js?v=113";
-import { ensureVerified } from "../verify.js?v=113";
-import { accountEmail } from "../session.js?v=113";
-import { albumOf, onCover, setCover, clearCover, setAlbumTitle } from "../cover.js?v=113";
-import { playQueue, onPlayer, isCurrent, state as playerState, toggle, trackFromFile } from "../player.js?v=113";
-import { icon } from "../icons.js?v=113";
-import { esc, h, plural, toast, errorText, formatDuration, actionSheet, confirmSheet, promptSheet, openSheet, triggerDownload } from "../ui.js?v=113";
+} from "../api.js?v=114";
+import { saveZip, canStreamToDisk, MEMORY_LIMIT } from "../zip.js?v=114";
+import { mountUploads } from "./uploads.js?v=114";
+import { openUploadSheet } from "./upload-sheet.js?v=114";
+import { stateOf, isEngineerOf } from "./review.js?v=114";
+import { ensureVerified } from "../verify.js?v=114";
+import { accountEmail } from "../session.js?v=114";
+import { albumOf, onCover, setCover, clearCover, setAlbumTitle } from "../cover.js?v=114";
+import { playQueue, onPlayer, isCurrent, state as playerState, toggle, trackFromFile } from "../player.js?v=114";
+import { icon } from "../icons.js?v=114";
+import { esc, h, plural, toast, errorText, formatDuration, actionSheet, confirmSheet, promptSheet, openSheet, triggerDownload } from "../ui.js?v=114";
 
 // Pochette générée : un aplat dont la teinte dépend du nom, les initiales
 // en grand. Pas de dégradé (identité sobre).
@@ -328,9 +328,13 @@ export async function mountReviewHome(root, ctx) {
     const t = mailText();
     const mail = '<button class="btn btn-ghost btn-icon' + (notifyEmail ? " is-on" : "") + '" data-notify aria-label="' + esc(t.off) + '" title="' +
       esc(notifyEmail ? t.on + notifyEmail : t.off) + '">' + icon("mail", 20) + "</button>";
+    // lien de partage (WhatsApp...) : l'hôte seul le crée
+    const share = s.isHost
+      ? '<button class="btn btn-ghost btn-icon" data-share-verdict aria-label="Lien de partage" title="Lien à partager (WhatsApp, SMS…)">' + icon("link", 20) + "</button>"
+      : "";
     engActions.innerHTML = engineer
-      ? '<label class="btn">' + icon("upload", 18) + "<span>Déposer</span>" + '<input type="file" multiple hidden data-pick></label>' + mail
-      : mail;
+      ? '<label class="btn">' + icon("upload", 18) + "<span>Déposer</span>" + '<input type="file" multiple hidden data-pick></label>' + share + mail
+      : share + mail;
     const pick = engActions.querySelector("[data-pick]");
     if (pick) pick.addEventListener("change", (e) => { openUploadSheet(ctx, e.target.files); e.target.value = ""; });
     drawOffer();
@@ -406,6 +410,11 @@ export async function mountReviewHome(root, ctx) {
   }
 
   engActions.addEventListener("click", async (e) => {
+    if (e.target.closest("[data-share-verdict]")) {
+      const { openShareSheet } = await import("./people.js?v=114");
+      openShareSheet(ctx);
+      return;
+    }
     if (!e.target.closest("[data-notify]")) return;
     if (notifyEmail) {
       const ok = await confirmSheet("Plus d'email pour cet espace ?", { ok: "Couper les emails", title: "Emails" });
