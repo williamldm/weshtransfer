@@ -3,12 +3,12 @@
 // ne décide de rien : c'est la fonction "admin" qui vérifie que le compte
 // connecté fait partie des administrateurs, et qui renvoie les données.
 
-import { invoke } from "./db.js?v=105";
-import { accountEmail, login, logout } from "./session.js?v=105";
-import { ensureVerified } from "./verify.js?v=105";
-import { icon } from "./icons.js?v=105";
-import { esc, toast, errorText, formatBytes, formatDate, timeAgo, plural, fileBadge, confirmSheet } from "./ui.js?v=105";
-import { isAudio, categoryOf } from "./files.js?v=105";
+import { invoke } from "./db.js?v=106";
+import { accountEmail, login, logout } from "./session.js?v=106";
+import { ensureVerified } from "./verify.js?v=106";
+import { icon } from "./icons.js?v=106";
+import { esc, toast, errorText, formatBytes, formatDate, timeAgo, plural, fileBadge, confirmSheet } from "./ui.js?v=106";
+import { isAudio, categoryOf } from "./files.js?v=106";
 
 const root = document.getElementById("adm");
 const who = document.getElementById("who");
@@ -272,7 +272,20 @@ function drawOverview() {
   const d = (m && m.day) || {};
   const ok = (via) => (d[via] ? d[via].ok : 0);
   const items = alerts();
-  const recentFiles = data.files.slice().sort((a, c) => String(c.created_at).localeCompare(String(a.created_at))).slice(0, 5);
+  // Envois + tout ce qui est déposé dans un Verdict ou un séminaire
+  // (nouvelles versions v2, v3... comprises). Les fichiers d'un espace
+  // "Envois" sont déjà dans leur envoi : pas de doublon.
+  const feed = [
+    ...data.transfers.map((t) => ({
+      at: t.created_at, kind: "Envoi", title: t.title || "Sans titre",
+      sub: (t.sender || "?") + " · " + plural(t.files.length, "fichier", "fichiers") + " · " + formatBytes(t.size)
+    })),
+    ...data.files.filter((f) => f.mode !== "envoi").map((f) => ({
+      at: f.created_at, kind: MODES[f.mode] || "Fichier",
+      title: (f.project || f.name) + (f.version > 1 || f.mode === "revue" ? " · v" + f.version : ""),
+      sub: (f.space || "?") + " · " + (f.uploader || "?") + " · " + formatBytes(f.size) + (f.project ? " · " + f.name : "")
+    }))
+  ].sort((a, c) => String(c.at).localeCompare(String(a.at))).slice(0, 12);
   const modes = Object.entries(st.spaces_by_mode).map(([k, n]) => n + " " + (MODES[k] || k).toLowerCase()).join(" · ");
   return '<div class="adm-kpis">' +
       kpi("Stockage", b ? formatBytes(b.storage.used) : "…", b ? "sur " + formatBytes(b.storage.cap) + " (" + usedPct + " %)" : "calcul en cours",
@@ -285,14 +298,10 @@ function drawOverview() {
       (items.length ? items.map(([cls, t, sub]) => '<li class="' + cls + '"><span class="dot"></span><span><b>' + esc(t) + "</b> " + esc(sub) + "</span></li>").join("")
         : '<li><span class="dot"></span><span><b>Rien à signaler.</b> Emails, stockage et envois sont dans le vert.</span></li>') +
     "</ul></div>" +
-    '<div class="adm-grid">' +
-      '<div class="adm-card"><div class="adm-card-head"><h2>Derniers envois</h2><button class="adm-link" data-go="transfers">Tout voir</button></div><ul class="adm-mini">' +
-        (data.transfers.slice(0, 5).map((t) => '<li><span class="t"><b>' + esc(t.title || "Sans titre") + "</b><small>" + esc(t.sender || "?") + " · " + plural(t.files.length, "fichier", "fichiers") + " · " + esc(formatBytes(t.size)) + '</small></span><span class="r">' + when(t.created_at) + "</span></li>").join("") || '<li><span class="r">Aucun envoi.</span></li>') +
-      "</ul></div>" +
-      '<div class="adm-card"><div class="adm-card-head"><h2>Derniers fichiers</h2><button class="adm-link" data-go="files">Tout voir</button></div><ul class="adm-mini">' +
-        (recentFiles.map((f) => '<li><span class="t"><b>' + esc(f.name) + "</b><small>" + esc(f.space || "?") + " · " + esc(f.uploader || "?") + " · " + esc(formatBytes(f.size)) + '</small></span><span class="r">' + when(f.created_at) + "</span></li>").join("") || '<li><span class="r">Aucun fichier.</span></li>') +
-      "</ul></div>" +
-    "</div>" +
+    '<div class="adm-card" style="margin-top:var(--sp-4)"><div class="adm-card-head"><h2>Activité récente</h2>' +
+      '<span class="adm-tools"><button class="adm-link" data-go="transfers">Envois</button><button class="adm-link" data-go="files">Fichiers</button></span></div>' +
+      '<ul class="adm-mini">' + (feed.map((x) => '<li><span class="t"><b>' + esc(x.title) + '</b><small><span class="adm-pill">' + esc(x.kind) + "</span> " + esc(x.sub) + '</small></span><span class="r">' + when(x.at) + "</span></li>").join("")
+        || '<li><span class="r">Rien pour l\'instant.</span></li>') + "</ul></div>" +
     '<p class="adm-strip"><span><b>' + st.users + "</b> utilisateurs (" + st.accounts + " avec compte)</span><span><b>" + st.spaces + "</b> espaces : " + esc(modes) +
       "</span><span><b>" + st.transfers + "</b> envois · " + st.recipients + " destinataires · " + st.downloads + " téléchargements</span><span><b>" + st.files + "</b> fichiers · " + esc(formatBytes(st.bytes)) + "</span></p>";
 }
