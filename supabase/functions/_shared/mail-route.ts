@@ -52,7 +52,7 @@ export async function smtpRoute(db: any): Promise<SmtpRoute> {
 // Le destinataire n'existe pas : ni o2switch ni Brevo n'y peuvent rien, et
 // réessayer ailleurs abîmerait aussi la réputation de Brevo.
 export function badRecipient(err: string): boolean {
-  return /\b5\.1\.(1|10)\b|user unknown|unknown user|no such user|does not exist|mailbox unavailable|recipient address rejected|invalid recipient|address not found/i
+  return /\b5\.1\.(1|10)\b|user unknown|unknown user|no such user|does not exist|mailbox unavailable|recipient address rejected|invalid recipient|address not found|adresse refusée/i
     .test(err) && !spamSignal(err);
 }
 
@@ -77,6 +77,7 @@ export type LogRow = {
   message_id?: string | null;
   ref?: string | null;
   error?: string | null;
+  final?: boolean;   // false : tentative intermédiaire, retentée ailleurs
 };
 
 export async function logMails(db: any, rows: LogRow[]): Promise<void> {
@@ -89,6 +90,7 @@ export async function logMails(db: any, rows: LogRow[]): Promise<void> {
     message_id: r.message_id ?? null,
     ref: r.ref ?? null,
     error: r.error ? r.error.slice(0, 500) : null,
+    final: r.final !== false,
   })));
   if (error) console.error("mail_log :", error.message);
 }

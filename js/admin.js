@@ -3,12 +3,12 @@
 // ne décide de rien : c'est la fonction "admin" qui vérifie que le compte
 // connecté fait partie des administrateurs, et qui renvoie les données.
 
-import { invoke } from "./db.js?v=112";
-import { accountEmail, login, logout } from "./session.js?v=112";
-import { ensureVerified } from "./verify.js?v=112";
-import { icon } from "./icons.js?v=112";
-import { esc, toast, errorText, formatBytes, formatDate, timeAgo, plural, fileBadge, confirmSheet } from "./ui.js?v=112";
-import { isAudio, categoryOf } from "./files.js?v=112";
+import { invoke } from "./db.js?v=113";
+import { accountEmail, login, logout } from "./session.js?v=113";
+import { ensureVerified } from "./verify.js?v=113";
+import { icon } from "./icons.js?v=113";
+import { esc, toast, errorText, formatBytes, formatDate, timeAgo, plural, fileBadge, confirmSheet } from "./ui.js?v=113";
+import { isAudio, categoryOf } from "./files.js?v=113";
 
 const root = document.getElementById("adm");
 const who = document.getElementById("who");
@@ -376,7 +376,7 @@ function drawAlertsCard() {
     (cur.length
       ? '<ul class="adm-alerts">' + cur.map((x) => '<li class="' + (x.level === "crit" ? "is-err" : "is-warn") + '"><span class="dot"></span><span><b>' + esc(x.title) + "</b> " + esc(x.detail || "") + "</span></li>").join("") + "</ul>"
       : '<ul class="adm-alerts"><li><span class="dot"></span><span><b>Rien à signaler en ce moment.</b></span></li></ul>') +
-    '<p class="adm-note">Contrôle toutes les heures : stockage (80 %), base de données, voie o2switch coupée, liste noire, emails refusés, quota Brevo, pic de bande passante. Un email groupé à l\'apparition d\'une alerte, un rappel par 24 h tant qu\'elle dure, et un mot quand c\'est réglé.</p>' +
+    '<p class="adm-note">Contrôle toutes les heures : stockage (80 %), base de données, voie o2switch coupée, liste noire, email qui n\'est pas parti (dès le premier, sur le moment), quota Brevo, pic de bande passante. Un email groupé à l\'apparition d\'une alerte, un rappel par 24 h tant qu\'elle dure, et un mot quand c\'est réglé.</p>' +
   "</div>";
 }
 

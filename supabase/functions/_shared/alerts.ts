@@ -8,7 +8,9 @@
 // deno-lint-ignore-file no-explicit-any
 import { adminAlertMail, mailConfig, sendEmails } from "./email.ts";
 
-export type Alert = { key: string; level: "warn" | "crit"; title: string; detail: string };
+// renotify : un nouvel email dès que le titre change (ex. le nombre
+// d'emails refusés augmente), pas seulement à l'apparition
+export type Alert = { key: string; level: "warn" | "crit"; title: string; detail: string; renotify?: boolean };
 
 const GB = 1024 ** 3;
 const num = (name: string, def: number) => {
@@ -64,12 +66,21 @@ export async function currentAlerts(db: any): Promise<Alert[]> {
     }
   }
   const since = new Date(now - 86400e3).toISOString();
-  const [{ count: failed }, { count: brevo }] = await Promise.all([
-    db.from("mail_log").select("id", { count: "exact", head: true }).eq("ok", false).gte("created_at", since),
+  const [{ data: failedRows, count: failed }, { count: brevo }] = await Promise.all([
+    db.from("mail_log").select("kind, to_domain, error, created_at", { count: "exact" }).eq("ok", false).eq("final", true)
+      .gte("created_at", since).order("created_at", { ascending: false }).limit(3),
     db.from("mail_log").select("id", { count: "exact", head: true }).eq("via", "brevo").eq("ok", true).gte("created_at", since),
   ]);
-  if ((failed ?? 0) >= 5) {
-    out.push({ key: "mail-failed", level: "warn", title: `${failed} emails refusés en 24 h`, detail: "Détail dans l'admin, onglet Emails." });
+  // emails qui ne sont pas partis du tout (ni o2switch ni Brevo), dès le premier
+  if ((failed ?? 0) >= num("ALERT_MAIL_FAILED", 1)) {
+    const KIND: Record<string, string> = { code: "code", transfert: "envoi", confirmation: "confirmation", invitation: "invitation", retours: "récap retours", versions: "nouvelles versions", avis: "avis" };
+    const last = ((failedRows ?? []) as any[]).map((r) =>
+      `${KIND[r.kind] ?? r.kind ?? "email"} vers @${r.to_domain || "?"} : ${String(r.error || "refusé").slice(0, 120)}`).join(" · ");
+    out.push({
+      key: "mail-failed", level: (failed ?? 0) >= 5 ? "crit" : "warn", renotify: true,
+      title: failed === 1 ? "1 email n'est pas parti (24 h)" : `${failed} emails ne sont pas partis (24 h)`,
+      detail: last,
+    });
   }
   if ((brevo ?? 0) >= 240) {
     out.push({ key: "brevo-quota", level: (brevo ?? 0) >= 290 ? "crit" : "warn", title: `Brevo : ${brevo} emails sur 300 aujourd'hui`, detail: "Au-delà de 300, plus aucun email ne part tant qu'o2switch est coupé." });
@@ -120,8 +131,9 @@ export async function runAlerts(db: any, opts: { test?: boolean; to?: string[] }
   for (const a of alerts) {
     const k = byKey.get(a.key);
     const escalated = k && k.level === "warn" && a.level === "crit";
-    const due = !k || escalated || !k.last_sent_at || Date.now() - new Date(k.last_sent_at).getTime() >= 24 * 3600e3;
-    if (due) toSend.push({ ...a, isNew: !k || escalated });
+    const changed = !!k && a.renotify && k.title !== a.title;
+    const due = !k || escalated || changed || !k.last_sent_at || Date.now() - new Date(k.last_sent_at).getTime() >= 24 * 3600e3;
+    if (due) toSend.push({ ...a, isNew: !k || escalated || changed });
   }
   const resolved = ((known ?? []) as any[]).filter((k) => !current.has(k.key));
 

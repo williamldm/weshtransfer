@@ -74,6 +74,7 @@ export async function sendEmails(cfg: MailConfig, emails: OutgoingEmail[], meta:
   try { db = admin(); } catch { /* sans base : pas de journal, o2switch sans garde-fou */ }
 
   let smtpError = "";
+  let connError = "";   // la connexion elle-même a échoué (pas un destinataire)
   let route = { ok: !!cfg.smtp, left: emails.length, reason: cfg.smtp ? "" : "non configurée" };
   if (cfg.smtp && db && emails.length) {
     route = await smtpRoute(db).catch((err) => ({ ok: false, left: 0, reason: (err as Error).message }));
@@ -92,18 +93,22 @@ export async function sendEmails(cfg: MailConfig, emails: OutgoingEmail[], meta:
           return;
         }
         smtpError = r.error;
-        log(i, { via: "smtp", ok: false, error: r.error });
-        if (badRecipient(r.error)) results[i] = { ok: false, error: "Adresse inexistante" };
+        const bad = badRecipient(r.error);
+        // adresse inexistante : échec définitif ; sinon Brevo retente
+        log(i, { via: "smtp", ok: false, error: r.error, final: bad });
+        if (bad) results[i] = { ok: false, error: "Adresse inexistante" };
       });
     } catch (err) {
       smtpError = (err as Error).message;
-      logs.push({ via: "smtp", ok: false, to: batch[0].to, kind: meta.kind ?? null, error: smtpError });
+      connError = smtpError;
+      logs.push({ via: "smtp", ok: false, to: batch[0].to, kind: meta.kind ?? null, error: smtpError, final: false });
     }
     if (smtpError && db) {
       if (/\b535\b|auth/i.test(smtpError)) await trip(db, 6, `authentification o2switch refusée : ${smtpError}`);
       else if (/rate|too many|\b421\b|\b451\b/i.test(smtpError)) await trip(db, 1, `o2switch ralentit : ${smtpError}`);
       else if (spamSignal(smtpError)) await trip(db, 24, `refus spam/politique : ${smtpError}`);
-      else if (!results.some((r) => r && r.ok)) await trip(db, 0.5, `o2switch en panne : ${smtpError}`);
+      // panne : seulement si la connexion a échoué, jamais pour un destinataire refusé
+      else if (connError) await trip(db, 0.5, `o2switch en panne : ${connError}`);
     }
     if (smtpError) console.warn("o2switch : bascule Brevo :", smtpError);
   }
@@ -121,6 +126,13 @@ export async function sendEmails(cfg: MailConfig, emails: OutgoingEmail[], meta:
   }));
 
   if (db) await logMails(db, logs).catch(() => {});
+  // un email n'est pas parti : l'admin est prévenu tout de suite (pas au
+  // contrôle horaire). Jamais pour ses propres alertes (pas de boucle).
+  if (db && meta.kind !== "admin" && results.some((r) => r && !r.ok)) {
+    const check = import("./alerts.ts").then((m) => m.runAlerts(db)).catch((err) => console.error("alertes :", err.message));
+    const rt = (globalThis as unknown as { EdgeRuntime?: { waitUntil?: (p: Promise<unknown>) => void } }).EdgeRuntime;
+    if (rt?.waitUntil) rt.waitUntil(check); else await check;
+  }
   return results as SendResult[];
 }
 
