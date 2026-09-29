@@ -155,9 +155,12 @@ Deno.serve(async (req) => {
   // ------------------------------------------ lien de partage (hôte)
   if (body.action === "link") {
     const spaceId = String(body.space_id ?? "");
-    const { data: me } = await db.from("participants").select("id, is_host")
+    const { data: me } = await db.from("participants").select("id, is_host, viewer")
       .eq("space_id", spaceId).eq("user_id", uid).maybeSingle();
-    if (!me || !me.is_host) return json({ error: "SEUL_LE_HOST" }, 403);
+    // lire le lien : hôte ou artiste (pas l'écoute seule) ;
+    // le créer, le renouveler ou le couper : l'hôte seul
+    if (!me || me.viewer) return json({ error: "SEUL_LE_HOST" }, 403);
+    if ((body.renew || body.off) && !me.is_host) return json({ error: "SEUL_LE_HOST" }, 403);
     const { data: space } = await db.from("spaces").select("id, mode, purge_at").eq("id", spaceId).maybeSingle();
     if (!space || space.mode === "envoi") return json({ error: "ESPACE_INCONNU" }, 404);
     const site = (Deno.env.get("SITE_URL") ?? "https://weshtransfer.fr").replace(/\/+$/, "");
@@ -172,6 +175,9 @@ Deno.serve(async (req) => {
     if (alive && !body.renew) {
       return json({ url: linkOf(site, current.open_token), expires_at: current.expires_at, uses: current.uses, max_uses: current.max_uses });
     }
+    // pas de lien en cours : seul l'hôte en crée un (un artiste ne rouvre pas
+    // un lien que l'hôte a coupé)
+    if (!me.is_host) return json({ url: null, host_only: true });
     // nouveau lien : l'ancien ne marche plus
     if (current) await db.from("space_invites").delete().eq("id", current.id);
     const until = Date.now() + INVITE_DAYS * 86400e3;

@@ -6,17 +6,17 @@
 import {
   listProjects, listReviewComments, deleteProjectFully, listParticipants, updateProject,
   reviewNotifyStatus, reviewSubscribe, reviewUnsubscribe, signFiles, cachedDownload, myPrefs, savePref
-} from "../api.js?v=116";
-import { saveZip, canStreamToDisk, MEMORY_LIMIT } from "../zip.js?v=116";
-import { mountUploads } from "./uploads.js?v=116";
-import { openUploadSheet } from "./upload-sheet.js?v=116";
-import { stateOf, isEngineerOf } from "./review.js?v=116";
-import { ensureVerified } from "../verify.js?v=116";
-import { accountEmail } from "../session.js?v=116";
-import { albumOf, onCover, setCover, clearCover, setAlbumTitle } from "../cover.js?v=116";
-import { playQueue, onPlayer, isCurrent, state as playerState, toggle, trackFromFile } from "../player.js?v=116";
-import { icon } from "../icons.js?v=116";
-import { esc, h, plural, toast, errorText, formatDuration, actionSheet, confirmSheet, promptSheet, openSheet, triggerDownload } from "../ui.js?v=116";
+} from "../api.js?v=117";
+import { saveZip, canStreamToDisk, MEMORY_LIMIT } from "../zip.js?v=117";
+import { mountUploads } from "./uploads.js?v=117";
+import { openUploadSheet } from "./upload-sheet.js?v=117";
+import { stateOf, isEngineerOf } from "./review.js?v=117";
+import { ensureVerified } from "../verify.js?v=117";
+import { accountEmail } from "../session.js?v=117";
+import { albumOf, onCover, setCover, clearCover, setAlbumTitle } from "../cover.js?v=117";
+import { playQueue, onPlayer, isCurrent, state as playerState, toggle, trackFromFile } from "../player.js?v=117";
+import { icon } from "../icons.js?v=117";
+import { esc, h, plural, toast, errorText, formatDuration, actionSheet, confirmSheet, promptSheet, openSheet, triggerDownload } from "../ui.js?v=117";
 
 // Pochette générée : un aplat dont la teinte dépend du nom, les initiales
 // en grand. Pas de dégradé (identité sobre).
@@ -214,9 +214,9 @@ export async function mountReviewHome(root, ctx) {
   function drawCover() {
     const empty = !coverImg;
     coverBox.innerHTML =
-      '<button type="button" class="rh-cover-btn' + (empty && !engineer ? " is-empty" : "") + '" data-cover aria-label="' + (empty ? "Ajouter une cover" : "Changer la cover") + '">' +
+      '<button type="button" class="rh-cover-btn' + (empty && !engineer && !welcomed() ? " is-empty" : "") + '" data-cover aria-label="' + (empty ? "Ajouter une cover" : "Changer la cover") + '">' +
         (empty ? albumArt(titleOf(), "cover-xl") : cover(s.name, "cover-xl", coverImg)) +
-        (empty && !engineer
+        (empty && !engineer && !welcomed()
           ? '<span class="cover-cta" aria-hidden="true">' + icon("plus", 14) + "<span>Ajoute ta cover</span></span>"
           : '<span class="rh-cover-edit" aria-hidden="true">' + icon(empty ? "image" : "edit", 16) + "</span>") +
       "</button>";
@@ -340,7 +340,7 @@ export async function mountReviewHome(root, ctx) {
     const mail = '<button class="btn btn-ghost btn-icon' + (notifyEmail ? " is-on" : "") + '" data-notify aria-label="' + esc(t.off) + '" title="' +
       esc(notifyEmail ? t.on + notifyEmail : t.off) + '">' + icon("mail", 20) + "</button>";
     // lien de partage (WhatsApp...) : l'hôte seul le crée
-    const share = s.isHost
+    const share = !s.viewer
       ? '<button class="btn btn-ghost btn-icon" data-share-verdict aria-label="Lien de partage" title="Lien à partager (WhatsApp, SMS…)">' + icon("link", 20) + "</button>"
       : "";
     engActions.innerHTML = engineer
@@ -423,7 +423,7 @@ export async function mountReviewHome(root, ctx) {
 
   engActions.addEventListener("click", async (e) => {
     if (e.target.closest("[data-share-verdict]")) {
-      const { openShareSheet } = await import("./people.js?v=116");
+      const { openShareSheet } = await import("./people.js?v=117");
       openShareSheet(ctx);
       return;
     }

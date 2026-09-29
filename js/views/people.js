@@ -1,9 +1,9 @@
 // Feuille "Participants" : qui est là, inviter, réglages du host.
 
-import { shareInviteLink, listParticipants, updateSpace, deleteSpace, inviteByEmail, listInvites, deleteInvite, listContacts, suggestContacts, senderEmail, rememberContactsLocal } from "../api.js?v=116";
-import { icon } from "../icons.js?v=116";
-import { esc, h, openSheet, avatar, shareLink, copyText, toast, errorText, formatDate, confirmSheet, canShare, promptSheet } from "../ui.js?v=116";
-import { leaveSpace, knownSpaces, switchTo, forgetSpace, renameMe, accountEmail, logout } from "../session.js?v=116";
+import { shareInviteLink, listParticipants, updateSpace, deleteSpace, inviteByEmail, listInvites, deleteInvite, listContacts, suggestContacts, senderEmail, rememberContactsLocal } from "../api.js?v=117";
+import { icon } from "../icons.js?v=117";
+import { esc, h, openSheet, avatar, shareLink, copyText, toast, errorText, formatDate, confirmSheet, canShare, promptSheet } from "../ui.js?v=117";
+import { leaveSpace, knownSpaces, switchTo, forgetSpace, renameMe, accountEmail, logout } from "../session.js?v=117";
 
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
@@ -27,8 +27,8 @@ export async function openShareSheet(ctx) {
   const msg = () => (s.mode === "revue" ? "Écoute mes mix et donne ton verdict : " : "Rejoins le séminaire : ");
   function draw(r) {
     if (!r.url) {
-      box.innerHTML = '<p class="muted">Lien coupé : plus personne ne peut entrer avec.</p>' +
-        '<button class="btn btn-primary btn-block" data-renew>' + icon("link", 18) + " Créer un lien</button>";
+      box.innerHTML = '<p class="muted">' + (s.isHost ? "Lien coupé : plus personne ne peut entrer avec." : "Pas de lien de partage pour l'instant : demande à l'ingé d'en créer un.") + "</p>" +
+        (s.isHost ? '<button class="btn btn-primary btn-block" data-renew>' + icon("link", 18) + " Créer un lien</button>" : "");
       return;
     }
     const wa = "https://wa.me/?text=" + encodeURIComponent(msg() + r.url);
@@ -40,8 +40,8 @@ export async function openShareSheet(ctx) {
           : '<a class="btn btn-primary btn-block" href="' + esc(wa) + '" target="_blank" rel="noopener">' + icon("send", 18) + " WhatsApp</a>") +
       "</div>" +
       '<p class="muted small">' + r.uses + " / " + r.max_uses + " entrées · valable jusqu'au " + esc(formatDate(r.expires_at)) + "</p>" +
-      '<div class="row-2"><button class="btn btn-ghost btn-sm" data-renew>' + icon("retry", 16) + " Nouveau lien</button>" +
-        '<button class="btn btn-ghost btn-sm" data-off>' + icon("x", 16) + " Couper le lien</button></div>";
+      (s.isHost ? '<div class="row-2"><button class="btn btn-ghost btn-sm" data-renew>' + icon("retry", 16) + " Nouveau lien</button>" +
+        '<button class="btn btn-ghost btn-sm" data-off>' + icon("x", 16) + " Couper le lien</button></div>" : "");
     box.querySelector("[data-url]").addEventListener("focus", (e) => e.target.select());
     box.querySelector("[data-copy-link]").onclick = async () => toast(await copyText(r.url) ? "Lien copié" : "Copie impossible", "ok");
     const sh = box.querySelector("[data-share-link]");

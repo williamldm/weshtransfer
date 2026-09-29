@@ -1,23 +1,23 @@
 // Coquille de l'appli : démarrage, routeur à hash, en-tête, bus
 // d'événements, temps réel. Chaque vue est un module avec mount().
 
-import { restore, getSpace, leaveSpace, switchTo } from "./session.js?v=116";
-import { requireClient } from "./db.js?v=116";
-import { connectSpace } from "./realtime.js?v=116";
-import { startJam } from "./jam.js?v=116";
-import { bindPlayerBar } from "./player.js?v=116";
-import { activeCount, onUploads } from "./upload.js?v=116";
-import { openPeopleSheet } from "./views/people.js?v=116";
-import { openUploadSheet } from "./views/upload-sheet.js?v=116";
-import { icon } from "./icons.js?v=116";
-import { monogram } from "./brand.js?v=116";
-import { toast, errorText, esc } from "./ui.js?v=116";
+import { restore, getSpace, leaveSpace, switchTo } from "./session.js?v=117";
+import { requireClient } from "./db.js?v=117";
+import { connectSpace } from "./realtime.js?v=117";
+import { startJam } from "./jam.js?v=117";
+import { bindPlayerBar } from "./player.js?v=117";
+import { activeCount, onUploads } from "./upload.js?v=117";
+import { openPeopleSheet } from "./views/people.js?v=117";
+import { openUploadSheet } from "./views/upload-sheet.js?v=117";
+import { icon } from "./icons.js?v=117";
+import { monogram } from "./brand.js?v=117";
+import { toast, errorText, esc } from "./ui.js?v=117";
 
-import * as home from "./views/home.js?v=116";
-import * as project from "./views/project.js?v=116";
-import * as file from "./views/file.js?v=116";
-import * as send from "./views/send.js?v=116";
-import * as transfers from "./views/transfers.js?v=116";
+import * as home from "./views/home.js?v=117";
+import * as project from "./views/project.js?v=117";
+import * as file from "./views/file.js?v=117";
+import * as send from "./views/send.js?v=117";
+import * as transfers from "./views/transfers.js?v=117";
 
 // L'accueil dépend du mode de l'espace : morceaux (séminaire) ou
 // directement le composeur d'envoi (espace dédié aux envois).
@@ -299,7 +299,7 @@ async function boot() {
   window.addEventListener("hashchange", routeSmoothly);
 
   // compte : "Mes espaces" à jour depuis le serveur (autres appareils)
-  import("./session.js?v=116").then((m) => m.syncSpaces()).catch(() => {});
+  import("./session.js?v=117").then((m) => m.syncSpaces()).catch(() => {});
 
   // message laissé par l'accueil (ex. réglage refusé à la création)
   try {
