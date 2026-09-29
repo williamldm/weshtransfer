@@ -1,5 +1,5 @@
-@import url("fonts.css?v=97");
-@import url("tokens.css?v=97");
+@import url("fonts.css?v=98");
+@import url("tokens.css?v=98");
 
 /* ================================================================= base */
 *, *::before, *::after { box-sizing: border-box; }
@@ -1491,9 +1491,9 @@ body.admin { min-height: 100vh; background: var(--bg); }
    large, titre, deux boutons égaux, actions secondaires en dessous).
    Rien ne dépasse de l'écran : le bloc prend toute la largeur. */
 @media (max-width: 559px) {
-  .rh-hero.rv-hero { gap: var(--sp-4); margin-bottom: var(--sp-3); padding: var(--sp-6) var(--sp-4) var(--sp-4); }
+  .rh-hero.rv-hero { gap: var(--sp-3); margin-bottom: var(--sp-3); padding: var(--sp-5) var(--sp-4) var(--sp-4); }
   .rh-cover { align-self: center; }
-  .cover-xl { width: min(62vw, 240px); height: min(62vw, 240px); border-radius: 18px; font-size: 72px; box-shadow: 0 30px 60px -12px rgba(0, 0, 0, .7), 0 0 0 .5px rgba(255, 255, 255, .08); }
+  .cover-xl { width: min(42vw, 170px); height: min(42vw, 170px); border-radius: 14px; font-size: 56px; box-shadow: 0 30px 60px -12px rgba(0, 0, 0, .7), 0 0 0 .5px rgba(255, 255, 255, .08); }
   .rh-cover-edit { right: 10px; bottom: 10px; width: 30px; height: 30px; background: rgba(0, 0, 0, .45); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
   .rh-info { width: 100%; display: flex; flex-direction: column; align-items: center; }
   .rh-info .eyebrow { margin: 0 0 6px; font-size: 11px; letter-spacing: .16em; }
@@ -1501,7 +1501,7 @@ body.admin { min-height: 100vh; background: var(--bg); }
   .rh-info h1 { font-size: clamp(26px, 8vw, 34px); line-height: 1.1; letter-spacing: -0.025em; text-align: center; }
   .rh-title-edit { padding: 5px; }
   .rh-title-edit svg { width: 14px; height: 14px; }
-  .rh-meta { margin: 6px 0 var(--sp-5); color: rgba(255, 255, 255, .55); font-size: 14px; }
+  .rh-meta { margin: 4px 0 var(--sp-4); color: rgba(255, 255, 255, .55); font-size: 14px; }
 
   .rh-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; width: 100%; }
   .rh-actions > .btn, .rh-actions [data-engineer-actions] > .btn { min-height: 48px; border-radius: 12px; font-size: 15px; font-weight: 600; }
@@ -1537,4 +1537,11 @@ body.admin { min-height: 100vh; background: var(--bg); }
 }
 @media (max-width: 359px) {
   .rh-actions > .btn, .rh-actions [data-engineer-actions] > .btn { padding: 0 10px; font-size: 14px; gap: 6px; }
+}
+
+/* Verdict : le fond reprend plus fort les couleurs de la pochette */
+.rh-hero .rv-backdrop { filter: blur(40px) saturate(2.1) brightness(1.05); }
+.rh-hero .rv-backdrop.is-flat { filter: none; }
+.rh-hero.rv-hero::after {
+  background: linear-gradient(to bottom, rgba(22, 20, 27, 0) 0%, rgba(22, 20, 27, .25) 45%, rgba(22, 20, 27, .8) 82%, rgba(22, 20, 27, .97) 100%);
 }
