@@ -108,6 +108,9 @@ function button(href, label) {
     `</td></tr></table>`;
 }
 
+// Texte d'aperçu caché (preheader) : display:none, jamais de police à 0 ou
+// 1 px ni de couleur transparente. SpamAssassin (règle FONT_INVIS_MSGID,
+// -2,5 sur mail-tester) prend ça pour du texte invisible de spammeur.
 function layout(o) {
   const site = o.site;
   const filler = "&#847;&zwnj;&nbsp;".repeat(60);
@@ -135,7 +138,7 @@ a{color:${C.bright}}
 </style>
 </head>
 <body style="margin:0;padding:0;background:${C.bg};" bgcolor="${C.bg}">
-<div style="max-height:0;max-width:0;overflow:hidden;mso-hide:all;font-size:1px;line-height:1px;color:${C.bg};">${esc(o.preheader)}${filler}</div>
+<div style="display:none;max-height:0;max-width:0;overflow:hidden;mso-hide:all;opacity:0;">${esc(o.preheader)}${filler}</div>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${C.bg}" style="background:${C.bg};">
 <tr><td align="center" style="padding:28px 12px 44px;">
 <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:600px;">
