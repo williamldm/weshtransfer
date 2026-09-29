@@ -1,7 +1,7 @@
 // Briques d'interface partagées : DOM, messages, formatage, feuilles.
 
-import { icon } from "./icons.js?v=109";
-import { CATEGORY, categoryOf, extOf } from "./files.js?v=109";
+import { icon } from "./icons.js?v=110";
+import { CATEGORY, categoryOf, extOf } from "./files.js?v=110";
 
 // ------------------------------------------------------------------ DOM
 
@@ -183,12 +183,12 @@ export function kindBadge(kind) {
   return '<span class="kind kind-' + k + '">' + KIND_LABEL[k] + "</span>";
 }
 
-// Badge d'un fichier : le type musical pour l'audio (voix, mix...), la
-// catégorie pour le reste (image, vidéo, projet...).
-export function fileBadge(name, mime, kind) {
+// Badge d'un fichier : la catégorie (image, vidéo, archive, projet...).
+// Rien pour l'audio : le type musical (mix, voix, stems...) n'est plus
+// affiché, il n'apportait rien.
+export function fileBadge(name, mime) {
   const cat = categoryOf(name, mime);
-  // un zip de stems reste "Stems" : le type musical prime sur le format
-  if (cat === "audio" || (cat === "archive" && kind === "stems")) return kindBadge(kind);
+  if (cat === "audio") return "";
   return '<span class="cat cat-' + cat + '">' + CATEGORY[cat].label + "</span>";
 }
 

@@ -76,7 +76,7 @@ export function typeLabel(name, kind) {
   const ext = extOf(name);
   const found = CATS.find(([, list]) => list.includes(ext));
   const cat = found ? found[0] : "Fichier";
-  return cat === "Audio" && KIND_LABEL[kind] ? KIND_LABEL[kind] : cat;
+  return cat;
 }
 
 function lines(text) {

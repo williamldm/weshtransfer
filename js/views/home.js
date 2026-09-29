@@ -1,16 +1,16 @@
 // Accueil de l'espace : gros boutons d'action, uploads en cours, morceaux
 // triés par activité récente.
 
-import { listProjects, createProject, listReviewComments, deleteProject, deleteFile, reviewNotifyStatus, reviewSubscribe, reviewUnsubscribe } from "../api.js?v=109";
-import { ensureVerified } from "../verify.js?v=109";
-import { mountReviewHome } from "./review-home.js?v=109";
-import { mountJam } from "./jam.js?v=109";
-import { stateOf, isEngineerOf } from "./review.js?v=109";
-import { mountUploads } from "./uploads.js?v=109";
-import { openUploadSheet } from "./upload-sheet.js?v=109";
-import { openPeopleSheet } from "./people.js?v=109";
-import { icon } from "../icons.js?v=109";
-import { esc, h, kindBadge, timeAgo, plural, promptSheet, toast, errorText, daysLeft, formatDate, actionSheet, confirmSheet } from "../ui.js?v=109";
+import { listProjects, createProject, listReviewComments, deleteProject, deleteFile, reviewNotifyStatus, reviewSubscribe, reviewUnsubscribe } from "../api.js?v=110";
+import { ensureVerified } from "../verify.js?v=110";
+import { mountReviewHome } from "./review-home.js?v=110";
+import { mountJam } from "./jam.js?v=110";
+import { stateOf, isEngineerOf } from "./review.js?v=110";
+import { mountUploads } from "./uploads.js?v=110";
+import { openUploadSheet } from "./upload-sheet.js?v=110";
+import { openPeopleSheet } from "./people.js?v=110";
+import { icon } from "../icons.js?v=110";
+import { esc, h, timeAgo, plural, promptSheet, toast, errorText, daysLeft, formatDate, actionSheet, confirmSheet } from "../ui.js?v=110";
 
 export const title = (ctx) => ctx.space.name;
 
@@ -55,7 +55,6 @@ export function renderProjects(projects, stats, canEdit, space) {
         '<div class="kinds">' + reviewStatus(files, stats, isEngineerOf(space, files)) + "</div>" +
       "</a>" + menu + "</div>";
     }
-    const kinds = [...new Set(files.map((f) => f.kind))];
     const bits = [
       plural(files.length, "version", "versions"),
       timeAgo(p.last_activity_at),
@@ -66,7 +65,6 @@ export function renderProjects(projects, stats, canEdit, space) {
       '<div class="row"><span class="name">' + esc(p.title) + "</span>" +
       '<span class="count">' + files.length + "</span></div>" +
       '<div class="meta">' + esc(bits.join(" · ")) + "</div>" +
-      (kinds.length ? '<div class="kinds">' + kinds.map(kindBadge).join("") + "</div>" : "") +
     "</a>" + menu + "</div>";
   }).join("");
 }

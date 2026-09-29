@@ -1,11 +1,11 @@
 // Feuille "Ajouter des sons" : choix du morceau, du type, détails optionnels.
 // L'upload démarre dès validation ; on peut naviguer pendant qu'il tourne.
 
-import { enqueue, checkFile, guessKind, guessBpm, titleFromName } from "../upload.js?v=109";
-import { listProjects, createProject } from "../api.js?v=109";
-import { icon } from "../icons.js?v=109";
-import { CATEGORY, categoryOf, isAudio } from "../files.js?v=109";
-import { esc, h, openSheet, toast, errorText, formatBytes, KINDS } from "../ui.js?v=109";
+import { enqueue, checkFile, guessKind, guessBpm, titleFromName } from "../upload.js?v=110";
+import { listProjects, createProject } from "../api.js?v=110";
+import { icon } from "../icons.js?v=110";
+import { CATEGORY, categoryOf } from "../files.js?v=110";
+import { esc, h, openSheet, toast, errorText, formatBytes } from "../ui.js?v=110";
 
 // opts : { projectId, newTitle, tag, onQueued(jobs, projectId) }
 export async function openUploadSheet(ctx, fileList, opts) {
@@ -43,12 +43,6 @@ export async function openUploadSheet(ctx, fileList, opts) {
       // effacée ; les retours et les transferts passent sur la nouvelle)
       '<label class="check-line" data-replace hidden><input type="checkbox" name="replace" checked>' +
         "<span>Remplacer la version précédente<small>Elle est supprimée pour faire de la place. Les retours et les liens déjà envoyés passent sur la nouvelle.</small></span></label>" +
-
-      '<div class="field"' + (ok.some((f) => isAudio(f.name, f.type)) ? "" : " hidden") + '><span class="label">Type</span><div class="chips" role="radiogroup">' +
-        KINDS.map(([k, label]) =>
-          '<label class="chip kind-chip kind-' + k + '"><input type="radio" name="kind" value="' + k + '"' +
-          (k === kind ? " checked" : "") + "><span>" + label + "</span></label>").join("") +
-      "</div></div>" +
 
       '<details class="more"><summary>BPM, tonalité, étiquette</summary>' +
         '<div class="grid-3">' +
@@ -114,7 +108,7 @@ export async function openUploadSheet(ctx, fileList, opts) {
         spaceId: ctx.space.id,
         projectId,
         projectTitle,
-        kind: String(form.get("kind") || "autre"),
+        kind,
         label: String(form.get("label") || "").trim() || null,
         bpm: bpmValue >= 40 && bpmValue <= 300 ? bpmValue : null,
         musicalKey: String(form.get("key") || "").trim() || null,
@@ -123,7 +117,9 @@ export async function openUploadSheet(ctx, fileList, opts) {
       });
 
       sheet.close();
-      if (o.onQueued) o.onQueued(jobs, projectId);
+      // Verdict : retour direct sur l'album, où la progression s'affiche
+      if (ctx.space.mode === "revue") ctx.navigate("#/projects");
+      else if (o.onQueued) o.onQueued(jobs, projectId);
       else ctx.navigate("#/p/" + projectId);
     } catch (err) {
       btn.disabled = false;

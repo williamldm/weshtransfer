@@ -1,18 +1,18 @@
 // Écoute d'une version : grande waveform, transport, commentaires
 // horodatés façon SoundCloud ("à 1:23, la voix sature").
 
-import { getFile, listComments, addComment, deleteComment, signFiles, cachedUrl, cachedDownload, deleteFile, updateFile } from "../api.js?v=109";
-import { createReview } from "./review.js?v=109";
-import { cover, backdrop } from "./review-home.js?v=109";
-import { albumOf } from "../cover.js?v=109";
-import { Waveform, formatTime } from "../waveform.js?v=109";
-import { play, toggle, isCurrent, onPlayer, seekRatio, seekSeconds, skip, state as playerState, trackFromFile } from "../player.js?v=109";
-import { icon } from "../icons.js?v=109";
-import { isAudio, canPreview, categoryOf } from "../files.js?v=109";
+import { getFile, listComments, addComment, deleteComment, signFiles, cachedUrl, cachedDownload, deleteFile, updateFile } from "../api.js?v=110";
+import { createReview } from "./review.js?v=110";
+import { cover, backdrop } from "./review-home.js?v=110";
+import { albumOf } from "../cover.js?v=110";
+import { Waveform, formatTime } from "../waveform.js?v=110";
+import { play, toggle, isCurrent, onPlayer, seekRatio, seekSeconds, skip, state as playerState, trackFromFile } from "../player.js?v=110";
+import { icon } from "../icons.js?v=110";
+import { isAudio, canPreview, categoryOf } from "../files.js?v=110";
 import {
   esc, h, fileBadge, fileTile, timeAgo, formatBytes, avatar, toast, errorText, triggerDownload, plural,
-  confirmSheet, actionSheet, KINDS, openSheet
-} from "../ui.js?v=109";
+  confirmSheet, actionSheet, openSheet
+} from "../ui.js?v=110";
 
 export const title = () => "Écoute";
 
@@ -308,7 +308,7 @@ export async function mount(root, ctx, params) {
     const more = root.querySelector("[data-more]");
     if (more) {
       more.onclick = () => actionSheet("v" + file.version_no, [
-        { label: "Changer le type / l'étiquette", icon: "edit", run: editMeta },
+        { label: "Changer l'étiquette", icon: "edit", run: editMeta },
         {
           label: "Supprimer cette version", icon: "trash", danger: true,
           run: async () => {
@@ -404,10 +404,6 @@ export async function mount(root, ctx, params) {
   function editMeta() {
     const body = h(
       '<form>' +
-        '<div class="field"><span class="label">Type</span><div class="chips">' +
-          KINDS.map(([k, label]) => '<label class="chip kind-chip kind-' + k + '"><input type="radio" name="kind" value="' + k + '"' +
-            (k === file.kind ? " checked" : "") + "><span>" + label + "</span></label>").join("") +
-        "</div></div>" +
         '<label class="field"><span class="label">Étiquette</span><input class="input" name="label" maxlength="40" value="' + esc(file.label || "") + '"></label>' +
         '<button class="btn btn-primary btn-block" type="submit">Enregistrer</button>' +
       "</form>"
@@ -417,7 +413,7 @@ export async function mount(root, ctx, params) {
       e.preventDefault();
       const fd = new FormData(body);
       try {
-        await updateFile(file.id, { kind: fd.get("kind"), label: String(fd.get("label") || "").trim() || null });
+        await updateFile(file.id, { label: String(fd.get("label") || "").trim() || null });
         sheet.close();
         await load();
       } catch (err) { toast(errorText(err), "err"); }
