@@ -6,17 +6,17 @@
 import {
   listProjects, listReviewComments, deleteProjectFully, listParticipants, updateProject,
   reviewNotifyStatus, reviewSubscribe, reviewUnsubscribe, signFiles, cachedDownload, myPrefs, savePref
-} from "../api.js?v=115";
-import { saveZip, canStreamToDisk, MEMORY_LIMIT } from "../zip.js?v=115";
-import { mountUploads } from "./uploads.js?v=115";
-import { openUploadSheet } from "./upload-sheet.js?v=115";
-import { stateOf, isEngineerOf } from "./review.js?v=115";
-import { ensureVerified } from "../verify.js?v=115";
-import { accountEmail } from "../session.js?v=115";
-import { albumOf, onCover, setCover, clearCover, setAlbumTitle } from "../cover.js?v=115";
-import { playQueue, onPlayer, isCurrent, state as playerState, toggle, trackFromFile } from "../player.js?v=115";
-import { icon } from "../icons.js?v=115";
-import { esc, h, plural, toast, errorText, formatDuration, actionSheet, confirmSheet, promptSheet, openSheet, triggerDownload } from "../ui.js?v=115";
+} from "../api.js?v=116";
+import { saveZip, canStreamToDisk, MEMORY_LIMIT } from "../zip.js?v=116";
+import { mountUploads } from "./uploads.js?v=116";
+import { openUploadSheet } from "./upload-sheet.js?v=116";
+import { stateOf, isEngineerOf } from "./review.js?v=116";
+import { ensureVerified } from "../verify.js?v=116";
+import { accountEmail } from "../session.js?v=116";
+import { albumOf, onCover, setCover, clearCover, setAlbumTitle } from "../cover.js?v=116";
+import { playQueue, onPlayer, isCurrent, state as playerState, toggle, trackFromFile } from "../player.js?v=116";
+import { icon } from "../icons.js?v=116";
+import { esc, h, plural, toast, errorText, formatDuration, actionSheet, confirmSheet, promptSheet, openSheet, triggerDownload } from "../ui.js?v=116";
 
 // Pochette générée : un aplat dont la teinte dépend du nom, les initiales
 // en grand. Pas de dégradé (identité sobre).
@@ -271,7 +271,10 @@ export async function mountReviewHome(root, ctx) {
     const val = { v, at: new Date().toISOString() };
     helpPref = val;
     try { localStorage.setItem(HELP_KEY, v); localStorage.setItem(HELP_KEY + ".at", JSON.stringify(val)); } catch (err) { /* navigation privée */ }
-    if (s.participantId) savePref(s.participantId, "help", val).catch(() => {});
+    myPrefs().catch(() => []).then((rows) => {
+      const ids = new Set((rows || []).map((r) => r.id).concat(s.participantId ? [s.participantId] : []));
+      for (const id of ids) savePref(id, "help", val).catch(() => {});
+    });
     drawHelp();
   };
   helpBox.addEventListener("click", (e) => { if (e.target.closest("[data-help-hide]")) setHelp("closed"); });
@@ -314,8 +317,14 @@ export async function mountReviewHome(root, ctx) {
   // global, 10 minutes après la dernière action de l'autre.
   let notifyEmail = null;
   let notifyKnown = false;   // état chargé (sinon on ne propose rien)
-  const OFFER_KEY = "weshtransfer.notifyOffer." + s.id;
-  let spacePrefs = {};       // préférences de cette place (compte)
+  // Choix "je ne veux plus voir ça" : valables pour TOUS les projets, sur
+  // tous les appareils (compte) et retenus tout de suite sur celui-ci.
+  // Chaque valeur : { v, at } ; la plus récente l'emporte.
+  const GLOBAL_KEY = "weshtransfer.verdictPrefs";
+  let globalPrefs = {};      // { offer: {v, at}, mailNotice: {v, at} }
+  try { globalPrefs = JSON.parse(localStorage.getItem(GLOBAL_KEY) || "{}") || {}; } catch (err) { /* privé */ }
+  let myRows = [];           // toutes mes places (pour écrire partout)
+  const spacePrefs = { get offer() { return globalPrefs.offer && globalPrefs.offer.v; }, get mailNotice() { return globalPrefs.mailNotice && globalPrefs.mailNotice.v; } };
   const mailText = () => engineer
     ? { on: "Récap des retours activé : ", off: "Recevoir un email quand l'artiste a fait ses retours",
         offer: "Reçois un email récapitulatif quand l'artiste a laissé ses avis : un seul, 10 minutes après sa dernière retouche.",
@@ -344,13 +353,14 @@ export async function mountReviewHome(root, ctx) {
 
   // Proposition bien visible tant que les emails ne sont pas activés (une
   // croix la range pour de bon sur cet appareil ; l'enveloppe reste)
-  function offerDismissed() {
-    if (spacePrefs.offer === "hidden") return true;
-    try { return localStorage.getItem(OFFER_KEY) === "1"; } catch (err) { return false; }
-  }
+  function offerDismissed() { return spacePrefs.offer === "hidden"; }
   const keep = (key, value) => {
-    spacePrefs[key] = value;
-    if (s.participantId) savePref(s.participantId, key, value).catch(() => {});
+    const val = { v: value, at: new Date().toISOString() };
+    globalPrefs[key] = val;
+    try { localStorage.setItem(GLOBAL_KEY, JSON.stringify(globalPrefs)); } catch (err) { /* privé */ }
+    // écrit sur toutes mes places : il en reste une même si un projet disparaît
+    const ids = new Set(myRows.map((r) => r.id).concat(s.participantId ? [s.participantId] : []));
+    for (const id of ids) savePref(id, key, val).catch(() => {});
   };
   function drawOffer() {
     if (s.viewer) { offerBox.innerHTML = ""; return; }
@@ -378,7 +388,6 @@ export async function mountReviewHome(root, ctx) {
   offerBox.addEventListener("click", async (e) => {
     if (e.target.closest("[data-offer-on]")) { turnOnEmails(); return; }
     if (e.target.closest("[data-offer-x]")) {
-      try { localStorage.setItem(OFFER_KEY, "1"); } catch (err) { /* navigation privée */ }
       keep("offer", "hidden");
       drawOffer();
       return;
@@ -414,7 +423,7 @@ export async function mountReviewHome(root, ctx) {
 
   engActions.addEventListener("click", async (e) => {
     if (e.target.closest("[data-share-verdict]")) {
-      const { openShareSheet } = await import("./people.js?v=115");
+      const { openShareSheet } = await import("./people.js?v=116");
       openShareSheet(ctx);
       return;
     }
@@ -649,8 +658,13 @@ export async function mountReviewHome(root, ctx) {
     reviewNotifyStatus(s.id),
     myPrefs().catch(() => [])
   ]).then(([r, rows]) => {
-    const mine = (rows || []).find((x) => x.id === s.participantId);
-    spacePrefs = Object.assign({}, (mine && mine.prefs) || {});
+    myRows = rows || [];
+    for (const key of ["offer", "mailNotice"]) {
+      const best = myRows.map((x) => x.prefs && x.prefs[key]).concat([globalPrefs[key]])
+        .filter((p) => p && p.v && p.at).sort((a, b) => String(a.at).localeCompare(String(b.at))).pop();
+      if (best) globalPrefs[key] = best;
+    }
+    try { localStorage.setItem(GLOBAL_KEY, JSON.stringify(globalPrefs)); } catch (err) { /* privé */ }
     helpPref = (rows || []).map((x) => x.prefs && x.prefs.help).filter((h) => h && h.v)
       .sort((a, b) => String(a.at).localeCompare(String(b.at))).pop() || null;
     notifyEmail = r && r.email;
