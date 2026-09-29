@@ -6,19 +6,19 @@ import {
   getProject, getFilesByIds, createTransfer, sendTransfer, emailEnabled,
   getTransfer, transferUrl, createProject, signFiles, cachedUrl,
   knownVerified, listContacts, forgetContact, rememberContactsLocal, suggestContacts
-} from "../api.js?v=110";
-import { accountEmail } from "../session.js?v=110";
-import { ensureVerified } from "../verify.js?v=110";
-import { openUploadSheet } from "./upload-sheet.js?v=110";
-import { mountUploads } from "./uploads.js?v=110";
-import { onUploads, enqueue, checkFile, getJobs } from "../upload.js?v=110";
-import { categoryOf, canPreview, FILE_MAX } from "../files.js?v=110";
-import { takePending } from "../pending.js?v=110";
-import { icon } from "../icons.js?v=110";
+} from "../api.js?v=111";
+import { accountEmail } from "../session.js?v=111";
+import { ensureVerified } from "../verify.js?v=111";
+import { openUploadSheet } from "./upload-sheet.js?v=111";
+import { mountUploads } from "./uploads.js?v=111";
+import { onUploads, enqueue, checkFile, getJobs } from "../upload.js?v=111";
+import { categoryOf, canPreview, FILE_MAX } from "../files.js?v=111";
+import { takePending } from "../pending.js?v=111";
+import { icon } from "../icons.js?v=111";
 import {
   esc, h, formatBytes, formatDuration, plural, toast, errorText, openSheet, copyText, shareLink,
   canShare, formatDate, daysLeft, fileBadge, fileTile
-} from "../ui.js?v=110";
+} from "../ui.js?v=111";
 
 // Dans un espace "envoi", ce composeur EST l'accueil.
 export const title = (ctx) => (ctx && ctx.space.mode === "envoi" ? ctx.space.name : "Envoyer");

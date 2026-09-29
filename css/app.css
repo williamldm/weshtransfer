@@ -1,5 +1,5 @@
-@import url("fonts.css?v=110");
-@import url("tokens.css?v=110");
+@import url("fonts.css?v=111");
+@import url("tokens.css?v=111");
 
 /* ================================================================= base */
 *, *::before, *::after { box-sizing: border-box; }
@@ -1284,8 +1284,9 @@ body.app .app-header { view-transition-name: topbar; }
   filter: none;
   transform: none;
   background:
-    radial-gradient(circle at 18% 12%, hsla(var(--hue), 70%, 55%, .55), transparent 55%),
-    linear-gradient(160deg, hsla(var(--hue), 45%, 28%, .9), transparent 70%);
+    radial-gradient(circle at 18% 12%, rgba(164, 139, 255, .55), transparent 55%),
+    radial-gradient(circle at 85% 30%, rgba(123, 92, 230, .35), transparent 50%),
+    linear-gradient(160deg, rgba(58, 40, 128, .92), transparent 72%);
 }
 /* fondu vers la carte, en bas de l'en-tête */
 .rv-hero::after {
@@ -1519,3 +1520,30 @@ body.app .app-header { view-transition-name: topbar; }
 .add-files.is-nudge { animation: nudge .45s ease; }
 .add-files.is-nudge .add-circle { background: var(--accent-hover); box-shadow: 0 0 0 6px var(--accent-soft); }
 @media (prefers-reduced-motion: reduce) { .add-files.is-nudge { animation: none; } }
+
+/* Verdict : visuel d'attente tant qu'il n'y a pas de pochette (albumArt) */
+.cover.cover-art {
+  position: relative; overflow: hidden; align-items: flex-end; justify-content: flex-start;
+  background:
+    radial-gradient(120% 90% at 0% 0%, rgba(164, 139, 255, .5), transparent 58%),
+    radial-gradient(90% 80% at 100% 100%, rgba(123, 92, 230, .35), transparent 60%),
+    linear-gradient(150deg, #2B1F5C, #120E1F 72%);
+  color: #fff; box-shadow: 0 24px 60px rgba(0, 0, 0, .45), inset 0 0 0 .5px rgba(255, 255, 255, .1);
+}
+.cover-art svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.cover-art-text { position: absolute; left: 9%; right: 9%; bottom: 8%; display: flex; flex-direction: column; gap: .06em; text-align: left; }
+.cover-art-kicker { color: rgba(255, 255, 255, .6); font: 500 max(6px, .1em)/1.2 var(--mono); letter-spacing: .22em; text-transform: uppercase; }
+.cover-art-title {
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden;
+  font: 800 max(9px, .24em)/1.05 var(--display); letter-spacing: -0.02em; text-shadow: 0 2px 12px rgba(0, 0, 0, .35); overflow-wrap: anywhere;
+}
+/* l'artiste, sans pochette : une pastille pour en ajouter une */
+.cover-cta {
+  position: absolute; left: 50%; bottom: 0; display: inline-flex; align-items: center; gap: 5px;
+  padding: 7px 13px; border-radius: 99px; background: var(--accent); color: #fff;
+  font: 600 13px/1 var(--font); white-space: nowrap; box-shadow: 0 8px 22px rgba(0, 0, 0, .45);
+  transform: translate(-50%, 50%); transition: background .15s;
+}
+.rh-cover-btn:hover .cover-cta { background: var(--accent-hover); }
+.rh-cover-btn.is-empty { margin-bottom: 16px; }
+.rh-cover-btn.is-empty .cover-art-text { bottom: 19%; }

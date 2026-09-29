@@ -1,18 +1,18 @@
 // Écoute d'une version : grande waveform, transport, commentaires
 // horodatés façon SoundCloud ("à 1:23, la voix sature").
 
-import { getFile, listComments, addComment, deleteComment, signFiles, cachedUrl, cachedDownload, deleteFile, updateFile } from "../api.js?v=110";
-import { createReview } from "./review.js?v=110";
-import { cover, backdrop } from "./review-home.js?v=110";
-import { albumOf } from "../cover.js?v=110";
-import { Waveform, formatTime } from "../waveform.js?v=110";
-import { play, toggle, isCurrent, onPlayer, seekRatio, seekSeconds, skip, state as playerState, trackFromFile } from "../player.js?v=110";
-import { icon } from "../icons.js?v=110";
-import { isAudio, canPreview, categoryOf } from "../files.js?v=110";
+import { getFile, listComments, addComment, deleteComment, signFiles, cachedUrl, cachedDownload, deleteFile, updateFile } from "../api.js?v=111";
+import { createReview } from "./review.js?v=111";
+import { cover, backdrop, albumArt } from "./review-home.js?v=111";
+import { albumOf } from "../cover.js?v=111";
+import { Waveform, formatTime } from "../waveform.js?v=111";
+import { play, toggle, isCurrent, onPlayer, seekRatio, seekSeconds, skip, state as playerState, trackFromFile } from "../player.js?v=111";
+import { icon } from "../icons.js?v=111";
+import { isAudio, canPreview, categoryOf } from "../files.js?v=111";
 import {
   esc, h, fileBadge, fileTile, timeAgo, formatBytes, avatar, toast, errorText, triggerDownload, plural,
   confirmSheet, actionSheet, openSheet
-} from "../ui.js?v=110";
+} from "../ui.js?v=111";
 
 export const title = () => "Écoute";
 
@@ -124,7 +124,7 @@ function renderReviewShell(file, versions, audio, media, cat, mine, space) {
   return (
     '<header class="rv-hero rv-now">' +
       '<div data-rv-backdrop>' + backdrop(null, title) + "</div>" +
-      '<span class="rv-now-cover" data-rv-cover>' + cover(title, "cover-lg") + "</span>" +
+      '<span class="rv-now-cover" data-rv-cover>' + albumArt(title, "cover-lg") + "</span>" +
       '<div class="rv-now-text">' +
         '<p class="eyebrow" data-rv-album>Verdict</p>' +
         "<h1>" + esc(title) + "</h1>" +

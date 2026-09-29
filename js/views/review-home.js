@@ -6,17 +6,17 @@
 import {
   listProjects, listReviewComments, deleteProjectFully, listParticipants, updateProject,
   reviewNotifyStatus, reviewSubscribe, reviewUnsubscribe, signFiles, cachedDownload, myPrefs, savePref
-} from "../api.js?v=110";
-import { saveZip, canStreamToDisk, MEMORY_LIMIT } from "../zip.js?v=110";
-import { mountUploads } from "./uploads.js?v=110";
-import { openUploadSheet } from "./upload-sheet.js?v=110";
-import { stateOf, isEngineerOf } from "./review.js?v=110";
-import { ensureVerified } from "../verify.js?v=110";
-import { accountEmail } from "../session.js?v=110";
-import { albumOf, onCover, setCover, clearCover, setAlbumTitle } from "../cover.js?v=110";
-import { playQueue, onPlayer, isCurrent, state as playerState, toggle, trackFromFile } from "../player.js?v=110";
-import { icon } from "../icons.js?v=110";
-import { esc, h, plural, toast, errorText, formatDuration, actionSheet, confirmSheet, promptSheet, openSheet, triggerDownload } from "../ui.js?v=110";
+} from "../api.js?v=111";
+import { saveZip, canStreamToDisk, MEMORY_LIMIT } from "../zip.js?v=111";
+import { mountUploads } from "./uploads.js?v=111";
+import { openUploadSheet } from "./upload-sheet.js?v=111";
+import { stateOf, isEngineerOf } from "./review.js?v=111";
+import { ensureVerified } from "../verify.js?v=111";
+import { accountEmail } from "../session.js?v=111";
+import { albumOf, onCover, setCover, clearCover, setAlbumTitle } from "../cover.js?v=111";
+import { playQueue, onPlayer, isCurrent, state as playerState, toggle, trackFromFile } from "../player.js?v=111";
+import { icon } from "../icons.js?v=111";
+import { esc, h, plural, toast, errorText, formatDuration, actionSheet, confirmSheet, promptSheet, openSheet, triggerDownload } from "../ui.js?v=111";
 
 // Pochette générée : un aplat dont la teinte dépend du nom, les initiales
 // en grand. Pas de dégradé (identité sobre).
@@ -60,10 +60,29 @@ function statusOf(p, stats, engineer) {
 
 // Fond d'en-tête façon plateforme de streaming : la pochette, floutée et
 // assombrie ; sans pochette, un aplat de la teinte du titre.
+// Visuel d'attente d'un Verdict, tant que l'artiste n'a pas mis sa
+// pochette : un vinyle qui sort d'une pochette violette (couleurs du site),
+// le nom du projet dessus. Même dessin partout, taille suivant la classe.
+export function albumArt(text, cls) {
+  const grooves = [29, 25, 21, 17].map((r) =>
+    '<circle cx="63" cy="42" r="' + r + '" fill="none" stroke="rgba(255,255,255,.07)" stroke-width=".7"/>').join("");
+  return '<span class="cover cover-art ' + (cls || "") + '" aria-hidden="true">' +
+    '<svg viewBox="0 0 100 100" preserveAspectRatio="xMidYMid slice" focusable="false">' +
+      '<circle cx="63" cy="42" r="34" fill="#0B0910"/>' + grooves +
+      '<path d="M40 17a34 34 0 0 1 36-6" fill="none" stroke="rgba(255,255,255,.16)" stroke-width="1.6" stroke-linecap="round"/>' +
+      '<circle cx="63" cy="42" r="10.5" fill="#7B5CE6"/>' +
+      '<circle cx="63" cy="42" r="10.5" fill="none" stroke="rgba(255,255,255,.18)" stroke-width=".6"/>' +
+      '<circle cx="63" cy="42" r="1.7" fill="#0B0910"/>' +
+    "</svg>" +
+    '<span class="cover-art-text"><span class="cover-art-kicker">Verdict</span>' +
+      '<span class="cover-art-title">' + esc(text || "") + "</span></span>" +
+  "</span>";
+}
+
 export function backdrop(image, text) {
   return image
     ? '<div class="rv-backdrop" style="background-image:url(\'' + esc(image) + '\')" aria-hidden="true"></div>'
-    : '<div class="rv-backdrop is-flat" style="--hue:' + hueOf(text) + '" aria-hidden="true"></div>';
+    : '<div class="rv-backdrop is-flat" aria-hidden="true"></div>';
 }
 
 const HELP_KEY = "weshtransfer.reviewHelp";
@@ -153,8 +172,7 @@ export async function mountReviewHome(root, ctx) {
         '<p class="welcome-lead">' + (hostName ? "<b>" + esc(hostName) + "</b> t'a invité" : "Tu es invité") +
           " à écouter ses mix et à dire ce qui ne va pas. Avant d'y aller, habille ton projet :</p>" +
         '<label class="welcome-cover" data-wc-pick>' +
-          '<span data-wc-preview>' + (coverImg ? cover(titleOf(), "cover-xl", coverImg)
-            : '<span class="cover cover-xl cover-add">' + icon("image", 28) + "<span>Ajoute la cover</span></span>") + "</span>" +
+          '<span data-wc-preview>' + (coverImg ? cover(titleOf(), "cover-xl", coverImg) : albumArt(titleOf(), "cover-xl")) + "</span>" +
           '<input type="file" accept="image/*" hidden data-wc-file>' +
           '<span class="welcome-cover-hint">' + (coverImg ? "Changer la cover" : "Choisir une image") + "</span>" +
         "</label>" +
@@ -195,9 +213,10 @@ export async function mountReviewHome(root, ctx) {
     const empty = !coverImg;
     coverBox.innerHTML =
       '<button type="button" class="rh-cover-btn' + (empty && !engineer ? " is-empty" : "") + '" data-cover aria-label="' + (empty ? "Ajouter une cover" : "Changer la cover") + '">' +
+        (empty ? albumArt(titleOf(), "cover-xl") : cover(s.name, "cover-xl", coverImg)) +
         (empty && !engineer
-          ? '<span class="cover cover-xl cover-add">' + icon("image", 28) + "<span>Ajoute la cover du projet</span></span>"
-          : cover(s.name, "cover-xl", coverImg) + '<span class="rh-cover-edit" aria-hidden="true">' + icon(empty ? "image" : "edit", 16) + "</span>") +
+          ? '<span class="cover-cta" aria-hidden="true">' + icon("plus", 14) + "<span>Ajoute ta cover</span></span>"
+          : '<span class="rh-cover-edit" aria-hidden="true">' + icon(empty ? "image" : "edit", 16) + "</span>") +
       "</button>";
   }
 
