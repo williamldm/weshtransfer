@@ -1,5 +1,5 @@
-@import url("fonts.css?v=99");
-@import url("tokens.css?v=99");
+@import url("fonts.css?v=100");
+@import url("tokens.css?v=100");
 
 /* ================================================================= base */
 *, *::before, *::after { box-sizing: border-box; }
@@ -1544,4 +1544,31 @@ body.admin { min-height: 100vh; background: var(--bg); }
 .rh-hero .rv-backdrop.is-flat { filter: none; }
 .rh-hero.rv-hero::after {
   background: linear-gradient(to bottom, rgba(22, 20, 27, 0) 0%, rgba(22, 20, 27, .25) 45%, rgba(22, 20, 27, .8) 82%, rgba(22, 20, 27, .97) 100%);
+}
+
+/* Grands écrans : le sol des décors ne finit plus en bande noire. Le bas
+   de l'écran devient un sol mouillé : le décor s'y reflète (retourné,
+   flou, qui s'estompe), avec une lueur violette à l'horizon. Aucun bord
+   visible, à toutes les tailles. Les calculs suivent le "cover" du décor
+   (image 1600x1000, sol à 83 % de sa hauteur). */
+@media (min-width: 860px) {
+  .scene {
+    --img-h: max(62.5vw, 100vh);
+    --band: calc(var(--img-h) * .17 + 24px);
+  }
+  body.hub .scene::after, body.app .scene::after, body.public .scene::after {
+    content: "";
+    position: absolute;
+    left: -20px; right: -20px; bottom: -12px;
+    height: var(--band);
+    background:
+      radial-gradient(60% 55% at 50% 0%, rgba(164, 139, 255, .16), transparent 70%),
+      var(--scene, url("../img/scene.svg")) center calc(var(--band) - var(--img-h) * .83 - 12px) / max(100vw, 160vh) auto no-repeat;
+    transform: scaleY(-1);
+    filter: blur(5px) brightness(.9);
+    opacity: .55;
+    -webkit-mask-image: linear-gradient(to top, #000 0%, rgba(0, 0, 0, .6) 45%, transparent 100%);
+    mask-image: linear-gradient(to top, #000 0%, rgba(0, 0, 0, .6) 45%, transparent 100%);
+    pointer-events: none;
+  }
 }
