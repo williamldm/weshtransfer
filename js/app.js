@@ -1,22 +1,23 @@
 // Coquille de l'appli : démarrage, routeur à hash, en-tête, bus
 // d'événements, temps réel. Chaque vue est un module avec mount().
 
-import { restore, getSpace, leaveSpace } from "./session.js?v=102";
-import { connectSpace } from "./realtime.js?v=102";
-import { startJam } from "./jam.js?v=102";
-import { bindPlayerBar } from "./player.js?v=102";
-import { activeCount, onUploads } from "./upload.js?v=102";
-import { openPeopleSheet } from "./views/people.js?v=102";
-import { openUploadSheet } from "./views/upload-sheet.js?v=102";
-import { icon } from "./icons.js?v=102";
-import { monogram } from "./brand.js?v=102";
-import { toast, errorText, esc } from "./ui.js?v=102";
+import { restore, getSpace, leaveSpace, switchTo } from "./session.js?v=103";
+import { requireClient } from "./db.js?v=103";
+import { connectSpace } from "./realtime.js?v=103";
+import { startJam } from "./jam.js?v=103";
+import { bindPlayerBar } from "./player.js?v=103";
+import { activeCount, onUploads } from "./upload.js?v=103";
+import { openPeopleSheet } from "./views/people.js?v=103";
+import { openUploadSheet } from "./views/upload-sheet.js?v=103";
+import { icon } from "./icons.js?v=103";
+import { monogram } from "./brand.js?v=103";
+import { toast, errorText, esc } from "./ui.js?v=103";
 
-import * as home from "./views/home.js?v=102";
-import * as project from "./views/project.js?v=102";
-import * as file from "./views/file.js?v=102";
-import * as send from "./views/send.js?v=102";
-import * as transfers from "./views/transfers.js?v=102";
+import * as home from "./views/home.js?v=103";
+import * as project from "./views/project.js?v=103";
+import * as file from "./views/file.js?v=103";
+import * as send from "./views/send.js?v=103";
+import * as transfers from "./views/transfers.js?v=103";
 
 // L'accueil dépend du mode de l'espace : morceaux (séminaire) ou
 // directement le composeur d'envoi (espace dédié aux envois).
@@ -129,10 +130,34 @@ function parse() {
   return { path, query: new URLSearchParams(qs || "") };
 }
 
+// Un lien vers un morceau ou une écoute (#/p/..., #/f/..., celui d'un email
+// aussi) doit s'ouvrir DANS SON espace. Le lien ne porte pas l'espace : on
+// le lit sur le morceau, et si ce n'est pas l'espace de cet onglet, on
+// bascule dessus (ou on refuse), jamais on n'affiche un verdict avec
+// l'en-tête, le retour et les droits d'un autre.
+async function ensureSpaceFor(kind, id) {
+  let spaceId = null;
+  try {
+    const { data } = await requireClient().from(kind === "f" ? "files" : "projects").select("space_id").eq("id", id).maybeSingle();
+    spaceId = data ? data.space_id : null;
+  } catch (err) { return true; }   // réseau : la vue affichera son erreur
+  if (!spaceId || spaceId === ctx.space.id) return true;
+  if (switchTo(spaceId)) { location.reload(); return false; }
+  viewEl.innerHTML = '<div class="empty-state">' + icon("alert", 36) +
+    "<p>Ce lien mène à un autre espace, que tu n'as pas ouvert sur cet appareil.<br>Rejoins-le depuis l'accueil avec son code ou son invitation.</p>" +
+    '<a class="btn btn-primary" href="index.html">Accueil</a></div>';
+  return false;
+}
+
 async function route() {
   const { path, query } = parse();
   const match = ROUTES.map((r) => ({ r, m: path.match(r.re) })).find((x) => x.m);
   if (!match) { navigate("#/projects"); return; }
+  if (/^\/[pf]\//.test(path)) {
+    const before = location.hash;
+    const ok = await ensureSpaceFor(path[1], match.m[1]);
+    if (!ok || before !== location.hash) return;   // bascule en cours, ou navigation entre-temps
+  }
 
   const my = ++token;
   if (unmount) { try { unmount(); } catch (err) { console.error(err); } unmount = null; }
@@ -271,7 +296,7 @@ async function boot() {
   window.addEventListener("hashchange", routeSmoothly);
 
   // compte : "Mes espaces" à jour depuis le serveur (autres appareils)
-  import("./session.js?v=102").then((m) => m.syncSpaces()).catch(() => {});
+  import("./session.js?v=103").then((m) => m.syncSpaces()).catch(() => {});
 
   // message laissé par l'accueil (ex. réglage refusé à la création)
   try {

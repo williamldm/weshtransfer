@@ -3,7 +3,7 @@
 // mot de passe), il partage le compte de cette adresse : les mêmes espaces,
 // envois et blazes sur tous ses appareils.
 
-import { sb, q, invoke, requireClient } from "./db.js?v=102";
+import { sb, q, invoke, requireClient } from "./db.js?v=103";
 
 const SPACE_KEY = "seminaire.space";      // espace actif
 const KNOWN_KEY = "seminaire.spaces";     // tous les espaces rejoints sur cet appareil
@@ -16,8 +16,23 @@ function write(key, value) {
   try { localStorage.setItem(key, JSON.stringify(value)); } catch (err) { /* navigation privée */ }
 }
 
+// L'espace actif est PROPRE À L'ONGLET (sessionStorage) : ouvrir un autre
+// verdict dans un second onglet, ou revenir avec le bouton retour du
+// navigateur, ne change plus l'espace d'un onglet déjà ouvert. Le dernier
+// espace utilisé (localStorage) ne sert que de point de départ à un
+// nouvel onglet.
+function readTab() {
+  try { return JSON.parse(sessionStorage.getItem(SPACE_KEY)) || null; } catch (err) { return null; }
+}
+function writeTab(value) {
+  try { sessionStorage.setItem(SPACE_KEY, JSON.stringify(value)); } catch (err) { /* privé */ }
+}
+function clearTab() {
+  try { sessionStorage.removeItem(SPACE_KEY); } catch (err) { /* privé */ }
+}
+
 export function getSpace() {
-  return read(SPACE_KEY, null);
+  return readTab() || read(SPACE_KEY, null);
 }
 
 // Espaces connus de cet appareil (un même téléphone peut être dans
@@ -33,13 +48,14 @@ function remember(space) {
 }
 
 function setSpace(space) {
+  writeTab(space);
   write(SPACE_KEY, space);
   remember(space);
 }
 
 export function switchTo(id) {
   const target = knownSpaces().find((s) => s.id === id);
-  if (target) write(SPACE_KEY, target);
+  if (target) { writeTab(target); write(SPACE_KEY, target); }
   return !!target;
 }
 
@@ -48,6 +64,7 @@ export function forgetSpace(id) {
   write(KNOWN_KEY, knownSpaces().filter((s) => s.id !== id));
   const current = getSpace();
   if (current && current.id === id) {
+    clearTab();
     try { localStorage.removeItem(SPACE_KEY); } catch (err) { /* privé */ }
   }
 }
@@ -55,6 +72,7 @@ export function forgetSpace(id) {
 export function leaveSpace() {
   const current = getSpace();
   if (current) write(KNOWN_KEY, knownSpaces().filter((s) => s.id !== current.id));
+  clearTab();
   try { localStorage.removeItem(SPACE_KEY); } catch (err) { /* idem */ }
 }
 
@@ -174,6 +192,7 @@ export async function login(email, code) {
 export async function logout() {
   await sb.auth.signOut();
   write(KNOWN_KEY, []);
+  clearTab();
   try { localStorage.removeItem(SPACE_KEY); } catch (err) { /* privé */ }
 }
 
@@ -195,6 +214,7 @@ export async function syncSpaces() {
   write(KNOWN_KEY, list.slice(0, 50));
   const current = getSpace();
   if (current && !list.some((s) => s.id === current.id)) {
+    clearTab();
     try { localStorage.removeItem(SPACE_KEY); } catch (err) { /* privé */ }
   }
   return list;
