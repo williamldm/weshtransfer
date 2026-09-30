@@ -3,7 +3,7 @@
 // mot de passe), il partage le compte de cette adresse : les mêmes espaces,
 // envois et blazes sur tous ses appareils.
 
-import { sb, q, invoke, requireClient } from "./db.js?v=119";
+import { sb, q, invoke, requireClient } from "./db.js?v=120";
 
 const SPACE_KEY = "seminaire.space";      // espace actif
 const KNOWN_KEY = "seminaire.spaces";     // tous les espaces rejoints sur cet appareil
@@ -192,7 +192,11 @@ export async function login(email, code) {
 // Se déconnecter de CET appareil : rien n'est supprimé, tout revient en se
 // reconnectant.
 export async function logout() {
-  await sb.auth.signOut();
+  // scope "local" : cet appareil seulement. Par défaut (global), supabase-js
+  // révoque les sessions de TOUS les appareils du compte : se déconnecter
+  // ici déconnectait le téléphone et l'autre ordinateur, qui retombaient sur
+  // un utilisateur anonyme en redemandant l'email.
+  await sb.auth.signOut({ scope: "local" });
   write(KNOWN_KEY, []);
   clearTab();
   try { localStorage.removeItem(SPACE_KEY); } catch (err) { /* privé */ }

@@ -35,6 +35,13 @@ for p in code:
         if any(c in line for c in curly):
             problems.append(f"{p.relative_to(root)}:{i} : guillemet typographique")
 
+# 5. signOut() sans portee : supabase-js deconnecte alors TOUS les appareils
+#    du compte (global par defaut). Toujours preciser { scope: "local" }.
+for p in root.joinpath("js").rglob("*.js"):
+    for i, line in enumerate(p.read_text(encoding="utf-8").splitlines(), 1):
+        if re.search(r"\.signOut\(\s*(\{\s*\})?\s*\)", line):
+            problems.append(f"{p.relative_to(root)}:{i} : signOut() sans scope (global par defaut) -> signOut({{ scope: \"local\" }})")
+
 for msg in problems:
     print("ECHEC  " + msg)
 print(f"{len(front)} fichiers front, {len(code)} fichiers de code, version assets : v{','.join(versions) or '?'}")

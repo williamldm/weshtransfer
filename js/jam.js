@@ -4,10 +4,10 @@
 // qui peuvent se caler dessus. Rien en base : des messages broadcast sur
 // le canal temps réel de l'espace, qui vivent tant que l'appli est ouverte.
 
-import { listProjects, signFiles } from "./api.js?v=119";
-import { isAudio, canPreview } from "./files.js?v=119";
-import { onPlayer, state, play, toggle, seekSeconds, queueInfo, refreshQueue, trackFromFile } from "./player.js?v=119";
-import { sendJam } from "./realtime.js?v=119";
+import { listProjects, signFiles } from "./api.js?v=120";
+import { isAudio, canPreview } from "./files.js?v=120";
+import { onPlayer, state, play, toggle, seekSeconds, queueInfo, refreshQueue, trackFromFile } from "./player.js?v=120";
+import { sendJam } from "./realtime.js?v=120";
 
 export const JAM_DAYS = 5;
 const HEARTBEAT = 4000;

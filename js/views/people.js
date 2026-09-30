@@ -1,9 +1,9 @@
 // Feuille "Participants" : qui est là, inviter, réglages du host.
 
-import { shareInviteLink, listParticipants, updateSpace, deleteSpace, inviteByEmail, listInvites, deleteInvite, listContacts, suggestContacts, senderEmail, rememberContactsLocal } from "../api.js?v=119";
-import { icon } from "../icons.js?v=119";
-import { esc, h, openSheet, avatar, shareLink, copyText, toast, errorText, formatDate, confirmSheet, canShare, promptSheet } from "../ui.js?v=119";
-import { leaveSpace, knownSpaces, switchTo, forgetSpace, renameMe, accountEmail, logout } from "../session.js?v=119";
+import { shareInviteLink, listParticipants, updateSpace, deleteSpace, inviteByEmail, listInvites, deleteInvite, listContacts, suggestContacts, senderEmail, rememberContactsLocal } from "../api.js?v=120";
+import { icon } from "../icons.js?v=120";
+import { esc, h, openSheet, avatar, shareLink, copyText, toast, errorText, formatDate, confirmSheet, canShare, promptSheet } from "../ui.js?v=120";
+import { leaveSpace, knownSpaces, switchTo, forgetSpace, renameMe, accountEmail, logout } from "../session.js?v=120";
 
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
@@ -11,14 +11,16 @@ export function inviteUrl(code) {
   return location.origin + "/c/" + encodeURIComponent(code);
 }
 
-// Lien de partage (WhatsApp, SMS...) d'un espace sur invitation : ouvert,
-// mais chacun vérifie son email avant d'entrer. L'hôte seul le gère.
+// Lien de partage (WhatsApp, SMS...) d'un espace sur invitation : qui
+// l'ouvre entre directement en écoute seule, sans blaze ni email. L'hôte et
+// tous les artistes le lisent et en créent un ; le renouveler ou le couper
+// (ce qui invalide le lien déjà partagé) reste à l'hôte.
 export async function openShareSheet(ctx) {
   const s = ctx.space;
   const what = s.mode === "revue" ? "ton verdict" : "ton séminaire";
   const body = h(
     '<div class="share-link">' +
-      '<p class="muted">Un lien court à coller sur WhatsApp ou par SMS : qui l\'ouvre choisit un blaze et entre dans ' + what + " en écoute seule (écouter, télécharger), sans rien pouvoir modifier. Pour qu\'un artiste donne ses retours, invite-le par email.</p>" +
+      '<p class="muted">Un lien court à coller sur WhatsApp ou par SMS : qui l\'ouvre entre directement dans ' + what + " en écoute seule (écouter, télécharger), sans blaze à choisir ni rien pouvoir modifier. Pour qu\'un artiste donne ses retours, invite-le par email.</p>" +
       '<div data-share-box><div class="skeleton"></div></div>' +
     "</div>"
   );
@@ -27,8 +29,8 @@ export async function openShareSheet(ctx) {
   const msg = () => (s.mode === "revue" ? "Écoute mes mix et donne ton verdict : " : "Rejoins le séminaire : ");
   function draw(r) {
     if (!r.url) {
-      box.innerHTML = '<p class="muted">' + (s.isHost ? "Lien coupé : plus personne ne peut entrer avec." : "Pas de lien de partage pour l'instant : demande à l'ingé d'en créer un.") + "</p>" +
-        (s.isHost ? '<button class="btn btn-primary btn-block" data-renew>' + icon("link", 18) + " Créer un lien</button>" : "");
+      box.innerHTML = '<p class="muted">' + (s.isHost ? "Lien coupé : plus personne ne peut entrer avec." : "Pas de lien de partage pour l'instant.") + "</p>" +
+        '<button class="btn btn-primary btn-block" data-create>' + icon("link", 18) + " Créer un lien</button>";
       return;
     }
     const wa = "https://wa.me/?text=" + encodeURIComponent(msg() + r.url);
@@ -52,6 +54,8 @@ export async function openShareSheet(ctx) {
     catch (err) { box.innerHTML = '<p class="form-error">' + esc(errorText(err)) + "</p>"; }
   }
   box.addEventListener("click", async (e) => {
+    // pas de lien en cours : le serveur en crée un, pour l'hôte comme pour un artiste
+    if (e.target.closest("[data-create]")) { load(); return; }
     if (e.target.closest("[data-renew]")) {
       const had = box.querySelector("[data-url]");
       if (had && !await confirmSheet("L'ancien lien ne marchera plus. Ceux qui sont déjà entrés restent.", { ok: "Nouveau lien", title: "Nouveau lien" })) return;

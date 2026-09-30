@@ -178,7 +178,13 @@ serveur, échangé par `verifyOtp`, jamais envoyé par email). Un appareil
 qui avait déjà des espaces sans compte les apporte au compte
 (`merge_users`). Créer ou rejoindre un espace demande l'email ; accepter
 une invitation connecte au compte de l'adresse invitée. "Mes espaces" est
-lu sur le serveur ; "Se déconnecter de cet appareil" ne supprime rien.
+lu sur le serveur ; "Se déconnecter de cet appareil" ne supprime rien et ne
+coupe que cet appareil (`signOut({ scope: "local" })` : le défaut de
+supabase-js est `global` et déconnecterait tous les appareils du compte,
+qui retomberaient sur un utilisateur anonyme ; `tools/check.py` refuse un
+`signOut()` sans scope). La liste locale des emails vérifiés
+(`seminaire.verifiedEmails`) est tenue par session : le serveur range la
+vérification sous l'utilisateur de la session, pas de l'appareil.
 
 ### Entrée sur invitation (salons et retours)
 
@@ -193,6 +199,14 @@ sur un nouvel appareil, la même personne revérifie et reprend sa place
 (même blaze). L'hôte peut repasser en "entrée avec le code". Codes :
 `_shared/codes.ts` (mêmes limites que la vérification de l'expéditeur).
 Edge Function `invite`, table `space_invites`.
+
+**Lien de partage** (WhatsApp, SMS) : un seul lien ouvert par espace
+(`space_invites.email` vide, jeton lisible par les membres). Qui l'ouvre
+entre en **écoute seule** (`participants.viewer`), sans email, code ni blaze
+à choisir : l'appli lui donne "Invité 4821" (ou son blaze habituel). L'hôte
+et tous les artistes (membres qui ne sont pas en écoute seule) lisent le lien
+et en créent un quand il n'y en a plus ; le renouveler ou le couper, ce qui
+invalide le lien déjà partagé, reste à l'hôte.
 
 ### Email à l'ingé son (retours de mix)
 

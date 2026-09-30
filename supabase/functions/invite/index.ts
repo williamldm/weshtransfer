@@ -4,9 +4,9 @@
 // POST { action: "info", token }         -> espace, adresse masquée, déjà vérifié ?
 // POST { action: "send-code", token }    -> code à 6 chiffres envoyé à l'adresse invitée
 // POST { action: "accept", token, code?, pseudo }  -> entre dans l'espace
-// POST { action: "link", space_id, renew?, off? }  (host) -> lien de partage
-//   ouvert (WhatsApp...) : sans adresse, l'invité donne la sienne et la
-//   vérifie ; send-code et accept prennent alors { email } en plus.
+// POST { action: "link", space_id, renew?, off? }  (host ; artistes : lire et
+//   créer, pas renew ni off) -> lien de partage ouvert (WhatsApp...) : sans
+//   adresse ni code, qui l'ouvre entre en écoute seule (voir accept).
 //
 // Le lien porte un jeton de 128 bits (seul son sha256 est stocké). Il ne
 // suffit pas : il faut aussi le code reçu à l'adresse invitée, sauf sur un
@@ -157,8 +157,9 @@ Deno.serve(async (req) => {
     const spaceId = String(body.space_id ?? "");
     const { data: me } = await db.from("participants").select("id, is_host, viewer")
       .eq("space_id", spaceId).eq("user_id", uid).maybeSingle();
-    // lire le lien : hôte ou artiste (pas l'écoute seule) ;
-    // le créer, le renouveler ou le couper : l'hôte seul
+    // lire le lien, et en créer un quand il n'y en a pas (ou plus) : l'hôte
+    // et tous les artistes (pas l'écoute seule) ; le renouveler ou le
+    // couper, ce qui invalide un lien déjà partagé : l'hôte seul
     if (!me || me.viewer) return json({ error: "SEUL_LE_HOST" }, 403);
     if ((body.renew || body.off) && !me.is_host) return json({ error: "SEUL_LE_HOST" }, 403);
     const { data: space } = await db.from("spaces").select("id, mode, purge_at").eq("id", spaceId).maybeSingle();
@@ -175,10 +176,8 @@ Deno.serve(async (req) => {
     if (alive && !body.renew) {
       return json({ url: linkOf(site, current.open_token), expires_at: current.expires_at, uses: current.uses, max_uses: current.max_uses });
     }
-    // pas de lien en cours : seul l'hôte en crée un (un artiste ne rouvre pas
-    // un lien que l'hôte a coupé)
-    if (!me.is_host) return json({ url: null, host_only: true });
-    // nouveau lien : l'ancien ne marche plus
+    // pas de lien en cours (jamais créé, coupé, expiré ou plein) : l'hôte
+    // comme les artistes en créent un
     if (current) await db.from("space_invites").delete().eq("id", current.id);
     const until = Date.now() + INVITE_DAYS * 86400e3;
     const expires = new Date(space.purge_at ? Math.min(until, new Date(space.purge_at).getTime()) : until).toISOString();
@@ -187,7 +186,18 @@ Deno.serve(async (req) => {
       space_id: spaceId, email: null, token_hash: await sha256(token), open_token: token, invited_by: me.id, invited_user: uid,
       created_at: new Date().toISOString(), expires_at: expires, max_uses: OPEN_MAX_USES, uses: 0,
     });
-    if (error) return json({ error: "ERREUR_BASE", detail: error.message }, 500);
+    if (error) {
+      // deux artistes ont cliqué en même temps : un seul lien ouvert par
+      // espace (index unique), on rend celui qui vient d'être créé
+      if (error.code === "23505") {
+        const { data: other } = await db.from("space_invites").select("open_token, expires_at, uses, max_uses")
+          .eq("space_id", spaceId).is("email", null).maybeSingle();
+        if (other && other.open_token) {
+          return json({ url: linkOf(site, other.open_token), expires_at: other.expires_at, uses: other.uses, max_uses: other.max_uses });
+        }
+      }
+      return json({ error: "ERREUR_BASE", detail: error.message }, 500);
+    }
     return json({ url: linkOf(site, token), expires_at: expires, uses: 0, max_uses: OPEN_MAX_USES });
   }
 
