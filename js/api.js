@@ -1,7 +1,7 @@
 // Accès aux données. Toutes les requêtes de l'appli passent par ici : les
 // vues ne connaissent ni PostgREST ni le Storage.
 
-import { sb, q, invoke, requireClient } from "./db.js?v=118";
+import { sb, q, invoke, requireClient } from "./db.js?v=119";
 
 // Toute requête passe par ici : sans config, message clair plutôt
 // qu'un "Cannot read properties of null".
@@ -293,16 +293,40 @@ export function sendTransfer(transferId, retry) {
 // Vérification de l'email de l'expéditeur (code à 6 chiffres), une fois
 // par appareil et par adresse. Le serveur fait foi ; la liste locale évite
 // juste un aller-retour.
+// Le serveur range l'adresse vérifiée sous l'utilisateur de la SESSION :
+// la liste locale est donc tenue par session ("<uid> <email>"). Après une
+// déconnexion ou une session expirée, l'appareil repart sur un nouvel
+// utilisateur anonyme pour qui rien n'est vérifié. Une liste par appareil
+// disait encore "vérifiée", la connexion partait sans code et le serveur
+// répondait "Ce n'est pas le bon code." sans qu'aucun code soit demandé.
 const VERIFIED_KEY = "seminaire.verifiedEmails";
+
+function sessionUid() {
+  try {
+    const s = JSON.parse(localStorage.getItem("seminaire.auth") || "null");
+    return (s && s.user && s.user.id) || "";
+  } catch (err) { return ""; }
+}
 
 function verifiedLocal() {
   try { return JSON.parse(localStorage.getItem(VERIFIED_KEY) || "[]"); } catch (err) { return []; }
 }
 
-function rememberVerified(email) {
-  const list = verifiedLocal().filter((e) => e !== email);
-  list.unshift(email);
+function writeVerified(list) {
   try { localStorage.setItem(VERIFIED_KEY, JSON.stringify(list.slice(0, 10))); } catch (err) { /* privé */ }
+}
+
+function rememberVerified(email) {
+  const uid = sessionUid();
+  if (!uid) return;
+  const entry = uid + " " + email;
+  writeVerified([entry].concat(verifiedLocal().filter((e) => e !== entry)));
+}
+
+// Le serveur a dit "pas vérifiée" pour cette session : la liste mentait.
+export function forgetVerified(email) {
+  const entry = sessionUid() + " " + email;
+  writeVerified(verifiedLocal().filter((e) => e !== entry));
 }
 
 export async function emailVerified(email) {
@@ -312,7 +336,8 @@ export async function emailVerified(email) {
 }
 
 export function knownVerified(email) {
-  return verifiedLocal().includes(email);
+  const uid = sessionUid();
+  return !!uid && verifiedLocal().includes(uid + " " + email);
 }
 
 export function requestEmailCode(email) {
