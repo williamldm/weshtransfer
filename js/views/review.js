@@ -15,11 +15,11 @@
 import {
   listCommentsOf, addComment, deleteComment, setCommentResolved, setCommentVerified,
   setFileApproved, updateFile, reviewFlush
-} from "../api.js?v=117";
-import { formatTime } from "../waveform.js?v=117";
-import { icon } from "../icons.js?v=117";
-import { esc, h, timeAgo, toast, errorText, plural, confirmSheet, openSheet, copyText, triggerDownload, formatBytes } from "../ui.js?v=117";
-import { enqueue, onUploads, checkFile } from "../upload.js?v=117";
+} from "../api.js?v=118";
+import { formatTime } from "../waveform.js?v=118";
+import { icon } from "../icons.js?v=118";
+import { esc, h, timeAgo, toast, errorText, plural, confirmSheet, openSheet, copyText, triggerDownload, formatBytes } from "../ui.js?v=118";
+import { enqueue, onUploads, checkFile } from "../upload.js?v=118";
 
 export const TAGS = [
   ["voix", "Voix"], ["instru", "Instru"], ["basse", "Basse"], ["batterie", "Batterie"],
@@ -439,18 +439,25 @@ export function createReview(o) {
 
   // ------------------------------------------------------------ actions
 
+  // La musique continue pendant qu'on écrit : la note garde l'instant où
+  // l'on a commencé (le repère se fige dès qu'on touche la zone de texte),
+  // pas celui où l'on appuie sur Envoyer.
+  let lockedMs = null;
+  const noteMs = () => (lockedMs != null ? lockedMs : o.currentMs());
+
   function syncTime(ms) {
     const at = o.quick && o.quick.querySelector("[data-quick-at]");
     if (at) at.textContent = formatTime((ms != null ? ms : o.currentMs()) / 1000);
     const chip = q("[data-rv-time]");
     if (!chip) return;
-    chip.querySelector("span").textContent = "à " + formatTime((ms != null ? ms : o.currentMs()) / 1000);
+    chip.querySelector("span").textContent = "à " + formatTime((lockedMs != null ? lockedMs : (ms != null ? ms : o.currentMs())) / 1000);
     chip.classList.toggle("is-on", useTime);
   }
 
   function focusComposer() {
     const ta = q("[data-rv-form] textarea");
     useTime = true;
+    lockedMs = o.currentMs();   // l'instant où on a demandé la note
     syncTime();
     ta.scrollIntoView({ behavior: "smooth", block: "center" });
     setTimeout(() => ta.focus(), 250);
@@ -613,9 +620,10 @@ export function createReview(o) {
 
     const form = q("[data-rv-form]");
     const ta = form.querySelector("textarea");
-    ta.addEventListener("focus", () => { if (o.pause) o.pause(); });
 
-    q("[data-rv-time]").onclick = () => { useTime = !useTime; syncTime(); };
+    q("[data-rv-time]").onclick = () => { useTime = !useTime; lockedMs = null; syncTime(); };
+    ta.addEventListener("focus", () => { if (useTime && lockedMs == null) { lockedMs = o.currentMs(); syncTime(); } });
+    ta.addEventListener("blur", () => { if (!ta.value.trim()) { lockedMs = null; syncTime(); } });
     q("[data-rv-tags]").addEventListener("click", (e) => {
       const b = e.target.closest("[data-tag]");
       if (!b) return;
@@ -630,8 +638,9 @@ export function createReview(o) {
       const btn = form.querySelector("[type=submit]");
       btn.disabled = true;
       try {
-        await addComment(file.id, body, useTime ? o.currentMs() : null, { tag });
+        await addComment(file.id, body, useTime ? noteMs() : null, { tag });
         ta.value = "";
+        lockedMs = null;
         tag = null;
         for (const x of el.querySelectorAll("[data-tag]")) x.classList.remove("is-on");
         filter = "open";
