@@ -3,14 +3,14 @@
 // les autres peuvent écouter avec lui en direct. Chaque son disparaît
 // 5 jours après son ajout.
 
-import { deleteProject, deleteFile } from "../api.js?v=122";
-import { mountUploads } from "./uploads.js?v=122";
-import { openUploadSheet } from "./upload-sheet.js?v=122";
-import { cover } from "./review-home.js?v=122";
-import { onJam, jamInfo, jamTracks, jamTag, reloadJam, followDj, unfollow, expiresAt, JAM_DAYS } from "../jam.js?v=122";
-import { playQueue, onPlayer, isCurrent, state as playerState, toggle, queueInfo } from "../player.js?v=122";
-import { icon } from "../icons.js?v=122";
-import { esc, plural, toast, errorText, formatDuration, actionSheet, confirmSheet, fileBadge } from "../ui.js?v=122";
+import { deleteProject, deleteFile } from "../api.js?v=123";
+import { mountUploads } from "./uploads.js?v=123";
+import { openUploadSheet } from "./upload-sheet.js?v=123";
+import { cover } from "./review-home.js?v=123";
+import { onJam, jamInfo, jamTracks, jamTag, reloadJam, followDj, unfollow, expiresAt, JAM_DAYS } from "../jam.js?v=123";
+import { playQueue, onPlayer, isCurrent, state as playerState, toggle, queueInfo } from "../player.js?v=123";
+import { icon } from "../icons.js?v=123";
+import { esc, plural, toast, errorText, formatDuration, actionSheet, confirmSheet, fileBadge } from "../ui.js?v=123";
 
 function hueOf(text) {
   let h = 0;
@@ -56,7 +56,7 @@ export async function mountJam(root, ctx) {
     '<div class="jam-live" data-live hidden></div>' +
     '<div data-uploads hidden></div>' +
     '<div data-list><ol class="tracklist"><li class="skeleton"></li><li class="skeleton"></li></ol></div>' +
-    '<a class="link-row" href="#/transfers">' + icon("mail", 18) + "<span>Envois par email et liens</span>" + icon("chevron", 18) + "</a>";
+    '<a class="link-row" href="#/transfers">' + icon("mail", 18) + "<span>Mes liens partagés</span>" + icon("chevron", 18) + "</a>";
 
   const art = root.querySelector("[data-art]");
   const meta = root.querySelector("[data-meta]");

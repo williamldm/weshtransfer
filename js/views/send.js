@@ -1,77 +1,61 @@
-// Envoi façon WeTransfer : des fichiers, des adresses, un message, et
-// chaque destinataire reçoit un lien pour écouter et télécharger, sans
-// compte ni code. Sans adresse, on obtient juste un lien à partager.
+// Envoi façon WeTransfer, par lien seul : des fichiers, un mot si on veut,
+// et un lien à partager (WhatsApp, SMS...) pour écouter et télécharger,
+// sans compte. Rien ne part par email. Un lien vit 7 jours au plus ; une
+// même connexion (IP) crée un envoi toutes les 10 minutes (serveur :
+// migration 20260930000001).
 
 import {
-  getProject, getFilesByIds, createTransfer, sendTransfer, emailEnabled,
-  getTransfer, transferUrl, createProject, signFiles, cachedUrl,
-  knownVerified, listContacts, forgetContact, rememberContactsLocal, suggestContacts
-} from "../api.js?v=122";
-import { accountEmail } from "../session.js?v=122";
-import { ensureVerified } from "../verify.js?v=122";
-import { openUploadSheet } from "./upload-sheet.js?v=122";
-import { mountUploads } from "./uploads.js?v=122";
-import { onUploads, enqueue, checkFile, getJobs } from "../upload.js?v=122";
-import { categoryOf, canPreview, FILE_MAX } from "../files.js?v=122";
-import { takePending } from "../pending.js?v=122";
-import { icon } from "../icons.js?v=122";
+  getProject, getFilesByIds, createTransfer, transferWaitSeconds,
+  getTransfer, transferUrl, createProject, signFiles, cachedUrl
+} from "../api.js?v=123";
+import { openUploadSheet } from "./upload-sheet.js?v=123";
+import { mountUploads } from "./uploads.js?v=123";
+import { onUploads, enqueue, checkFile, getJobs } from "../upload.js?v=123";
+import { categoryOf, canPreview, FILE_MAX } from "../files.js?v=123";
+import { takePending } from "../pending.js?v=123";
+import { icon } from "../icons.js?v=123";
 import {
-  esc, h, formatBytes, formatDuration, plural, toast, errorText, openSheet, copyText, shareLink,
+  esc, formatBytes, formatDuration, plural, toast, errorText, copyText, shareLink,
   canShare, formatDate, daysLeft, fileBadge, fileTile
-} from "../ui.js?v=122";
+} from "../ui.js?v=123";
 
 // Dans un espace "envoi", ce composeur EST l'accueil.
 export const title = (ctx) => (ctx && ctx.space.mode === "envoi" ? ctx.space.name : "Envoyer");
 
-const REPLY_KEY = "seminaire.replyTo";
-const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
-// 0 = "jusqu'au premier téléchargement" : pas de date limite, chaque
-// fichier est détruit dès qu'un destinataire l'a téléchargé en entier.
+// 0 = "jusqu'au premier téléchargement" : chaque fichier est détruit dès
+// qu'il a été téléchargé en entier, et au plus tard au bout de 7 jours.
 // Choix par défaut dès qu'il y a une archive (sessions FL Studio zippées).
-const DURATIONS = [0, 1, 3, 7, 14];
+const DURATIONS = [0, 1, 3, 7];
 const dayLabel = (d) => (d === 0 ? "1er téléchargement" : plural(d, "jour", "jours"));
 
 // Ce que coûte chaque durée à la planète (selon nos calculs, faux).
 const DAY_JOKES = {
-  0: "Sans date limite : ton fichier dort au chaud jusqu'au premier téléchargement complet, puis on le pulvérise.",
+  0: "Ton fichier dort au chaud jusqu'au premier téléchargement complet (7 jours au plus), puis on le pulvérise.",
   1: "24 h : la centrale tourne à peine, on a presque honte.",
   3: "3 jours : un plein de jet privé, sans le champagne.",
-  7: "7 jours : une semaine de serveurs au charbon. Classique.",
-  14: "14 jours : on rallume une deuxième centrale, rien que pour toi."
+  7: "7 jours : une semaine de serveurs au charbon. C'est le maximum."
 };
 
 // Le nom d'un fichier sans son extension : "Nuit blanche - mix v3"
 const baseName = (name) => String(name || "").replace(/\.[a-z0-9]{1,10}$/i, "").trim() || String(name || "");
 
-// Ton email : celui du compte connecté, sinon le dernier utilisé ici.
-function remembered() {
-  const account = accountEmail();
-  if (account) return account;
-  try { return localStorage.getItem(REPLY_KEY) || ""; } catch (err) { return ""; }
-}
-
-// Première version : carnet gardé dans le navigateur. Il vit désormais
-// sur le serveur, rattaché à l'email d'expédition : on efface l'ancien.
-try { localStorage.removeItem("seminaire.recentRecipients"); } catch (err) { /* privé */ }
+// "dans 7 min" : attente avant le prochain envoi (une IP, un envoi par 10 min)
+const waitLabel = (s) => (s >= 60 ? Math.ceil(s / 60) + " min" : s + " s");
 
 export async function mount(root, ctx, params) {
   const state = {
     files: [],          // [{ id, original_name, size_bytes, kind, version_no, label, project }]
-    emails: [],
     title: "",
-    message: "",
-    replyTo: remembered(),
     days: 7,
     daysTouched: false, // choisi à la main : on ne le change plus tout seul
     sending: false,
-    contacts: [],       // carnet de l'email d'expédition (vérifié)
-    contactsOf: ""
+    wait: 0             // secondes avant de pouvoir créer un envoi (même IP)
   };
   const tag = "send-" + Date.now();
   const envoiMode = ctx.space.mode === "envoi";
   let draft = null;   // morceau créé en coulisse pour les fichiers de cet envoi
   let waiting = 0;    // fichiers de cet envoi encore en cours d'upload
-  const maxDays = ctx.space.purgeAt ? daysLeft(ctx.space.purgeAt) : 30;
+  const maxDays = Math.min(7, ctx.space.purgeAt ? daysLeft(ctx.space.purgeAt) : 7);
 
   root.innerHTML = '<div class="skeleton tall"></div>';
 
@@ -94,13 +78,9 @@ export async function mount(root, ctx, params) {
   }
   if (!state.title && state.files[0]) state.title = state.files[0].project ? state.files[0].project.title : state.files[0].original_name;
 
-  const emailOn = await emailEnabled();
-
   // ------------------------------------------------------ rendu
-  // Façon WeTransfer : les fichiers, à qui, un mot, un bouton. Le reste
-  // (titre, durée) est replié dans "Options", l'expéditeur tient sur une
-  // ligne quand on le connaît déjà.
-  const knownFrom = !!state.replyTo;
+  // Façon WeTransfer : les fichiers, un mot, un bouton. Le reste (titre,
+  // durée) est replié dans "Options".
   root.innerHTML =
     '<form class="send-card sx" novalidate data-form>' +
       '<h1 class="sx-title">' + (envoiMode ? "Nouvel envoi" : "Envoyer des fichiers") + "</h1>" +
@@ -116,28 +96,7 @@ export async function mount(root, ctx, params) {
         "</label>" +
       "</div>" +
 
-      '<div class="sx-row">' +
-        '<div class="email-input" data-emailbox>' +
-          '<span data-chips></span>' +
-          // type="text" et non "email" : un champ email efface lui-même les
-          // espaces de fin, le séparateur tapé serait invisible. inputmode
-          // garde le clavier email sur mobile.
-          '<input type="text" inputmode="email" autocomplete="email" autocapitalize="off" spellcheck="false" ' +
-            'placeholder="Envoyer à (email)" aria-label="Destinataires" data-email>' +
-        "</div>" +
-        '<div class="recents" data-recents hidden></div>' +
-      "</div>" +
-
       '<textarea class="input sx-msg" name="message" rows="2" maxlength="2000" placeholder="Un message ? (facultatif)" aria-label="Message"></textarea>' +
-
-      '<div class="sx-from" data-from>' +
-        (knownFrom
-          ? '<span class="sx-from-line">De <strong data-from-email>' + esc(state.replyTo) + '</strong> <button type="button" class="link-btn" data-change-from>changer</button></span>'
-          : "") +
-        '<input class="input" type="email" name="reply" inputmode="email" autocomplete="email" autocapitalize="off" value="' + esc(state.replyTo) +
-          '" placeholder="Ton email" aria-label="Ton email"' + (knownFrom ? " hidden" : "") + ">" +
-        '<span class="hint" data-reply-hint></span>' +
-      "</div>" +
 
       '<details class="sx-more">' +
         '<summary>Options <span class="muted" data-more-sum></span></summary>' +
@@ -150,7 +109,7 @@ export async function mount(root, ctx, params) {
       "</details>" +
 
       '<button class="btn btn-primary btn-block btn-xl" type="submit" data-submit></button>' +
-      (emailOn ? "" : '<p class="hint center">' + icon("link", 14) + " Tu obtiens un lien à partager.</p>") +
+      '<p class="hint center" data-wait>' + icon("link", 14) + " Tu obtiens un lien à partager, valable 7 jours au plus.</p>" +
     "</form>" +
     (envoiMode
       ? '<a class="link-row sx-history" href="#/transfers">' + icon("mail", 18) + "<span>Mes envois</span>" + icon("chevron", 18) + "</a>"
@@ -159,29 +118,13 @@ export async function mount(root, ctx, params) {
   const form = root.querySelector("[data-form]");
   const titleInput = form.querySelector("[name=title]");
   const messageInput = form.querySelector("[name=message]");
-  const replyInput = form.querySelector("[name=reply]");
   const filesEl = root.querySelector("[data-files]");
   const totalEl = root.querySelector("[data-total]");
-  const chipsEl = root.querySelector("[data-chips]");
-  const emailEl = root.querySelector("[data-email]");
-  const recentsEl = root.querySelector("[data-recents]");
   const submitEl = root.querySelector("[data-submit]");
   const pendingEl = root.querySelector("[data-pending]");
-  const replyHint = root.querySelector("[data-reply-hint]");
-  const waybillEl = null;   // bordereau retiré : la page reste simple
+  const waitEl = root.querySelector("[data-wait]");
   const moreSum = root.querySelector("[data-more-sum]");
   const addLabel = root.querySelector("[data-add-label]");
-
-  // "De ... changer" : le champ réapparaît pour taper une autre adresse
-  const changeFrom = root.querySelector("[data-change-from]");
-  if (changeFrom) {
-    changeFrom.onclick = () => {
-      changeFrom.closest(".sx-from-line").hidden = true;
-      replyInput.hidden = false;
-      replyInput.focus();
-      replyInput.select();
-    };
-  }
   const dayJoke = root.querySelector("[data-day-joke]");
   function drawMoreSum() {
     moreSum.textContent = state.days === 0 ? "· jusqu'au 1er téléchargement" : "· " + plural(state.days, "jour", "jours") + " de charbon";
@@ -201,75 +144,17 @@ export async function mount(root, ctx, params) {
     const more = names.length - 1;
     titleInput.value = baseName(names[0]) + (more ? " + " + more + (more > 1 ? " autres" : " autre") : "");
   }
-  const shipNo = "WT-" + Math.random().toString(36).slice(2, 6).toUpperCase();
-
-  // Bordereau d'expédition : le récapitulatif de l'envoi, en direct, façon
-  // ticket de fret. Le CO2 est une pure blague (la même que sur l'accueil).
   // une archive dans l'envoi : "jusqu'au premier téléchargement" par défaut
   function autoDays() {
     if (state.daysTouched) return;
     const names = state.files.map((f) => f.original_name)
       .concat(getJobs().filter((j) => j.meta.tag === tag && j.state !== "error" && j.state !== "canceled").map((j) => j.name));
-    const want = names.some((n) => categoryOf(n) === "archive") ? 0 : (DURATIONS.filter((d) => d > 0 && d <= Math.min(7, maxDays)).pop() || 1);
+    const want = names.some((n) => categoryOf(n) === "archive") ? 0 : (DURATIONS.filter((d) => d > 0 && d <= maxDays).pop() || 1);
     if (want === state.days) return;
     state.days = want;
     for (const b of root.querySelectorAll("[data-d]")) b.classList.toggle("is-on", Number(b.dataset.d) === want);
     if (moreSum) drawMoreSum();
   }
-
-  function drawWaybill() {
-    autoDays();
-    if (!waybillEl) return;
-    const n = state.files.length;
-    const bytes = state.files.reduce((s, f) => s + (f.size_bytes || 0), 0);
-    const to = state.emails.filter((e) => EMAIL_RE.test(e)).length;
-    const until = new Date(Date.now() + state.days * 86400e3).toISOString();
-    const kg = n ? Math.max(0.4, (bytes / 1073741824) * 38 * Math.max(1, to) + 0.4 * Math.max(1, to)) : 0;
-    const rows = [
-      ["Colis", n ? plural(n, "fichier", "fichiers") + " · " + formatBytes(bytes) : "vide pour l'instant"],
-      ["Destinataires", to ? plural(to, "adresse", "adresses") : "un lien à partager"],
-      ["Transport", "jet privé, vol direct"],
-      ["Conservation", state.days === 0 ? "jusqu'au 1er téléchargement complet, puis destruction" : plural(state.days, "jour", "jours") + ", jusqu'au " + formatDate(until)],
-      ["CO₂ estimé", n ? kg.toFixed(1).replace(".", ",") + " kg*" : "en attente du colis"]
-    ];
-    waybillEl.innerHTML =
-      '<div class="wb-head"><span>Bordereau d\'expédition</span><span>N° ' + shipNo + "</span></div>" +
-      "<dl>" + rows.map(([k, v]) => "<dt>" + k + "</dt><dd>" + esc(v) + "</dd>").join("") + "</dl>" +
-      '<p class="wb-foot">' + (n ? "* Estimation totalement fantaisiste. Aucun jet n'a été affrété." : "Ajoute des fichiers pour lancer la chaudière.") + "</p>";
-  }
-
-  // Sous "Ton email" : vérifiée ou pas, et pourquoi on la demande.
-  function drawReplyHint() {
-    const v = replyInput.value.trim().toLowerCase();
-    // une seule ligne, et seulement quand elle sert à quelque chose
-    if (!emailOn || (v && knownVerified(v))) replyHint.textContent = "";
-    else if (state.emails.length) replyHint.textContent = "La première fois, un code arrive à cette adresse pour vérifier que c'est toi.";
-    else replyHint.textContent = "";
-    replyHint.hidden = !replyHint.textContent;
-  }
-  replyInput.addEventListener("input", drawReplyHint);
-
-  // Le carnet suit l'email d'expédition : chargé dès qu'une adresse valable
-  // est là (le serveur ne l'ouvre qu'à qui l'a prouvée ; sinon, la copie
-  // locale de cet appareil).
-  async function loadContacts() {
-    const sender = replyInput.value.trim().toLowerCase();
-    if (!emailOn || !EMAIL_RE.test(sender)) {
-      if (state.contactsOf) { state.contacts = []; state.contactsOf = ""; drawRecents(); }
-      return;
-    }
-    if (sender === state.contactsOf) return;
-    try {
-      const list = await listContacts(sender);
-      if (replyInput.value.trim().toLowerCase() !== sender) return;   // adresse changée entre-temps
-      state.contacts = list;
-      state.contactsOf = sender;
-      drawRecents();
-      drawReplyHint();
-    } catch (err) { /* sans carnet, on tape les adresses à la main */ }
-  }
-  let contactsTimer = null;
-  replyInput.addEventListener("input", () => { clearTimeout(contactsTimer); contactsTimer = setTimeout(loadContacts, 400); });
 
   // Si la durée par défaut dépasse la vie de l'espace, on prend la plus longue possible.
   if (state.days > maxDays) {
@@ -319,107 +204,12 @@ export async function mount(root, ctx, params) {
     drawSubmit();
   }
 
-  // Destinataires déjà utilisés : proposés sous le champ, filtrés par la saisie
-  function drawRecents() {
-    const list = suggestContacts(state.contacts, emailEl.value, state.emails);
-    recentsEl.hidden = !list.length;
-    if (!list.length) { recentsEl.innerHTML = ""; return; }
-    recentsEl.innerHTML =
-      '<span class="recents-label">' + (emailEl.value.trim() ? "Ton carnet" : "Récents") + "</span>" +
-      list.map((r) =>
-        '<span class="recent">' +
-          '<button type="button" class="recent-add" data-add="' + esc(r.email) + '">' + icon("plus", 14) + "<span>" + esc(r.email) + "</span></button>" +
-          '<button type="button" class="recent-forget" data-forget="' + esc(r.email) + '" aria-label="Oublier ' + esc(r.email) + '">' + icon("x", 12) + "</button>" +
-        "</span>").join("");
-  }
-
-  function drawChips() {
-    chipsEl.innerHTML = state.emails.map((e, i) =>
-      '<span class="email-chip' + (EMAIL_RE.test(e) ? "" : " is-bad") + '">' + esc(e) +
-      '<button type="button" data-rm="' + i + '" aria-label="Retirer ' + esc(e) + '">' + icon("x", 14) + "</button></span>").join("");
-    drawSubmit();
-    drawRecents();
-  }
-
   function drawSubmit() {
     if (waiting > 0) return drawPending();
-    const n = state.emails.length;
-    const label = n && emailOn ? "Envoyer à " + plural(n, "personne", "personnes") : "Créer le lien";
-    submitEl.innerHTML = icon(n && emailOn ? "send" : "link", 22) + "<span>" + label + "</span>";
-    submitEl.disabled = state.sending || !state.files.length;
-    if (replyHint) drawReplyHint();
-    if (waybillEl) drawWaybill();
+    autoDays();
+    submitEl.innerHTML = icon("link", 22) + "<span>" + (state.wait > 0 ? "Prochain lien dans " + waitLabel(state.wait) : "Créer le lien") + "</span>";
+    submitEl.disabled = state.sending || !state.files.length || state.wait > 0;
   }
-
-  // ------------------------------------------- saisie des emails en pastilles
-  function commitEmails(raw) {
-    const parts = String(raw || "").split(/[\s,;]+/).map((s) => s.trim().toLowerCase()).filter(Boolean);
-    let added = 0;
-    for (const p of parts) {
-      if (!state.emails.includes(p) && state.emails.length < 20) {
-        state.emails.push(p);
-        added++;
-      }
-    }
-    if (parts.length && state.emails.length >= 20) toast("20 destinataires maximum", "err");
-    if (added) drawChips();
-  }
-
-  // Découpage sur le TEXTE saisi, pas sur les touches : les claviers
-  // Android (Gboard...) signalent chaque touche comme "Unidentified", un
-  // test sur e.key === " " n'y verrait jamais passer l'espace. Couvre
-  // aussi le collage d'une liste d'adresses.
-  emailEl.addEventListener("input", () => {
-    const value = emailEl.value;
-    if (!/[\s,;]/.test(value)) return drawRecents();
-    const parts = value.split(/[\s,;]+/);
-    const rest = /[\s,;]$/.test(value) ? "" : parts.pop();
-    commitEmails(parts.join(" "));
-    emailEl.value = rest;
-    drawRecents();
-  });
-  emailEl.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      if (emailEl.value.trim()) { const v = emailEl.value; emailEl.value = ""; commitEmails(v); drawRecents(); }
-    } else if (e.key === "Backspace" && !emailEl.value && state.emails.length) {
-      state.emails.pop();
-      drawChips();
-    }
-  });
-  emailEl.addEventListener("blur", () => {
-    if (emailEl.value.trim()) { const v = emailEl.value; emailEl.value = ""; commitEmails(v); drawRecents(); }
-  });
-  // mousedown/pointerdown sans défaut : le champ garde le focus, sinon son
-  // "blur" validerait le début tapé comme une adresse avant le clic
-  for (const type of ["mousedown", "pointerdown"]) {
-    recentsEl.addEventListener(type, (e) => { if (e.target.closest("button")) e.preventDefault(); });
-  }
-  recentsEl.addEventListener("click", (e) => {
-    const add = e.target.closest("[data-add]");
-    const forget = e.target.closest("[data-forget]");
-    if (add) {
-      emailEl.value = "";
-      commitEmails(add.dataset.add);
-      emailEl.focus();
-    } else if (forget) {
-      const email = forget.dataset.forget;
-      state.contacts = state.contacts.filter((r) => r.email !== email);
-      drawRecents();
-      forgetContact(state.contactsOf, email).catch((err) => toast(errorText(err), "err"));
-      if (!state.contacts.length) drawRecents();
-    }
-  });
-
-  root.querySelector("[data-emailbox]").addEventListener("click", (e) => {
-    const rm = e.target.closest("[data-rm]");
-    if (rm) {
-      state.emails.splice(Number(rm.dataset.rm), 1);
-      drawChips();
-      return;
-    }
-    emailEl.focus();
-  });
 
   // --------------------------------------------------------- fichiers
   filesEl.addEventListener("click", (e) => {
@@ -496,7 +286,7 @@ export async function mount(root, ctx, params) {
   const offJobs = mountUploads(pendingEl, (j) => j.meta.tag === tag && j.state !== "done");
 
   function drawPending() {
-    drawWaybill();
+    autoDays();
     submitEl.disabled = state.sending || !state.files.length;
     if (waiting > 0) submitEl.innerHTML = '<span class="spinner"></span><span>Chargement de la soute...</span>';
     else drawSubmit();
@@ -532,7 +322,6 @@ export async function mount(root, ctx, params) {
     if (!b || b.disabled) return;
     state.days = Number(b.dataset.d);
     state.daysTouched = true;
-    drawWaybill();
     drawMoreSum();
     for (const x of root.querySelectorAll("[data-d]")) x.classList.toggle("is-on", x === b);
   });
@@ -540,83 +329,65 @@ export async function mount(root, ctx, params) {
   // ------------------------------------------------------- envoi
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
-    if (emailEl.value.trim()) { commitEmails(emailEl.value); emailEl.value = ""; }
-
-    const bad = state.emails.find((x) => !EMAIL_RE.test(x));
-    if (bad) return toast("Adresse invalide : " + bad, "err");
     if (!state.files.length) return toast("Ajoute au moins un fichier", "err");
     if (waiting > 0) return toast("Attends la fin des uploads en cours", "err");
+    if (state.wait > 0) return toast("Un envoi toutes les 10 minutes : prochain lien dans " + waitLabel(state.wait), "err");
 
     // sans titre : celui du morceau, sinon la date (rien à remplir en plus)
     const stamp = new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }).format(new Date());
     const title = titleInput.value.trim() || (draft && draft.title) || "Envoi du " + stamp;
 
-    let replyTo = replyInput.value.trim().toLowerCase();
-    const byMail = state.emails.length > 0 && emailOn;
-    if (replyTo && !EMAIL_RE.test(replyTo)) { replyInput.focus(); return toast("Ton email n'est pas valide", "err"); }
-    if (byMail && !replyTo) {
-      replyInput.focus();
-      return toast("Donne ton email : tes destinataires doivent savoir qui leur écrit", "err");
-    }
-    try { localStorage.setItem(REPLY_KEY, replyTo); } catch (err) { /* privé */ }
-    // les adresses tapées rejoignent le carnet de cet email, tout de suite
-    rememberContactsLocal(replyTo, state.emails.filter((e) => EMAIL_RE.test(e)));
-
     state.sending = true;
     drawSubmit();
-
-    // Rien ne part "de ta part" sans que l'adresse soit vérifiée (une fois
-    // par appareil). Pour un simple lien, on peut passer : pas d'avis de
-    // téléchargement dans ce cas.
-    if (emailOn && replyTo) {
-      submitEl.innerHTML = '<span class="spinner"></span><span>Vérification de ton email...</span>';
-      const outcome = await ensureVerified(replyTo, { optional: !byMail });
-      if (outcome === "cancel") {
-        state.sending = false;
-        drawSubmit();
-        return;
-      }
-      if (outcome === "skip") replyTo = "";
-      drawReplyHint();
-      loadContacts();
-    }
-    submitEl.innerHTML = '<span class="spinner"></span><span>' + (state.emails.length && emailOn ? "Décollage..." : "Impression du billet...") + "</span>";
+    submitEl.innerHTML = '<span class="spinner"></span><span>Impression du billet...</span>';
 
     try {
       const created = await createTransfer({
         spaceId: ctx.space.id,
         title,
         fileIds: state.files.map((f) => f.id),
-        emails: state.emails,
         message: messageInput.value,
-        replyTo,
         days: state.days || 7,
         untilDownload: state.days === 0
       });
-
-      // emails aux destinataires, et confirmation (avec le lien) à
-      // l'expéditeur, même pour un envoi par lien seul
-      let results = [];
-      if (emailOn && (state.emails.length || replyTo)) {
-        try {
-          const r = await sendTransfer(created.id);
-          results = (r && r.results) || [];
-        } catch (err) {
-          if (state.emails.length) toast("Lien créé, mais l'envoi des emails a échoué : " + errorText(err), "err");
-        }
-      }
-      showDone(root, ctx, created, { emailOn, results, title });
+      stopWait();
+      showDone(root, ctx, created, { title });
     } catch (err) {
       state.sending = false;
+      // quelqu'un d'autre sur la même connexion vient d'envoyer : on attend
+      if (/UN_ENVOI_PAR_DIX_MINUTES/.test(String(err && err.message))) checkWait();
       drawSubmit();
       toast(errorText(err), "err");
     }
   });
 
+  // Une connexion (IP), un envoi par 10 minutes : on le dit AVANT l'upload
+  // et le bouton attend tout seul. Le serveur fait foi (create_transfer).
+  let waitTimer = null;
+  function stopWait() { if (waitTimer) { clearInterval(waitTimer); waitTimer = null; } }
+  function drawWait() {
+    waitEl.innerHTML = state.wait > 0
+      ? icon("clock", 14) + " Un envoi toutes les 10 minutes par connexion : ton prochain lien dans " + esc(waitLabel(state.wait)) + ". Tes fichiers peuvent déjà charger."
+      : icon("link", 14) + " Tu obtiens un lien à partager, valable 7 jours au plus.";
+  }
+  async function checkWait() {
+    state.wait = await transferWaitSeconds();
+    drawWait();
+    drawSubmit();
+    stopWait();
+    if (state.wait <= 0) return;
+    const end = Date.now() + state.wait * 1000;
+    waitTimer = setInterval(() => {
+      state.wait = Math.max(0, Math.ceil((end - Date.now()) / 1000));
+      drawWait();
+      if (!state.sending && waiting <= 0) drawSubmit();
+      if (!state.wait) stopWait();
+    }, 1000);
+  }
+  checkWait();
+
   drawFiles();
-  drawChips();
   drawMoreSum();
-  loadContacts();
 
   // Fichiers déposés sur l'accueil : l'upload démarre tout seul ici.
   if (envoiMode) {
@@ -630,7 +401,7 @@ export async function mount(root, ctx, params) {
     }
   }
 
-  return () => { offUploads(); offJobs(); };
+  return () => { offUploads(); offJobs(); stopWait(); };
 }
 
 // ---------------------------------------------------------------- succès
@@ -639,25 +410,17 @@ export async function showDone(root, ctx, created, info) {
   const url = transferUrl(created.token);
   let transfer = null;
   try { transfer = await getTransfer(created.id); } catch (err) { /* on affiche quand même le lien */ }
-  const recipients = transfer ? transfer.transfer_recipients : [];
-
-  const sent = recipients.filter((r) => r.status === "sent").length;
   // pure blague : un "aller-retour en jet" par tranche de 50 Mo, minimum 1
   const bytes = transfer ? (transfer.transfer_files || []).reduce((s, x) => s + ((x.file && x.file.size_bytes) || 0), 0) : 0;
   const carbon = Math.max(1, Math.round(bytes / (50 * 1024 * 1024)));
-  const failed = recipients.filter((r) => r.status === "failed").length;
-  const headline = !recipients.length || !info.emailOn
-    ? "Ton lien est prêt"
-    : failed && !sent ? "Lien créé, emails non partis" : "Envoyé !";
-  const sub = !recipients.length || !info.emailOn
-    ? "Partage-le où tu veux. " + (created.until_download ? "Il s'autodétruit au premier téléchargement complet." : "Il expire le " + formatDate(created.expires_at) + ".")
-    : plural(sent, "email parti", "emails partis") + (failed ? ", " + failed + " en échec" : "") +
-      (created.until_download ? ". Autodestruction au premier téléchargement complet." : ". Disponible jusqu'au " + formatDate(created.expires_at) + ".");
+  const sub = "Partage-le où tu veux. " + (created.until_download
+    ? "Il s'autodétruit au premier téléchargement complet (et au plus tard le " + formatDate(created.expires_at) + ")."
+    : "Il expire le " + formatDate(created.expires_at) + ".");
 
   root.innerHTML =
     '<div class="done">' +
-      '<div class="done-icon">' + icon(failed && !sent && info.emailOn && recipients.length ? "alert" : "check", 40) + "</div>" +
-      "<h1>" + esc(headline) + "</h1>" +
+      '<div class="done-icon">' + icon("check", 40) + "</div>" +
+      "<h1>Ton lien est prêt</h1>" +
       '<p class="muted">' + esc(sub) + "</p>" +
       '<p class="carbon">' + icon("sparkle", 14) + " Bilan carbone : " + plural(carbon, "aller-retour", "allers-retours") + " Paris-Dubaï en jet privé.</p>" +
 
@@ -668,24 +431,6 @@ export async function showDone(root, ctx, created, info) {
           (canShare() ? '<button class="btn btn-primary btn-block" data-share>' + icon("share", 18) + "<span>Partager</span></button>" : "") +
         "</div>" +
       "</div>" +
-
-      (recipients.length
-        ? '<div class="section-head"><h2>Destinataires</h2></div><ul class="recipients">' +
-          recipients.map((r) => {
-            const personal = transferUrl(r.token);
-            const status = !info.emailOn ? "" : r.status === "sent"
-              ? '<span class="st st-ok">' + icon("check", 14) + " envoyé</span>"
-              : r.status === "failed" ? '<span class="st st-bad">échec</span>' : '<span class="st">en attente</span>';
-            const mailto = "mailto:" + encodeURIComponent(r.email) +
-              "?subject=" + encodeURIComponent(ctx.space.pseudo + " t'a envoyé : " + info.title) +
-              "&body=" + encodeURIComponent("Écoute et télécharge ici :\n" + personal + (created.until_download ? "\n\nAttention : le fichier s'autodétruit au premier téléchargement complet." : "\n\nDisponible jusqu'au " + formatDate(created.expires_at) + "."));
-            return "<li><span class=\"r-mail\">" + esc(r.email) + "</span>" + status +
-              (!info.emailOn || r.status === "failed"
-                ? '<a class="btn btn-sm" href="' + esc(mailto) + '">' + icon("mail", 16) + " Écrire</a>"
-                : "") +
-            "</li>";
-          }).join("") + "</ul>"
-        : "") +
 
       '<div class="row-2 done-actions">' +
         '<a class="btn btn-block" href="#/transfers">Mes envois</a>' +
@@ -707,6 +452,3 @@ export async function showDone(root, ctx, created, info) {
   };
   window.scrollTo(0, 0);
 }
-
-// réexport : d'autres vues l'importaient d'ici
-export { ensureVerified };

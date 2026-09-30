@@ -1,30 +1,30 @@
 // Historique des envois de l'espace : qui a reçu quoi, qui a ouvert,
 // qui a téléchargé. Mis à jour en direct.
 
-import { listTransfers, listMyTransfers, revokeTransfer, deleteTransfer, sendTransfer, transferUrl, emailEnabled, deleteFile, listTransferRefs } from "../api.js?v=122";
-import { icon } from "../icons.js?v=122";
+import { listTransfers, listMyTransfers, revokeTransfer, deleteTransfer, transferUrl, deleteFile, listTransferRefs } from "../api.js?v=123";
+import { icon } from "../icons.js?v=123";
 import {
   esc, formatBytes, plural, timeAgo, formatDate, daysLeft, toast, errorText, copyText, shareLink,
   canShare, confirmSheet, actionSheet
-} from "../ui.js?v=122";
+} from "../ui.js?v=123";
 
 export const title = () => "Envois";
 
-function recipientState(r, emailOn) {
+// Anciens envois par email seulement (les envois se font par lien seul)
+function recipientState(r) {
   if (r.first_download_at) return '<span class="st st-ok">' + icon("download", 13) + " téléchargé</span>";
   if (r.first_opened_at) return '<span class="st st-info">' + icon("eye", 13) + " ouvert</span>";
-  if (!emailOn) return '<span class="st">lien personnel</span>';
   if (r.status === "sent") return '<span class="st">' + icon("check", 13) + " envoyé</span>";
   if (r.status === "failed") return '<span class="st st-bad" title="' + esc(r.error || "") + '">échec</span>';
   return '<span class="st">en attente</span>';
 }
 
 // me : ma place dans l'espace, ou l'ensemble de mes places (tous espaces)
-export function renderTransfers(list, me, isHost, emailOn, hereId) {
+export function renderTransfers(list, me, isHost, hereId) {
   const isMine = (id) => (me instanceof Set ? me.has(id) : id === me);
   if (!list.length) {
     return '<div class="empty-state">' + icon("send", 34) +
-      "<p><strong>Aucun envoi pour l'instant.</strong><br>Envoie un son par email ou crée un lien à partager.</p>" +
+      "<p><strong>Aucun envoi pour l'instant.</strong><br>Crée un lien à partager, valable 7 jours.</p>" +
       '<a class="btn btn-primary" href="#/send">' + icon("send", 18) + " Nouvel envoi</a></div>";
   }
   return list.map((t) => {
@@ -38,7 +38,6 @@ export function renderTransfers(list, me, isHost, emailOn, hereId) {
     // envoi parti d'un autre espace (liste "Mes envois" du compte)
     const from = hereId && t.space_id && t.space_id !== hereId && t.space ? " · depuis " + t.space.name : "";
     const recips = t.transfer_recipients || [];
-    const failed = recips.filter((r) => r.status === "failed").length;
 
     return '<article class="transfer' + (expired ? " is-expired" : "") + '" data-id="' + t.id + '">' +
       '<div class="tr-head">' +
@@ -54,13 +53,12 @@ export function renderTransfers(list, me, isHost, emailOn, hereId) {
       (t.message ? '<p class="tr-msg">' + esc(t.message) + "</p>" : "") +
       (recips.length
         ? '<ul class="tr-recips">' + recips.map((r) =>
-            "<li><span class=\"r-mail\">" + esc(r.email) + "</span>" + recipientState(r, emailOn) + "</li>").join("") + "</ul>"
-        : '<p class="muted small">Lien partagé, sans destinataire email.</p>') +
+            "<li><span class=\"r-mail\">" + esc(r.email) + "</span>" + recipientState(r) + "</li>").join("") + "</ul>"
+        : "") +
       (expired ? "" :
         '<div class="tr-actions">' +
           '<button class="btn btn-sm" data-copy>' + icon("copy", 16) + " Lien</button>" +
           (canShare() ? '<button class="btn btn-sm" data-share>' + icon("share", 16) + " Partager</button>" : "") +
-          (mine && failed && emailOn ? '<button class="btn btn-sm" data-retry>' + icon("retry", 16) + " Renvoyer</button>" : "") +
           (mine || isHost ? '<button class="btn btn-ghost btn-icon btn-sm" data-more aria-label="Plus">' + icon("more", 18) + "</button>" : "") +
         "</div>") +
       (expired && (mine || isHost) ? '<div class="tr-actions"><button class="btn btn-ghost btn-sm" data-delete>' + icon("trash", 16) + " Supprimer</button></div>" : "") +
@@ -70,7 +68,6 @@ export function renderTransfers(list, me, isHost, emailOn, hereId) {
 
 export async function mount(root, ctx) {
   let list = [];
-  const emailOn = await emailEnabled();
 
   // Espace Envois (personnel) : tous mes envois, de tous mes espaces.
   // Séminaire : les envois de l'espace, de tout le groupe.
@@ -78,8 +75,8 @@ export async function mount(root, ctx) {
   root.innerHTML =
     '<header class="page-head">' + (personal ? "" : '<div class="eyebrow">Espace ' + esc(ctx.space.name) + "</div>") + "<h1>" + (personal ? "Mes envois" : "Envois") + "</h1>" +
     '<div class="meta">' + (personal
-      ? "Tout ce que tu as envoyé, avec qui a ouvert et téléchargé."
-      : "Liens et emails envoyés depuis l\'espace, avec qui a ouvert et téléchargé.") + "</div></header>" +
+      ? "Tout ce que tu as envoyé, et combien de fois c'est téléchargé."
+      : "Liens partagés depuis l\'espace, et combien de fois c'est téléchargé.") + "</div></header>" +
     '<a class="btn btn-primary btn-block" href="#/send">' + icon("send", 18) + " Nouvel envoi</a>" +
     '<div class="transfers" data-list><div class="skeleton"></div></div>';
 
@@ -90,10 +87,10 @@ export async function mount(root, ctx) {
       if (personal) {
         const r = await listMyTransfers();
         list = r.list;
-        el.innerHTML = renderTransfers(list, r.mine, false, emailOn, ctx.space.id);
+        el.innerHTML = renderTransfers(list, r.mine, false, ctx.space.id);
       } else {
         list = await listTransfers(ctx.space.id);
-        el.innerHTML = renderTransfers(list, ctx.space.participantId, ctx.space.isHost, emailOn);
+        el.innerHTML = renderTransfers(list, ctx.space.participantId, ctx.space.isHost);
       }
     } catch (err) {
       el.innerHTML = '<p class="empty">' + esc(errorText(err)) + "</p>";
@@ -111,13 +108,6 @@ export async function mount(root, ctx) {
       toast(await copyText(url) ? "Lien copié" : "Copie impossible", "ok");
     } else if (e.target.closest("[data-share]")) {
       shareLink({ title: t.title, text: t.title, url });
-    } else if (e.target.closest("[data-retry]")) {
-      try {
-        const r = await sendTransfer(t.id, true);
-        const ok = ((r && r.results) || []).filter((x) => x.status === "sent").length;
-        toast(ok ? plural(ok, "email renvoyé", "emails renvoyés") : "Nouvel échec d'envoi", ok ? "ok" : "err");
-        load();
-      } catch (err) { toast(errorText(err), "err"); }
     } else if (e.target.closest("[data-delete]")) {
       removeTransfer(t);
     } else if (e.target.closest("[data-more]")) {
@@ -129,7 +119,7 @@ export async function mount(root, ctx) {
         {
           label: "Désactiver le lien maintenant", icon: "lock",
           run: async () => {
-            const ok = await confirmSheet("Plus personne ne pourra ouvrir cet envoi, y compris les destinataires email.", { ok: "Désactiver", danger: true });
+            const ok = await confirmSheet("Plus personne ne pourra ouvrir cet envoi avec le lien.", { ok: "Désactiver", danger: true });
             if (!ok) return;
             try { await revokeTransfer(t.id); toast("Lien désactivé", "ok"); load(); }
             catch (err) { toast(errorText(err), "err"); }

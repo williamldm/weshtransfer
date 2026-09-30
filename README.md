@@ -54,8 +54,16 @@ Réglages du bucket (posés par l'API `b2_update_bucket`) :
 
 ## Fonctionnement
 
-- **Entrée** : code d'espace + blaze. Chaque appareil reçoit un utilisateur
+- **Entrée** : code d'espace. Chaque appareil reçoit un utilisateur
   anonyme Supabase ; `join_space()` vérifie le code. Le premier arrivé est host.
+- **Blaze** : UN par personne, demandé une seule fois (la première fois qu'on
+  envoie, crée ou rejoint un espace), puis utilisé partout. Appareil :
+  `localStorage` `seminaire.pseudo` ; connecté : celui qu'on porte le plus
+  dans les espaces du compte, et les espaces restés sous un autre nom s'y
+  alignent à la synchro ("Envois de ..." compris). On le corrige à un seul
+  endroit ("Mes espaces" > modifier, ou "Changer" dans Participants) et ça le
+  change dans tous ses espaces (`setBlaze()`, `js/session.js`). Déjà porté
+  par quelqu'un d'autre dans un espace : on y entre sous "William 2".
 - **Morceaux et versions** : chaque upload est une version (`v1`, `v2`...) d'un
   morceau, typée (instru, voix, freestyle, mix, stems) avec BPM / tonalité.
   Type, BPM et titre sont devinés depuis le nom du fichier.
@@ -63,11 +71,14 @@ Réglages du bucket (posés par l'API `b2_update_bucket`) :
   parallèle, waveform calculée pendant l'envoi, écran maintenu allumé.
 - **Écoute** : lecteur global qui survit à la navigation, contrôles écran
   verrouillé, commentaires ancrés dans le temps et marqués sur la waveform.
-- **Envoi façon WeTransfer** : sélection de fichiers + adresses email +
-  message. Chaque destinataire reçoit un lien personnel vers `t.html` : écoute,
-  téléchargement fichier par fichier ou tout en zip, sans compte. L'expéditeur
-  voit qui a ouvert et téléchargé, et reçoit un email au premier téléchargement.
-  Sans email configuré, l'appli fournit le lien à partager (WhatsApp, SMS...).
+- **Envoi façon WeTransfer, par lien seul** : des fichiers, un message si on
+  veut, et un lien à partager (WhatsApp, SMS...) vers `t.html` : écoute,
+  téléchargement fichier par fichier ou tout en zip, sans compte. Ni compte ni
+  email pour envoyer, et rien ne part par email (ni aux destinataires, ni à
+  l'expéditeur). Un lien vit 7 jours au plus ("jusqu'au premier
+  téléchargement" compris) ; une même IP crée un envoi toutes les 10 minutes
+  (`create_transfer`, `transfer_wait_seconds()` : l'appli prévient avant
+  l'upload). Migration `20260930000001_seminar_link_only.sql`.
 - **Temps réel** : nouveaux sons, commentaires, statuts d'envoi, présence.
 - **Purge** : à `purge_at`, fichiers puis données de l'espace sont supprimés.
 

@@ -62,6 +62,20 @@ function mask(email: string): string {
 }
 
 const what = (mode: string) => (mode === "revue" ? "le verdict" : "le séminaire");
+
+// Un seul blaze par personne, jamais redemandé : s'il est déjà porté par
+// quelqu'un d'autre dans cet espace, on entre sous "William 2" (3, 4...).
+// deno-lint-ignore no-explicit-any
+async function insertWithFreeName(db: any, row: Record<string, unknown>, base: string, cols: string) {
+  const root = base.slice(0, 21).trim();
+  let last = null;
+  for (let n = 1; n <= 9; n++) {
+    const pseudo = n === 1 ? base : `${root} ${n}`;
+    last = await db.from("participants").insert({ ...row, pseudo }).select(cols).single();
+    if (!last.error || last.error.code !== "23505") return last;
+  }
+  return last;
+}
 const OPEN_MAX_USES = 25;
 const linkOf = (site: string, token: string) => (shortLinks() ? `${site}/i/${token}` : `${site}/index.html?i=${token}`);
 
@@ -274,9 +288,8 @@ Deno.serve(async (req) => {
       const { count } = await db.from("participants").select("id", { count: "exact", head: true }).eq("space_id", space.id);
       if ((count ?? 0) >= 200) return json({ error: "ESPACE_PLEIN" }, 409);
       if (!(await db.rpc("use_open_invite", { p_invite: invite.id })).data) return json({ error: "INVITATION_PLEINE" }, 410);
-      const { data: created, error } = await db.from("participants")
-        .insert({ space_id: space.id, user_id: uid, pseudo, is_host: false, viewer: true })
-        .select("id, pseudo, viewer").single();
+      const { data: created, error } = await insertWithFreeName(db,
+        { space_id: space.id, user_id: uid, is_host: false, viewer: true }, pseudo, "id, pseudo, viewer");
       if (error) return json({ error: error.code === "23505" ? "PSEUDO_PRIS" : "ERREUR_BASE", detail: error.message }, 409);
       participant = created;
     }
@@ -323,9 +336,8 @@ Deno.serve(async (req) => {
       if (pseudo.length < 2 || pseudo.length > 24) return json({ error: "PSEUDO_INVALIDE" }, 400);
       const { count } = await db.from("participants").select("id", { count: "exact", head: true }).eq("space_id", space.id);
       if ((count ?? 0) >= 200) return json({ error: "ESPACE_PLEIN" }, 409);
-      const { data: created, error } = await db.from("participants")
-        .insert({ space_id: space.id, user_id: owner, pseudo, is_host: false })
-        .select("id, pseudo").single();
+      const { data: created, error } = await insertWithFreeName(db,
+        { space_id: space.id, user_id: owner, is_host: false }, pseudo, "id, pseudo");
       if (error) return json({ error: error.code === "23505" ? "PSEUDO_PRIS" : "ERREUR_BASE", detail: error.message }, 409);
       participant = created;
     }

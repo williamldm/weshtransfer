@@ -1,7 +1,7 @@
 // Accès aux données. Toutes les requêtes de l'appli passent par ici : les
 // vues ne connaissent ni PostgREST ni le Storage.
 
-import { sb, q, invoke, requireClient } from "./db.js?v=122";
+import { sb, q, invoke, requireClient } from "./db.js?v=123";
 
 // Toute requête passe par ici : sans config, message clair plutôt
 // qu'un "Cannot read properties of null".
@@ -272,22 +272,31 @@ export function storageConfig() {
 
 // --------------------------------------------------------------- envois
 
+// Envoi par lien seul : ni destinataires, ni email d'expéditeur, 7 jours
+// au plus (le serveur l'impose aussi, migration 20260930000001).
 export function createTransfer(params) {
   return q(db().rpc("create_transfer", {
     p_space: params.spaceId,
     p_title: params.title,
     p_file_ids: params.fileIds,
-    p_emails: params.emails,
+    p_emails: [],
     p_message: params.message || null,
-    p_reply_to: params.replyTo || null,
-    p_days: params.days,
-    p_notify: true,
+    p_reply_to: null,
+    p_days: Math.min(7, params.days || 7),
+    p_notify: false,
     p_until_download: !!params.untilDownload
   }));
 }
 
-export function sendTransfer(transferId, retry) {
-  return invoke("send-transfer", { transfer_id: transferId, retry: !!retry });
+// Secondes avant que cette connexion (IP) puisse créer un envoi : un envoi
+// par 10 minutes. 0 si le serveur ne connaît pas encore la règle.
+export async function transferWaitSeconds() {
+  try {
+    const { data, error } = await db().rpc("transfer_wait_seconds");
+    return error ? 0 : Math.max(0, Number(data) || 0);
+  } catch (err) {
+    return 0;
+  }
 }
 
 // Vérification de l'email de l'expéditeur (code à 6 chiffres), une fois

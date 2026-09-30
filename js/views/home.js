@@ -1,16 +1,16 @@
 // Accueil de l'espace : gros boutons d'action, uploads en cours, morceaux
 // triés par activité récente.
 
-import { listProjects, createProject, listReviewComments, deleteProject, deleteFile, reviewNotifyStatus, reviewSubscribe, reviewUnsubscribe } from "../api.js?v=122";
-import { ensureVerified } from "../verify.js?v=122";
-import { mountReviewHome } from "./review-home.js?v=122";
-import { mountJam } from "./jam.js?v=122";
-import { stateOf, isEngineerOf } from "./review.js?v=122";
-import { mountUploads } from "./uploads.js?v=122";
-import { openUploadSheet } from "./upload-sheet.js?v=122";
-import { openPeopleSheet } from "./people.js?v=122";
-import { icon } from "../icons.js?v=122";
-import { esc, h, timeAgo, plural, promptSheet, toast, errorText, daysLeft, formatDate, actionSheet, confirmSheet } from "../ui.js?v=122";
+import { listProjects, createProject, listReviewComments, deleteProject, deleteFile, reviewNotifyStatus, reviewSubscribe, reviewUnsubscribe } from "../api.js?v=123";
+import { ensureVerified } from "../verify.js?v=123";
+import { mountReviewHome } from "./review-home.js?v=123";
+import { mountJam } from "./jam.js?v=123";
+import { stateOf, isEngineerOf } from "./review.js?v=123";
+import { mountUploads } from "./uploads.js?v=123";
+import { openUploadSheet } from "./upload-sheet.js?v=123";
+import { openPeopleSheet } from "./people.js?v=123";
+import { icon } from "../icons.js?v=123";
+import { esc, h, timeAgo, plural, promptSheet, toast, errorText, daysLeft, formatDate, actionSheet, confirmSheet } from "../ui.js?v=123";
 
 export const title = (ctx) => ctx.space.name;
 
@@ -105,7 +105,7 @@ export async function mount(root, ctx) {
           "</label>" +
           (review
             ? '<button class="btn btn-xl" data-invite>' + icon("share", 22) + "<span>Inviter l'artiste</span></button>"
-            : '<a class="btn btn-xl" href="#/send">' + icon("send", 22) + "<span>Envoyer par email</span></a>")) +
+            : '<a class="btn btn-xl" href="#/send">' + icon("send", 22) + "<span>Envoyer un lien</span></a>")) +
     "</div>" +
 
     '<div data-uploads hidden></div>' +
@@ -115,7 +115,7 @@ export async function mount(root, ctx) {
     "</div>" +
     '<div class="rows" data-list><div class="skeleton"></div><div class="skeleton"></div></div>' +
 
-    '<a class="link-row" href="#/transfers">' + icon("mail", 18) + "<span>Envois par email et liens</span>" + icon("chevron", 18) + "</a>";
+    '<a class="link-row" href="#/transfers">' + icon("mail", 18) + "<span>Mes liens partagés</span>" + icon("chevron", 18) + "</a>";
 
   const list = root.querySelector("[data-list]");
   const meta = root.querySelector("[data-meta]");

@@ -1,9 +1,9 @@
 // Feuille "Participants" : qui est là, inviter, réglages du host.
 
-import { shareInviteLink, listParticipants, updateSpace, deleteSpace, inviteByEmail, listInvites, deleteInvite, listContacts, suggestContacts, senderEmail, rememberContactsLocal } from "../api.js?v=122";
-import { icon } from "../icons.js?v=122";
-import { esc, h, openSheet, avatar, shareLink, copyText, toast, errorText, formatDate, confirmSheet, canShare, promptSheet } from "../ui.js?v=122";
-import { leaveSpace, knownSpaces, switchTo, forgetSpace, renameMe, accountEmail, logout } from "../session.js?v=122";
+import { shareInviteLink, listParticipants, updateSpace, deleteSpace, inviteByEmail, listInvites, deleteInvite, listContacts, suggestContacts, senderEmail, rememberContactsLocal } from "../api.js?v=123";
+import { icon } from "../icons.js?v=123";
+import { esc, h, openSheet, avatar, shareLink, copyText, toast, errorText, formatDate, confirmSheet, canShare, promptSheet } from "../ui.js?v=123";
+import { leaveSpace, knownSpaces, switchTo, forgetSpace, setBlaze, accountEmail, logout } from "../session.js?v=123";
 
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
@@ -98,13 +98,13 @@ export async function openPeopleSheet(ctx) {
             "Pour le retrouver sur un autre appareil, connecte-toi avec ton email.</p></div>"
         : '<div class="invite">' +
             '<div class="invite-code mono">' + esc(s.code) + "</div>" +
-            '<p class="muted">Donne ce code ou le lien : chacun choisit juste un blaze.</p>' +
+            '<p class="muted">Donne ce code ou le lien : on entre avec son blaze, sans compte.</p>' +
             '<div class="row-2">' +
               '<button class="btn btn-block" data-copy>' + icon("copy", 18) + " Copier le lien</button>" +
               (canShare() ? '<button class="btn btn-primary btn-block" data-share>' + icon("share", 18) + " Partager</button>" : "") +
             "</div>" +
           "</div>") +
-      '<div class="setting"><div><strong>Ton blaze</strong><div class="muted" data-my-pseudo>' + esc(s.pseudo || "") + "</div></div>" +
+      '<div class="setting"><div><strong>Ton blaze</strong><div class="muted"><span data-my-pseudo>' + esc(s.pseudo || "") + "</span> · le même dans tous tes espaces</div></div>" +
         '<button class="btn btn-sm" data-rename>' + icon("edit", 16) + " Changer</button></div>" +
       '<div class="section-head"><h2>Dans l\'espace</h2></div>' +
       '<ul class="people-list" data-list><li class="muted">Chargement...</li></ul>' +
@@ -131,15 +131,16 @@ export async function openPeopleSheet(ctx) {
     };
   }
 
-  // Changer de blaze (dans cet espace)
+  // Changer de blaze : un seul blaze, changé dans tous ses espaces d'un coup
   body.querySelector("[data-rename]").onclick = async () => {
-    const next = await promptSheet("Ton blaze", s.pseudo || "", { max: 24, ok: "Changer" });
+    const next = ((await promptSheet("Ton blaze, partout", s.pseudo || "", { max: 24, ok: "Changer partout" })) || "").trim();
     if (!next || next === s.pseudo) return;
     try {
-      s.pseudo = await renameMe(s.id, next);
-      try { localStorage.setItem("seminaire.pseudo", s.pseudo); } catch (err) { /* privé */ }
+      const r = await setBlaze(next);
+      if (!r.taken.includes(s.name)) s.pseudo = r.blaze;
       body.querySelector("[data-my-pseudo]").textContent = s.pseudo;
-      toast("Tu t'appelles maintenant " + s.pseudo, "ok");
+      toast("Tu es " + r.blaze + " dans tous tes espaces" +
+        (r.taken.length ? " (sauf " + r.taken.join(", ") + " : déjà pris par quelqu'un)" : ""), r.taken.length ? "err" : "ok");
       drawPeople();
     } catch (err) { toast(errorText(err), "err"); }
   };

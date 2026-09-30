@@ -3,7 +3,7 @@
 // mot de passe), il partage le compte de cette adresse : les mêmes espaces,
 // envois et blazes sur tous ses appareils.
 
-import { sb, q, invoke, requireClient } from "./db.js?v=122";
+import { sb, q, invoke, requireClient } from "./db.js?v=123";
 
 const SPACE_KEY = "seminaire.space";      // espace actif
 const KNOWN_KEY = "seminaire.spaces";     // tous les espaces rejoints sur cet appareil
@@ -48,16 +48,31 @@ function remember(space) {
   write(KNOWN_KEY, list.slice(0, 10));
 }
 
+// ------------------------------------------------------------- le blaze
+// UN blaze par personne, demandé une seule fois (la première fois qu'on
+// crée ou rejoint un espace) puis utilisé partout. On le corrige à un seul
+// endroit (setBlaze), et ça le change dans tous ses espaces.
+//   - sur cet appareil : localStorage "seminaire.pseudo" ;
+//   - connecté : celui qu'on porte le plus dans les espaces du compte
+//     (accountBlaze), qui suit donc d'un appareil à l'autre.
+const BLAZE_KEY = "seminaire.pseudo";
+const validBlaze = (p) => { const s = String(p || "").trim(); return s.length >= 2 && s.length <= 24 ? s : ""; };
+
+export function getBlaze() {
+  try { return validBlaze(localStorage.getItem(BLAZE_KEY)); } catch (err) { return ""; }
+}
+function saveBlaze(p) {
+  try { localStorage.setItem(BLAZE_KEY, p); } catch (err) { /* privé */ }
+}
+
 // Le blaze du compte : celui qu'on porte le plus souvent dans ses espaces
-// (hors espace d'envoi, hors écoute seule et hors "Invité 4821" donné par un
-// lien de partage). À égalité, le plus récent. null = rien pour décider.
-// Sert à ne plus reprendre un blaze tapé une fois sur cet appareil (un test,
-// un autre espace) pour nommer ses envois.
+// (hors écoute seule et hors "Invité 4821" donné par un lien de partage).
+// À égalité, le plus récent. null = rien pour décider.
 export function accountBlaze(list) {
   const count = new Map();
   (list || knownSpaces()).forEach((s, i) => {
     const p = String(s.pseudo || "").trim();
-    if (!p || s.mode === "envoi" || s.viewer || /^Invité \d{4}$/.test(p)) return;
+    if (!p || s.viewer || /^Invité \d{4}$/.test(p)) return;
     const c = count.get(p) || { n: 0, first: i };
     c.n++;
     count.set(p, c);
@@ -141,13 +156,32 @@ export async function createSpace(name, mode, pseudo) {
   return space;
 }
 
+// Blaze déjà porté par quelqu'un d'autre dans l'espace : "William 2", sans
+// rien redemander (le blaze ne se choisit pas espace par espace).
+export async function withFreeBlaze(base, run) {
+  const root = validBlaze(base).slice(0, 21);
+  for (let n = 1; ; n++) {
+    const name = n === 1 ? validBlaze(base) : root + " " + n;
+    try {
+      return await run(name);
+    } catch (err) {
+      if (!/PSEUDO_PRIS/.test(String((err && err.message) || err)) || n >= 9) throw err;
+    }
+  }
+}
+
 export async function joinSpace(code, pseudo) {
   await ensureAuth();
-  const s = await q(sb.rpc("join_space", { p_code: code, p_pseudo: pseudo }));
-  // code faux : renvoyé et non levé, pour que le serveur garde la trace
-  // de l'essai (limite anti-énumération des codes)
-  if (s && s.error) throw new Error(s.error);
-  const space = toSpace(s, pseudo);
+  let used = pseudo;
+  const s = await withFreeBlaze(pseudo, async (name) => {
+    const r = await q(sb.rpc("join_space", { p_code: code, p_pseudo: name }));
+    // code faux : renvoyé et non levé, pour que le serveur garde la trace
+    // de l'essai (limite anti-énumération des codes)
+    if (r && r.error) throw new Error(r.error);
+    used = name;
+    return r;
+  });
+  const space = toSpace(s, used);
   setSpace(space);
   return space;
 }
@@ -239,43 +273,63 @@ export async function syncSpaces() {
       pseudo: p.pseudo || "", viewer: !!p.viewer }))
     .sort((a, b) => rank(a.id) - rank(b.id));
   write(KNOWN_KEY, list.slice(0, 50));
-  // connecté : le blaze proposé par défaut est celui du compte, pas le
-  // dernier tapé sur cet appareil
-  const blaze = accountBlaze(list);
-  if (blaze) { try { localStorage.setItem("seminaire.pseudo", blaze); } catch (err) { /* privé */ } }
+  // Connecté : le blaze est celui du compte (pas un blaze tapé une fois sur
+  // cet appareil). Un espace resté sous un autre nom (avant la règle "un
+  // seul blaze") s'y aligne, "Envois de ..." compris.
+  const blaze = accountBlaze(list) || getBlaze();
+  if (blaze) {
+    saveBlaze(blaze);
+    await applyBlaze(blaze, data || []).catch(() => {});
+  }
   const current = getSpace();
   if (current && !list.some((s) => s.id === current.id)) {
     clearTab();
     try { localStorage.removeItem(SPACE_KEY); } catch (err) { /* privé */ }
   }
-  return list;
+  return knownSpaces();
 }
 
 // ----------------------------------------------------- changer de blaze
 
-// Dans l'espace donné, pour cet appareil. Blaze déjà pris : PSEUDO_PRIS.
-export async function renameMe(spaceId, pseudo) {
-  const clean = String(pseudo || "").trim();
-  if (clean.length < 2 || clean.length > 24) throw new Error("PSEUDO_INVALIDE");
-  const uid = await currentUserId();
-  if (!uid) throw new Error("NON_AUTHENTIFIE");
-  try {
-    await q(sb.from("participants").update({ pseudo: clean }).eq("space_id", spaceId).eq("user_id", uid).select("id").single());
-  } catch (err) {
-    throw new Error(err.code === "23505" ? "PSEUDO_PRIS" : err.message);
+// Pose `blaze` sur chacune de mes places (sauf l'écoute seule) et renomme
+// mon espace d'envoi "Envois de ...". rows : mes participants, avec
+// space:spaces(id, name, mode). Rend les espaces où le nom est déjà pris.
+async function applyBlaze(blaze, rows) {
+  const taken = [];
+  for (const p of rows) {
+    if (!p.space || p.viewer) continue;
+    if (p.pseudo !== blaze) {
+      const { error } = await sb.from("participants").update({ pseudo: blaze }).eq("id", p.id);
+      if (error) { if (error.code === "23505") taken.push(p.space.name); continue; }
+      p.pseudo = blaze;
+    }
+    const envois = "Envois de " + blaze;
+    if (p.space.mode === "envoi" && p.is_host && /^Envois de /.test(p.space.name) && p.space.name !== envois) {
+      const { error } = await sb.from("spaces").update({ name: envois }).eq("id", p.space.id);
+      if (!error) p.space.name = envois;
+    }
   }
-  const current = getSpace();
-  if (current && current.id === spaceId) write(SPACE_KEY, Object.assign(current, { pseudo: clean }));
-  write(KNOWN_KEY, knownSpaces().map((k) => (k.id === spaceId ? Object.assign(k, { pseudo: clean }) : k)));
-  return clean;
+  // liste de l'appareil et espace ouvert à jour
+  const byId = new Map(rows.filter((p) => p.space).map((p) => [p.space.id, p]));
+  const fix = (k) => (byId.has(k.id) && !k.viewer ? Object.assign(k, { pseudo: byId.get(k.id).pseudo, name: byId.get(k.id).space.name }) : k);
+  write(KNOWN_KEY, knownSpaces().map(fix));
+  const cur = getSpace();
+  if (cur) { writeTab(fix(cur)); write(SPACE_KEY, fix(read(SPACE_KEY, cur) || cur)); }
+  return taken;
 }
 
-// Renommer un espace connu de cet appareil (host), dans la liste locale aussi.
-export async function renameSpace(spaceId, name) {
-  await q(sb.from("spaces").update({ name }).eq("id", spaceId).select("id").single());
-  write(KNOWN_KEY, knownSpaces().map((k) => (k.id === spaceId ? Object.assign(k, { name }) : k)));
-  const current = getSpace();
-  if (current && current.id === spaceId) write(SPACE_KEY, Object.assign(current, { name }));
+// Le seul endroit où l'on change de blaze : dans tous ses espaces d'un coup.
+// { blaze, taken: [noms d'espaces où quelqu'un d'autre le porte déjà] }
+export async function setBlaze(next) {
+  const blaze = validBlaze(next);
+  if (!blaze) throw new Error("PSEUDO_INVALIDE");
+  saveBlaze(blaze);
+  if (!sb) return { blaze, taken: [] };
+  const uid = await currentUserId();
+  if (!uid) return { blaze, taken: [] };
+  const rows = await q(sb.from("participants")
+    .select("id, pseudo, is_host, viewer, space:spaces(id, name, mode)").eq("user_id", uid));
+  return { blaze, taken: await applyBlaze(blaze, rows || []) };
 }
 
 // Au démarrage de l'appli : la session et l'appartenance tiennent-elles ?

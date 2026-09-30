@@ -1,18 +1,18 @@
 // Un morceau : ses versions de la plus récente à la plus ancienne, chacune
 // avec sa mini-waveform jouable d'un tap.
 
-import { getProject, signFiles, cachedUrl, cachedDownload, updateProject, deleteProject, deleteFile } from "../api.js?v=122";
-import { mountUploads } from "./uploads.js?v=122";
-import { openUploadSheet } from "./upload-sheet.js?v=122";
-import { Waveform } from "../waveform.js?v=122";
-import { play, toggle, isCurrent, onPlayer, seekRatio, state as playerState, trackFromFile } from "../player.js?v=122";
-import { saveZip, canStreamToDisk, MEMORY_LIMIT } from "../zip.js?v=122";
-import { icon } from "../icons.js?v=122";
-import { isAudio, canPreview } from "../files.js?v=122";
+import { getProject, signFiles, cachedUrl, cachedDownload, updateProject, deleteProject, deleteFile } from "../api.js?v=123";
+import { mountUploads } from "./uploads.js?v=123";
+import { openUploadSheet } from "./upload-sheet.js?v=123";
+import { Waveform } from "../waveform.js?v=123";
+import { play, toggle, isCurrent, onPlayer, seekRatio, state as playerState, trackFromFile } from "../player.js?v=123";
+import { saveZip, canStreamToDisk, MEMORY_LIMIT } from "../zip.js?v=123";
+import { icon } from "../icons.js?v=123";
+import { isAudio, canPreview } from "../files.js?v=123";
 import {
   esc, fileBadge, fileTile, timeAgo, formatBytes, formatDuration, plural, promptSheet,
   confirmSheet, actionSheet, toast, errorText, triggerDownload
-} from "../ui.js?v=122";
+} from "../ui.js?v=123";
 
 export const title = () => "Morceau";
 
@@ -200,7 +200,7 @@ export async function mount(root, ctx, params) {
       const canDelete = f.uploaded_by === ctx.space.participantId || ctx.space.isHost;
       actionSheet("v" + f.version_no + (f.label ? " " + f.label : ""), [
         { label: "Télécharger", icon: "download", run: () => downloadOne(f) },
-        { label: "Envoyer par email", icon: "send", run: () => ctx.navigate("#/send?f=" + f.id) },
+        { label: "Envoyer un lien", icon: "link", run: () => ctx.navigate("#/send?f=" + f.id) },
         { label: "Écouter et commenter", icon: "comment", run: () => ctx.navigate("#/f/" + f.id) },
         canDelete ? {
           label: "Supprimer cette version", icon: "trash", danger: true,

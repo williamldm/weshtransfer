@@ -3,12 +3,12 @@
 // les espaces déjà ouverts sur cet appareil (ouvrir, oublier, supprimer).
 // session.js / api.js ne sont chargés qu'au moment d'agir.
 
-import { icon } from "./icons.js?v=122";
-import { esc, h, errorText, formatBytes, plural, actionSheet, confirmSheet, toast } from "./ui.js?v=122";
-import { isBlocked, FILE_MAX } from "./files.js?v=122";
-import { putPending, MAX_BYTES } from "./pending.js?v=122";
-import { mountWallpaperNote } from "./wallpapers.js?v=122";
-import { mountClaim } from "./claim-fx.js?v=122";
+import { icon } from "./icons.js?v=123";
+import { esc, h, errorText, formatBytes, plural, actionSheet, confirmSheet, promptSheet, toast } from "./ui.js?v=123";
+import { isBlocked, FILE_MAX } from "./files.js?v=123";
+import { putPending, MAX_BYTES } from "./pending.js?v=123";
+import { mountWallpaperNote } from "./wallpapers.js?v=123";
+import { mountClaim } from "./claim-fx.js?v=123";
 
 const PSEUDO_KEY = "seminaire.pseudo";
 const MODE_LABEL = { envoi: "Envois", seminaire: "Séminaire", revue: "Verdict" };
@@ -17,7 +17,7 @@ const deck = document.getElementById("deck");
 const spacesLink = document.getElementById("spaces-link");
 let picked = [];          // fichiers choisis sur l'accueil
 let tab = "send";
-let renaming = false;     // onglet Envoyer : changer de blaze
+let typedBlaze = "";      // blaze en cours de saisie (survit au redessin du formulaire)
 
 // --------------------------------------------------------------- mémoire
 
@@ -30,7 +30,7 @@ function accountBlaze() {
   const count = new Map();
   known().forEach((s, i) => {
     const p = String(s.pseudo || "").trim();
-    if (!p || s.mode === "envoi" || s.viewer || /^Invité \d{4}$/.test(p)) return;
+    if (!p || s.viewer || /^Invité \d{4}$/.test(p)) return;
     const c = count.get(p) || { n: 0, first: i };
     c.n++;
     count.set(p, c);
@@ -38,6 +38,13 @@ function accountBlaze() {
   let best = null;
   for (const [p, c] of count) if (!best || c.n > best.n || (c.n === best.n && c.first < best.first)) best = { p, n: c.n, first: c.first };
   return best ? best.p : null;
+}
+// UN blaze par personne, demandé une seule fois : celui de cet appareil,
+// sinon celui du compte. "" = jamais donné, on le demande.
+function myBlaze() {
+  const p = savedPseudo().trim();
+  if (p.length >= 2 && p.length <= 24) return p;
+  return (accountEmail() && accountBlaze()) || "";
 }
 function savePseudo(p) {
   try { localStorage.setItem(PSEUDO_KEY, p); } catch (err) { /* privé */ }
@@ -82,9 +89,9 @@ async function ensureAccount(form, fail) {
     fail("Ton email sert de compte (sans mot de passe) : on en a besoin.");
     return false;
   }
-  const session = await import("./session.js?v=122");
+  const session = await import("./session.js?v=123");
   await session.ensureAuth();
-  const { ensureVerified } = await import("./verify.js?v=122");
+  const { ensureVerified } = await import("./verify.js?v=123");
   if (await ensureVerified(email, { optional: false }) !== "ok") return false;
   try {
     await session.login(email);
@@ -93,7 +100,7 @@ async function ensureAccount(form, fail) {
     // pour cette session. On oublie ce que l'appareil croyait, on demande
     // un vrai code, et on recommence une fois.
     if (!/CODE_FAUX/.test(String((err && err.message) || err))) throw err;
-    const { forgetVerified } = await import("./api.js?v=122");
+    const { forgetVerified } = await import("./api.js?v=123");
     forgetVerified(email);
     if (await ensureVerified(email, { optional: false }) !== "ok") return false;
     await session.login(email);
@@ -108,7 +115,9 @@ async function ensureAccount(form, fail) {
 const field = (name, label, attrs, value) =>
   '<label class="field"><span class="label">' + label + '</span><input class="input" name="' + name + '" ' + attrs +
   ' value="' + esc(value || "") + '"></label>';
-const pseudoField = () => field("pseudo", "Ton blaze", 'maxlength="24" autocomplete="nickname" placeholder="Comment on te reconnaît"', savedPseudo());
+// Le champ blaze n'apparaît que la toute première fois.
+const pseudoField = () => (myBlaze() ? "" :
+  field("pseudo", "Ton blaze", 'maxlength="24" autocomplete="nickname" placeholder="Comment on te reconnaît partout"', typedBlaze));
 // Ton email = ton compte. Déjà connecté : une ligne, pas de champ.
 function accountField() {
   const acc = accountEmail();
@@ -118,18 +127,8 @@ function accountField() {
   return field("email", "Ton email", 'type="text" inputmode="email" autocomplete="email" autocapitalize="off" spellcheck="false" maxlength="254" placeholder="ton compte, sans mot de passe"', remembered);
 }
 
-// Espace Envois nommé avec un autre blaze que celui du compte (tapé une
-// fois sur un appareil) : on propose de le remettre, en un clic.
-function blazeHint(mine) {
-  const blaze = accountEmail() && accountBlaze();
-  if (!blaze || !mine.pseudo || blaze === mine.pseudo) return "";
-  return '<br><span>Ailleurs, tu es <strong>' + esc(blaze) + '</strong>. ' +
-    '<button type="button" class="link-btn" data-use-blaze>Utiliser ' + esc(blaze) + "</button></span>";
-}
-
 const VIEWS = {
   send() {
-    const mine = known().find((k) => k.mode === "envoi");
     const total = picked.reduce((s, f) => s + f.size, 0);
     return '<form class="deck-form" data-form="send" novalidate>' +
       '<label class="add-files" data-drop>' +
@@ -143,14 +142,10 @@ const VIEWS = {
             '<button type="button" class="btn btn-ghost btn-icon btn-sm" data-unpick="' + i + '" aria-label="Retirer ' + esc(f.name) + '">' + icon("x", 16) + "</button></li>").join("") +
           '</ul><p class="picked-total mono">' + plural(picked.length, "fichier", "fichiers") + " · " + formatBytes(total) + "</p>"
         : "") +
-      (mine && !renaming
-        ? '<p class="as-who">Envoyé par <strong>' + esc(mine.pseudo || savedPseudo() || "toi") + '</strong> <button type="button" class="link-btn" data-rename>changer</button>' +
-            blazeHint(mine) + "</p>"
-        : pseudoField()) +
-      accountField() +
+      pseudoField() +
       '<p class="form-error" data-err hidden></p>' +
       '<button class="btn btn-primary btn-block btn-xl" type="submit">Transférer</button>' +
-      '<p class="deck-note">Tu ajouteras les adresses à l\'étape suivante. Sans compte, ni pour toi ni pour eux.</p>' +
+      '<p class="deck-note">Tu obtiens un lien à partager (WhatsApp, SMS...), valable 7 jours. Sans compte ni email, ni pour toi ni pour eux.</p>' +
     "</form>";
   },
   salon() {
@@ -178,7 +173,7 @@ const VIEWS = {
   },
   join(code) {
     return '<form class="deck-form" data-form="join" novalidate>' +
-      '<p class="deck-lead">Le code qu\'on t\'a donné, et ton blaze.</p>' +
+      '<p class="deck-lead">' + (myBlaze() ? "Le code qu\'on t\'a donné." : "Le code qu\'on t\'a donné, et ton blaze.") + "</p>" +
       '<label class="field"><span class="label">Code</span><input class="input input-code" name="code" maxlength="8" autocapitalize="characters" autocomplete="off" autocorrect="off" spellcheck="false" placeholder="ABC123" value="' + esc(code || "") + '"></label>' +
       pseudoField() +
       accountField() +
@@ -192,7 +187,11 @@ const VIEWS = {
   spaces() {
     const list = known();
     const acc = accountEmail();
-    const account = acc
+    const blaze = myBlaze();
+    const who = blaze
+      ? '<p class="as-who">Ton blaze : <strong>' + esc(blaze) + '</strong> <button type="button" class="link-btn" data-blaze>modifier</button></p>'
+      : "";
+    const account = who + (acc
       ? '<div class="account-box"><p class="as-who">Connecté : <strong>' + esc(acc) + "</strong></p>" +
           '<p class="deck-note">Tes espaces, envois et blazes te suivent sur tous tes appareils.</p>' +
           '<button type="button" class="btn btn-ghost btn-sm" data-logout>Se déconnecter de cet appareil</button></div>'
@@ -200,7 +199,7 @@ const VIEWS = {
           '<p class="deck-lead">Retrouve tes espaces sur tous tes appareils. Pas de mot de passe : un code à ton adresse, une fois par appareil.</p>' +
           accountField() +
           '<p class="form-error" data-err hidden></p>' +
-          '<button class="btn btn-primary btn-block" type="submit">Se connecter</button></form>';
+          '<button class="btn btn-primary btn-block" type="submit">Se connecter</button></form>');
     if (!list.length) return account + '<p class="deck-lead">' + (acc ? "Aucun espace pour l'instant." : "Aucun espace sur cet appareil.") + "</p>";
     return account +
       '<p class="deck-lead">' + (acc ? "Les espaces de ton compte." : "Les espaces ouverts sur cet appareil.") +
@@ -239,6 +238,9 @@ function addFiles(list) {
   show("send");
 }
 
+deck.addEventListener("input", (e) => {
+  if (e.target.matches("[name=pseudo]")) typedBlaze = e.target.value;
+});
 deck.addEventListener("change", (e) => {
   if (e.target.matches("[data-files]")) { addFiles(e.target.files); e.target.value = ""; }
 });
@@ -277,7 +279,7 @@ function spaceMenu(k) {
     {
       label: "Oublier sur cet appareil", icon: "logout",
       run: async () => {
-        const session = await import("./session.js?v=122");
+        const session = await import("./session.js?v=123");
         session.forgetSpace(k.id);
         toast("\"" + k.name + "\" n'apparaît plus ici. Rien n'a été supprimé.", "ok");
         drawSpacesLink();
@@ -292,9 +294,9 @@ function spaceMenu(k) {
           { ok: "Tout supprimer", danger: true, title: "Supprimer l'espace" });
         if (!ok) return;
         try {
-          const session = await import("./session.js?v=122");
+          const session = await import("./session.js?v=123");
           await session.ensureAuth();
-          const api = await import("./api.js?v=122");
+          const api = await import("./api.js?v=123");
           await api.deleteSpace(k.id);
           session.forgetSpace(k.id);
           toast("\"" + k.name + "\" a été supprimé.", "ok");
@@ -320,9 +322,10 @@ deck.addEventListener("submit", async (e) => {
   err.hidden = true;
 
   let mine = kind === "send" && known().find((k) => k.mode === "envoi");
-  const pseudoBefore = (mine && mine.pseudo) || savedPseudo();
-  const pseudo = mine && !renaming ? pseudoBefore : val("pseudo");
+  // le blaze : celui déjà donné, sinon le champ (première fois seulement)
+  const pseudo = myBlaze() || val("pseudo");
   if (kind !== "account" && !mine && pseudo.length < 2) return fail("Ton blaze doit faire au moins 2 caractères.");
+  if (pseudo.length > 24) return fail("Ton blaze fait 24 caractères au plus.");
   if (kind === "join" && val("code").length < 5) return fail("Le code fait au moins 5 caractères.");
   if (kind === "salon" && !val("name")) return fail("Donne un nom à ton séminaire.");
   if (kind === "revue" && !val("project")) return fail("Pour quel artiste ou quel projet ?");
@@ -337,8 +340,9 @@ deck.addEventListener("submit", async (e) => {
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner"></span><span>Un instant…</span>';
   try {
-    // tout se rattache à un compte : email vérifié d'abord
-    if (!(await ensureAccount(form, fail))) {
+    // Envoyer : ni compte ni email (lien seul). Salon, verdict, code :
+    // tout se rattache à un compte, email vérifié d'abord.
+    if (kind !== "send" && !(await ensureAccount(form, fail))) {
       btn.disabled = false;
       btn.textContent = label;
       return;
@@ -350,7 +354,7 @@ deck.addEventListener("submit", async (e) => {
     // demande au serveur avant de créer un 2e espace Envois, qui ferait
     // disparaître les envois déjà faits de "Mes envois".
     if (kind === "send" && !mine && accountEmail()) {
-      const session = await import("./session.js?v=122");
+      const session = await import("./session.js?v=123");
       await session.syncSpaces();
       mine = known().find((k) => k.mode === "envoi");
     }
@@ -365,24 +369,17 @@ deck.addEventListener("submit", async (e) => {
       }
     }
     if (mine) {
-      // nouveau blaze : dans l'espace d'envoi, et dans son nom "Envois de ..."
-      if (renaming && pseudo !== pseudoBefore) {
-        const session = await import("./session.js?v=122");
-        await session.renameMe(mine.id, pseudo);
-        if (/^Envois de /.test(mine.name)) await session.renameSpace(mine.id, "Envois de " + pseudo).catch(() => {});
-      }
-      renaming = false;
       goTo(known().find((k) => k.id === mine.id) || mine);
       return;
     }
 
-    const session = await import("./session.js?v=122");
+    const session = await import("./session.js?v=123");
     if (kind === "join") await session.joinSpace(val("code"), pseudo);
     else if (kind === "salon") await session.createSpace(val("name"), "seminaire", pseudo);
     else if (kind === "revue") {
       const created = await session.createSpace(val("project"), "revue", pseudo);
       if (form.querySelector("[name=keep]").checked) {
-        const api = await import("./api.js?v=122");
+        const api = await import("./api.js?v=123");
         await api.updateSpace(created.id, { purge_at: null }).catch((err) => {
           try { sessionStorage.setItem("seminaire.flash", errorText(err)); } catch (e3) { /* privé */ }
         });
@@ -405,32 +402,24 @@ document.addEventListener("click", async (e) => {
     const ok = await confirmSheet("Rien n'est supprimé : tu retrouveras tout en te reconnectant avec ton email.",
       { ok: "Se déconnecter", title: "Se déconnecter de cet appareil" });
     if (!ok) return;
-    const session = await import("./session.js?v=122");
+    const session = await import("./session.js?v=123");
     await session.logout();
     drawSpacesLink();
     show("send");
     toast("Déconnecté de cet appareil", "ok");
   }
-  if (e.target.closest("[data-use-blaze]")) {
-    const mine = known().find((k) => k.mode === "envoi");
-    const blaze = accountBlaze();
-    if (!mine || !blaze) return;
+  // le seul endroit où l'on change de blaze : partout d'un coup
+  if (e.target.closest("[data-blaze]")) {
+    const before = myBlaze();
+    const next = ((await promptSheet("Ton blaze, partout", before, { max: 24, ok: "Changer partout" })) || "").trim();
+    if (!next || next === before) return;
     try {
-      const session = await import("./session.js?v=122");
-      await session.ensureAuth();
-      await session.renameMe(mine.id, blaze);
-      if (/^Envois de /.test(mine.name)) await session.renameSpace(mine.id, "Envois de " + blaze).catch(() => {});
-      savePseudo(blaze);
-      toast("Tes envois partent maintenant au nom de " + blaze, "ok");
-      show("send");
+      const session = await import("./session.js?v=123");
+      const r = await session.setBlaze(next);
+      toast("Tu es " + r.blaze + " dans tous tes espaces" +
+        (r.taken.length ? " (sauf " + r.taken.join(", ") + " : déjà pris par quelqu'un)" : ""), r.taken.length ? "err" : "ok");
+      show(tab);
     } catch (err) { toast(errorText(err), "err"); }
-    return;
-  }
-  if (e.target.closest("[data-rename]")) {
-    renaming = true;
-    show("send");
-    const input = deck.querySelector("[name=pseudo]");
-    if (input) { input.focus(); input.select(); }
   }
 });
 
@@ -442,7 +431,7 @@ document.addEventListener("click", async (e) => {
 async function openInvite(token) {
   show("invite");
   const box = deck.querySelector("[data-invite-view]");
-  const session = await import("./session.js?v=122");
+  const session = await import("./session.js?v=123");
   let info;
   try {
     info = await session.inviteInfo(token);
@@ -498,8 +487,7 @@ async function openInvite(token) {
   // "Invité 4821", et on en retire un autre si le nom est déjà pris.
   const guestName = () => "Invité " + (1000 + Math.floor(Math.random() * 9000));
   async function acceptOpen() {
-    const saved = savedPseudo();
-    let name = saved.length >= 2 && saved.length <= 24 ? saved : guestName();
+    let name = myBlaze() || guestName();
     for (let tries = 0; ; tries++) {
       try {
         return await session.acceptInvite(token, "", name);
@@ -512,7 +500,7 @@ async function openInvite(token) {
 
   const enter = async () => {
     const pseudoInput = form.querySelector("[name=pseudo]");
-    const pseudo = pseudoInput ? pseudoInput.value.trim() : "";
+    const pseudo = pseudoInput ? pseudoInput.value.trim() : myBlaze();
     if (pseudoInput && pseudo.length < 2) { pseudoInput.focus(); return fail("Ton blaze doit faire au moins 2 caractères."); }
     const code = codeBox ? form.querySelector("[name=code]").value.replace(/\D/g, "") : "";
     if (codeBox && code.length !== 6) { form.querySelector("[name=code]").focus(); return fail("Le code fait 6 chiffres."); }
@@ -623,7 +611,7 @@ for (const el of document.querySelectorAll("[data-icon]")) el.innerHTML = icon(e
 
 // Connecté : "Mes espaces" à jour depuis le serveur (autres appareils)
 if (accountEmail()) {
-  import("./session.js?v=122").then((m) => m.syncSpaces()).then(() => {
+  import("./session.js?v=123").then((m) => m.syncSpaces()).then(() => {
     drawSpacesLink();
     if (tab === "spaces") show("spaces");
     // blaze et espace Envois du compte, sauf si on est en train de taper
@@ -658,7 +646,7 @@ async function enterByCode(code) {
   if (sent || !(known().some(isMine) || accountEmail())) { show("join", code); return; }
   show("invite");   // squelette le temps de la vérification
   if (accountEmail()) {
-    try { await (await import("./session.js?v=122")).syncSpaces(); } catch (err) { /* hors ligne */ }
+    try { await (await import("./session.js?v=123")).syncSpaces(); } catch (err) { /* hors ligne */ }
   }
   const mine = known().find(isMine);
   if (mine) goTo(mine);
