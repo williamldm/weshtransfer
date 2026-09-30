@@ -16,7 +16,7 @@
 
 import { admin, callerId } from "../_shared/supabase.ts";
 import { json, preflight, readJson } from "../_shared/http.ts";
-import { inviteMail, isVerified, mailConfig, mailDayMax, mailsToday, sendEmails, shortLinks } from "../_shared/email.ts";
+import { inviteMail, isVerified, mailConfig, mailDayMax, mailsToday, sendEmails, shortLinks, viaName } from "../_shared/email.ts";
 import { clientIp, confirmCode, requestCode, sha256 } from "../_shared/codes.ts";
 import { loginAccount } from "../_shared/account.ts";
 
@@ -129,7 +129,7 @@ Deno.serve(async (req) => {
         site: cfg.site, email, host: me.pseudo, spaceName: space.name, mode: space.mode,
         link: shortLinks() ? `${cfg.site}/i/${token}` : `${cfg.site}/index.html?i=${token}`, expiresAt: expires,
       });
-      outgoing.push({ to: email, subject: mail.subject, html: mail.html, text: mail.text });
+      outgoing.push({ to: email, subject: mail.subject, html: mail.html, text: mail.text, from_name: viaName(cfg, me.pseudo) });
     }
     const sent = await sendEmails(cfg, outgoing, { kind: "invitation" });
 

@@ -8,6 +8,18 @@
 // double (bgcolor + style) pour les clients qui ignorent l'un ou l'autre.
 // Pensé sombre d'office (l'identité est noire) ; le logo est une image PNG
 // (le SVG ne passe pas dans Gmail) avec un texte de secours stylé.
+//
+// Gmail range dans "Promotions" ce qui ressemble à une newsletter. Ce sont
+// des emails d'une personne à une autre (un envoi, un code, un avis) : on
+// évite donc les marqueurs d'emailing (30/09/2026) :
+//   - pas de grande image de bandeau (seul le petit logo reste) ;
+//   - pas de polices web (@font-face) ;
+//   - texte d'aperçu sans remplissage invisible (&#847;&zwnj;... x60) ;
+//   - pas d'en-tête List-Unsubscribe (smtp.ts) : il n'y a pas de liste ;
+//   - l'expéditeur affiché est la personne : "William via WeshTransfer".
+// Gmail ne publie pas ses règles : ce sont les signaux connus, pas une
+// garantie. L'image de bandeau (img/mail/scene.jpg) reste sur le site pour
+// les emails déjà partis.
 
 const C = {
   bg: "#0E0B14", card: "#16141B", raised: "#1D1A23", tile: "#221E2B",
@@ -110,10 +122,11 @@ function button(href, label) {
 
 // Texte d'aperçu caché (preheader) : display:none, jamais de police à 0 ou
 // 1 px ni de couleur transparente. SpamAssassin (règle FONT_INVIS_MSGID,
-// -2,5 sur mail-tester) prend ça pour du texte invisible de spammeur.
+// -2,5 sur mail-tester) prend ça pour du texte invisible de spammeur. Pas de
+// remplissage derrière (technique des outils d'emailing) : l'aperçu peut
+// continuer sur le début du texte, c'est ce que fait un email normal.
 function layout(o) {
   const site = o.site;
-  const filler = "&#847;&zwnj;&nbsp;".repeat(60);
   return `<!doctype html>
 <html lang="fr" xmlns="http://www.w3.org/1999/xhtml"><head>
 <meta charset="utf-8">
@@ -123,8 +136,6 @@ function layout(o) {
 <meta name="supported-color-schemes" content="dark">
 <title>${esc(o.title)}</title>
 <style>
-@font-face{font-family:'Outfit';font-style:normal;font-weight:500 900;src:url(${site}/fonts/outfit-normal-500-900-latin.woff2) format('woff2')}
-@font-face{font-family:'IBM Plex Mono';font-style:normal;font-weight:400;src:url(${site}/fonts/ibm-plex-mono-normal-400-latin.woff2) format('woff2')}
 :root{color-scheme:dark;supported-color-schemes:dark}
 body{margin:0!important;padding:0!important;width:100%!important;background:${C.bg}}
 a{color:${C.bright}}
@@ -138,7 +149,7 @@ a{color:${C.bright}}
 </style>
 </head>
 <body style="margin:0;padding:0;background:${C.bg};" bgcolor="${C.bg}">
-<div style="display:none;max-height:0;max-width:0;overflow:hidden;mso-hide:all;opacity:0;">${esc(o.preheader)}${filler}</div>
+<div style="display:none;max-height:0;max-width:0;overflow:hidden;mso-hide:all;opacity:0;">${esc(o.preheader)}</div>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${C.bg}" style="background:${C.bg};">
 <tr><td align="center" style="padding:28px 12px 44px;">
 <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:600px;">
@@ -146,7 +157,6 @@ a{color:${C.bright}}
 <a href="${site}/" style="text-decoration:none;"><img src="${site}/img/mail/logo.png" width="196" alt="WeshTransfer" style="display:block;width:196px;max-width:100%;height:auto;border:0;color:${C.bright};font-family:${DISPLAY};font-size:22px;font-weight:800;"></a>
 </td></tr>
 <tr><td bgcolor="${C.card}" style="background:${C.card};border:1px solid ${C.line};border-radius:18px;overflow:hidden;">
-<img src="${site}/img/mail/scene.jpg" width="600" alt="" style="display:block;width:100%;max-width:600px;height:auto;border:0;border-radius:17px 17px 0 0;">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
 <td class="wt-pad" style="padding:34px 40px 40px;">
 ${o.body}

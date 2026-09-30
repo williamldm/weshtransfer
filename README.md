@@ -106,6 +106,17 @@ Réglages du bucket (posés par l'API `b2_update_bucket`) :
    fictives. Images des emails : `img/mail/` (PNG et JPEG : le SVG ne passe
    pas dans Gmail).
 
+   **Onglet Promotions de Gmail** : ce sont des emails d'une personne à une
+   autre, on évite ce qui ressemble à une newsletter. Pas de grande image de
+   bandeau (seul le logo reste ; `scene.jpg` reste en ligne pour les emails
+   déjà partis), pas de polices web, pas de remplissage invisible dans le
+   texte d'aperçu, pas d'en-tête `List-Unsubscribe` (il n'y a pas de liste).
+   Envois et invitations s'affichent au nom de la personne :
+   `William via WeshTransfer <envoi@weshtransfer.fr>` (`viaName()` dans
+   `email.ts`, adresse inchangée pour SPF/DKIM/DMARC). Chez Brevo, couper
+   aussi le suivi des ouvertures et des clics des emails transactionnels :
+   le pixel et les liens réécrits sont des marqueurs d'emailing.
+
    **Vérification de l'expéditeur** : avant qu'un email parte "de la part
    de" quelqu'un (Reply-To, avis de téléchargement), l'adresse est vérifiée
    par un code à 6 chiffres (Edge Function `verify-email`, tables

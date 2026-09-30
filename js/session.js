@@ -3,7 +3,7 @@
 // mot de passe), il partage le compte de cette adresse : les mêmes espaces,
 // envois et blazes sur tous ses appareils.
 
-import { sb, q, invoke, requireClient } from "./db.js?v=121";
+import { sb, q, invoke, requireClient } from "./db.js?v=122";
 
 const SPACE_KEY = "seminaire.space";      // espace actif
 const KNOWN_KEY = "seminaire.spaces";     // tous les espaces rejoints sur cet appareil
@@ -43,8 +43,28 @@ export function knownSpaces() {
 
 function remember(space) {
   const list = knownSpaces().filter((s) => s.id !== space.id);
-  list.unshift({ id: space.id, name: space.name, code: space.code, mode: space.mode, isHost: !!space.isHost });
+  list.unshift({ id: space.id, name: space.name, code: space.code, mode: space.mode, isHost: !!space.isHost,
+    pseudo: space.pseudo || "", viewer: !!space.viewer });
   write(KNOWN_KEY, list.slice(0, 10));
+}
+
+// Le blaze du compte : celui qu'on porte le plus souvent dans ses espaces
+// (hors espace d'envoi, hors écoute seule et hors "Invité 4821" donné par un
+// lien de partage). À égalité, le plus récent. null = rien pour décider.
+// Sert à ne plus reprendre un blaze tapé une fois sur cet appareil (un test,
+// un autre espace) pour nommer ses envois.
+export function accountBlaze(list) {
+  const count = new Map();
+  (list || knownSpaces()).forEach((s, i) => {
+    const p = String(s.pseudo || "").trim();
+    if (!p || s.mode === "envoi" || s.viewer || /^Invité \d{4}$/.test(p)) return;
+    const c = count.get(p) || { n: 0, first: i };
+    c.n++;
+    count.set(p, c);
+  });
+  let best = null;
+  for (const [p, c] of count) if (!best || c.n > best.n || (c.n === best.n && c.first < best.first)) best = { p, n: c.n, first: c.first };
+  return best ? best.p : null;
 }
 
 function setSpace(space) {
@@ -209,15 +229,20 @@ export async function syncSpaces() {
   const uid = await currentUserId();
   if (!uid) return knownSpaces();
   const { data, error } = await sb.from("participants")
-    .select("id, pseudo, is_host, space:spaces(id, name, code, mode)")
+    .select("id, pseudo, is_host, viewer, space:spaces(id, name, code, mode)")
     .eq("user_id", uid);
   if (error) return knownSpaces();
   const order = knownSpaces().map((k) => k.id);
   const rank = (id) => (order.indexOf(id) === -1 ? 999 : order.indexOf(id));
   const list = (data || []).filter((p) => p.space)
-    .map((p) => ({ id: p.space.id, name: p.space.name, code: p.space.code, mode: p.space.mode, isHost: !!p.is_host }))
+    .map((p) => ({ id: p.space.id, name: p.space.name, code: p.space.code, mode: p.space.mode, isHost: !!p.is_host,
+      pseudo: p.pseudo || "", viewer: !!p.viewer }))
     .sort((a, b) => rank(a.id) - rank(b.id));
   write(KNOWN_KEY, list.slice(0, 50));
+  // connecté : le blaze proposé par défaut est celui du compte, pas le
+  // dernier tapé sur cet appareil
+  const blaze = accountBlaze(list);
+  if (blaze) { try { localStorage.setItem("seminaire.pseudo", blaze); } catch (err) { /* privé */ } }
   const current = getSpace();
   if (current && !list.some((s) => s.id === current.id)) {
     clearTab();
@@ -241,6 +266,7 @@ export async function renameMe(spaceId, pseudo) {
   }
   const current = getSpace();
   if (current && current.id === spaceId) write(SPACE_KEY, Object.assign(current, { pseudo: clean }));
+  write(KNOWN_KEY, knownSpaces().map((k) => (k.id === spaceId ? Object.assign(k, { pseudo: clean }) : k)));
   return clean;
 }
 

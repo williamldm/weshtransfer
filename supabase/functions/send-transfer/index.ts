@@ -15,7 +15,7 @@
 
 import { admin, callerId } from "../_shared/supabase.ts";
 import { json, preflight, readJson } from "../_shared/http.ts";
-import { isVerified, mailConfig, mailDayMax, mailsToday, sendEmails, sentConfirmMail, transferLink, transferMail, type MailConfig, type OutgoingEmail } from "../_shared/email.ts";
+import { isVerified, mailConfig, mailDayMax, mailsToday, sendEmails, sentConfirmMail, transferLink, transferMail, viaName, type MailConfig, type OutgoingEmail } from "../_shared/email.ts";
 
 type TransferRow = {
   id: string;
@@ -150,6 +150,7 @@ Deno.serve(async (req) => {
       subject: mail.subject,
       html: mail.html,
       text: mail.text,
+      from_name: viaName(cfg, transfer.sender?.pseudo),
       ...(transfer.reply_to ? { reply_to: transfer.reply_to } : {}),
     };
   });

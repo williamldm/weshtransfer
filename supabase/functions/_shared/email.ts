@@ -50,7 +50,23 @@ export type OutgoingEmail = {
   html: string;
   text: string;
   reply_to?: string;
+  from_name?: string;   // nom affiché à la place de "WeshTransfer" (viaName)
 };
+
+// Nom d'expéditeur affiché pour un email envoyé AU NOM de quelqu'un (un
+// envoi, une invitation) : "William via WeshTransfer", comme Google Docs ou
+// WeTransfer. Une personne en expéditeur plutôt qu'une marque : c'est ce qui
+// distingue un email personnel d'une newsletter (onglet Promotions de Gmail).
+// L'adresse reste la nôtre (SPF, DKIM, DMARC inchangés). Le blaze est choisi
+// par l'utilisateur : on ne garde que des caractères sans rôle dans un
+// en-tête d'email (ni guillemets, ni chevrons, ni @, ni ponctuation).
+export function viaName(cfg: MailConfig, person: string | null | undefined): string | undefined {
+  const clean = String(person ?? "").replace(/[\x00-\x1f\x7f"(),.:;<>@[\]\\]/g, " ")
+    .replace(/\s+/g, " ").trim().slice(0, 40).trim();
+  if (clean.length < 2) return undefined;
+  return `${clean} via ${cfg.from.name || "WeshTransfer"}`;
+}
+const fromOf = (cfg: MailConfig, e: OutgoingEmail): Sender => (e.from_name ? { name: e.from_name, email: cfg.from.email } : cfg.from);
 
 export type SendResult =
   | { ok: true; id: string | null; via: "smtp" | "brevo" }
@@ -84,7 +100,7 @@ export async function sendEmails(cfg: MailConfig, emails: OutgoingEmail[], meta:
     const batch = emails.slice(0, Math.max(0, route.left));
     try {
       const out = await smtpSendAll(cfg.smtp, batch.map((e) => ({
-        from: cfg.from, to: e.to, replyTo: e.reply_to, subject: e.subject, html: e.html, text: e.text,
+        from: fromOf(cfg, e), to: e.to, replyTo: e.reply_to, subject: e.subject, html: e.html, text: e.text,
       })));
       out.forEach((r, i) => {
         if (r.ok) {
@@ -143,7 +159,7 @@ async function sendBrevo(cfg: MailConfig, e: OutgoingEmail): Promise<SendResult>
       method: "POST",
       headers: { "api-key": cfg.brevo!, "Content-Type": "application/json", Accept: "application/json" },
       body: JSON.stringify({
-        sender: cfg.from,
+        sender: fromOf(cfg, e),
         to: [{ email: e.to }],
         subject: e.subject,
         htmlContent: e.html,

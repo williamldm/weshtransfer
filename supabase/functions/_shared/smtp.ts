@@ -78,9 +78,10 @@ function buildMessage(m: SmtpMessage): { id: string; data: string } {
     `Message-ID: <${id}>`,
     "MIME-Version: 1.0",
     "Auto-Submitted: auto-generated",
-    // simple point de contact humain, pas un vrai flux en un clic : on n'a
-    // pas de liste de diffusion, juste une adresse qui répond
-    `List-Unsubscribe: <mailto:${m.from.email}>`,
+    // Pas de List-Unsubscribe : ajouté le 26/09 pour gagner un point sur
+    // mail-tester, mais c'est l'en-tête des listes de diffusion, et Gmail
+    // range ces emails dans "Promotions". Ici, pas de liste : chaque email
+    // répond à une action (un envoi, un code, une invitation).
     `Content-Type: multipart/alternative; boundary="${boundary}"`,
   ];
   const part = (type: string, body: string) =>

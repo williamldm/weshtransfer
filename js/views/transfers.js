@@ -1,12 +1,12 @@
 // Historique des envois de l'espace : qui a reçu quoi, qui a ouvert,
 // qui a téléchargé. Mis à jour en direct.
 
-import { listTransfers, revokeTransfer, deleteTransfer, sendTransfer, transferUrl, emailEnabled, deleteFile, listTransferRefs } from "../api.js?v=121";
-import { icon } from "../icons.js?v=121";
+import { listTransfers, listMyTransfers, revokeTransfer, deleteTransfer, sendTransfer, transferUrl, emailEnabled, deleteFile, listTransferRefs } from "../api.js?v=122";
+import { icon } from "../icons.js?v=122";
 import {
   esc, formatBytes, plural, timeAgo, formatDate, daysLeft, toast, errorText, copyText, shareLink,
   canShare, confirmSheet, actionSheet
-} from "../ui.js?v=121";
+} from "../ui.js?v=122";
 
 export const title = () => "Envois";
 
@@ -19,7 +19,9 @@ function recipientState(r, emailOn) {
   return '<span class="st">en attente</span>';
 }
 
-export function renderTransfers(list, me, isHost, emailOn) {
+// me : ma place dans l'espace, ou l'ensemble de mes places (tous espaces)
+export function renderTransfers(list, me, isHost, emailOn, hereId) {
+  const isMine = (id) => (me instanceof Set ? me.has(id) : id === me);
   if (!list.length) {
     return '<div class="empty-state">' + icon("send", 34) +
       "<p><strong>Aucun envoi pour l'instant.</strong><br>Envoie un son par email ou crée un lien à partager.</p>" +
@@ -32,7 +34,9 @@ export function renderTransfers(list, me, isHost, emailOn) {
     // "jusqu'au 1er téléchargement" : fini quand tout a été récupéré (et détruit)
     const taken = !!t.until_download && !files.length;
     const expired = left <= 0 || taken;
-    const mine = t.sender_id === me;
+    const mine = isMine(t.sender_id);
+    // envoi parti d'un autre espace (liste "Mes envois" du compte)
+    const from = hereId && t.space_id && t.space_id !== hereId && t.space ? " · depuis " + t.space.name : "";
     const recips = t.transfer_recipients || [];
     const failed = recips.filter((r) => r.status === "failed").length;
 
@@ -44,7 +48,7 @@ export function renderTransfers(list, me, isHost, emailOn) {
             : t.until_download ? "jusqu'au 1er téléchargement" : "encore " + plural(left, "jour", "jours")) + "</span>" +
       "</div>" +
       '<div class="tr-meta">' + esc((t.sender ? t.sender.pseudo : "?") + " · " + timeAgo(t.created_at) + " · " +
-        plural(files.length, "fichier", "fichiers") + " · " + formatBytes(size)) +
+        plural(files.length, "fichier", "fichiers") + " · " + formatBytes(size) + from) +
         (t.download_count ? ' · <span class="dl">' + icon("download", 13) + " " + t.download_count + "</span>" : "") +
       "</div>" +
       (t.message ? '<p class="tr-msg">' + esc(t.message) + "</p>" : "") +
@@ -68,9 +72,14 @@ export async function mount(root, ctx) {
   let list = [];
   const emailOn = await emailEnabled();
 
+  // Espace Envois (personnel) : tous mes envois, de tous mes espaces.
+  // Séminaire : les envois de l'espace, de tout le groupe.
+  const personal = ctx.space.mode === "envoi";
   root.innerHTML =
-    '<header class="page-head"><div class="eyebrow">Espace ' + esc(ctx.space.name) + "</div><h1>Envois</h1>" +
-    '<div class="meta">Liens et emails envoyés depuis l\'espace, avec qui a ouvert et téléchargé.</div></header>' +
+    '<header class="page-head">' + (personal ? "" : '<div class="eyebrow">Espace ' + esc(ctx.space.name) + "</div>") + "<h1>" + (personal ? "Mes envois" : "Envois") + "</h1>" +
+    '<div class="meta">' + (personal
+      ? "Tout ce que tu as envoyé, avec qui a ouvert et téléchargé."
+      : "Liens et emails envoyés depuis l\'espace, avec qui a ouvert et téléchargé.") + "</div></header>" +
     '<a class="btn btn-primary btn-block" href="#/send">' + icon("send", 18) + " Nouvel envoi</a>" +
     '<div class="transfers" data-list><div class="skeleton"></div></div>';
 
@@ -78,8 +87,14 @@ export async function mount(root, ctx) {
 
   const load = async () => {
     try {
-      list = await listTransfers(ctx.space.id);
-      el.innerHTML = renderTransfers(list, ctx.space.participantId, ctx.space.isHost, emailOn);
+      if (personal) {
+        const r = await listMyTransfers();
+        list = r.list;
+        el.innerHTML = renderTransfers(list, r.mine, false, emailOn, ctx.space.id);
+      } else {
+        list = await listTransfers(ctx.space.id);
+        el.innerHTML = renderTransfers(list, ctx.space.participantId, ctx.space.isHost, emailOn);
+      }
     } catch (err) {
       el.innerHTML = '<p class="empty">' + esc(errorText(err)) + "</p>";
     }
@@ -108,7 +123,7 @@ export async function mount(root, ctx) {
     } else if (e.target.closest("[data-more]")) {
       actionSheet(t.title, [
         {
-          label: ctx.space.mode === "envoi" ? "Supprimer l'envoi et ses fichiers" : "Supprimer l'envoi", icon: "trash", danger: true,
+          label: fromEnvoi(t) ? "Supprimer l'envoi et ses fichiers" : "Supprimer l'envoi", icon: "trash", danger: true,
           run: () => removeTransfer(t)
         },
         {
@@ -126,8 +141,14 @@ export async function mount(root, ctx) {
 
   // Dans un espace d'envoi, les fichiers n'existent que pour l'envoi : on
   // les efface avec lui, sauf s'ils servent encore à un autre envoi.
+  // l'espace d'où l'envoi est parti (dans "Mes envois", pas forcément celui-ci)
+  function fromEnvoi(t) {
+    return t.space ? t.space.mode === "envoi" : ctx.space.mode === "envoi";
+  }
+
   async function removeTransfer(t) {
-    const withFiles = ctx.space.mode === "envoi";
+    // les fichiers d'un séminaire restent au séminaire
+    const withFiles = fromEnvoi(t);
     const ok = await confirmSheet(
       withFiles
         ? "Le lien ne marchera plus, et les fichiers de cet envoi seront effacés."

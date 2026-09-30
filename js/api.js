@@ -1,7 +1,7 @@
 // Accès aux données. Toutes les requêtes de l'appli passent par ici : les
 // vues ne connaissent ni PostgREST ni le Storage.
 
-import { sb, q, invoke, requireClient } from "./db.js?v=121";
+import { sb, q, invoke, requireClient } from "./db.js?v=122";
 
 // Toute requête passe par ici : sans config, message clair plutôt
 // qu'un "Cannot read properties of null".
@@ -440,6 +440,24 @@ export function listTransfers(spaceId) {
     .select(TRANSFER_COLS)
     .eq("space_id", spaceId)
     .order("created_at", { ascending: false }));
+}
+
+// "Mes envois" de l'espace Envois : tout ce que CE compte (ou cet appareil)
+// a envoyé, de n'importe lequel de ses espaces : un 2e espace Envois, un
+// séminaire... Rien ne se perd si les envois sont éparpillés.
+// { list, mine: Set des places (participants) de l'utilisateur }
+export async function listMyTransfers() {
+  const { data: s } = await db().auth.getSession();
+  const uid = s && s.session ? s.session.user.id : null;
+  if (!uid) return { list: [], mine: new Set() };
+  const places = await q(db().from("participants").select("id").eq("user_id", uid).eq("viewer", false));
+  const mine = new Set((places || []).map((p) => p.id));
+  if (!mine.size) return { list: [], mine };
+  const list = await q(db().from("transfers")
+    .select(TRANSFER_COLS + ", space_id, space:spaces(name, mode)")
+    .in("sender_id", [...mine])
+    .order("created_at", { ascending: false }));
+  return { list, mine };
 }
 
 export function getTransfer(id) {
