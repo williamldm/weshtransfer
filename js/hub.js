@@ -3,12 +3,12 @@
 // les espaces déjà ouverts sur cet appareil (ouvrir, oublier, supprimer).
 // session.js / api.js ne sont chargés qu'au moment d'agir.
 
-import { icon } from "./icons.js?v=120";
-import { esc, h, errorText, formatBytes, plural, actionSheet, confirmSheet, toast } from "./ui.js?v=120";
-import { isBlocked, FILE_MAX } from "./files.js?v=120";
-import { putPending, MAX_BYTES } from "./pending.js?v=120";
-import { mountWallpaperNote } from "./wallpapers.js?v=120";
-import { mountClaim } from "./claim-fx.js?v=120";
+import { icon } from "./icons.js?v=121";
+import { esc, h, errorText, formatBytes, plural, actionSheet, confirmSheet, toast } from "./ui.js?v=121";
+import { isBlocked, FILE_MAX } from "./files.js?v=121";
+import { putPending, MAX_BYTES } from "./pending.js?v=121";
+import { mountWallpaperNote } from "./wallpapers.js?v=121";
+import { mountClaim } from "./claim-fx.js?v=121";
 
 const PSEUDO_KEY = "seminaire.pseudo";
 const MODE_LABEL = { envoi: "Envois", seminaire: "Séminaire", revue: "Verdict" };
@@ -67,9 +67,9 @@ async function ensureAccount(form, fail) {
     fail("Ton email sert de compte (sans mot de passe) : on en a besoin.");
     return false;
   }
-  const session = await import("./session.js?v=120");
+  const session = await import("./session.js?v=121");
   await session.ensureAuth();
-  const { ensureVerified } = await import("./verify.js?v=120");
+  const { ensureVerified } = await import("./verify.js?v=121");
   if (await ensureVerified(email, { optional: false }) !== "ok") return false;
   try {
     await session.login(email);
@@ -78,7 +78,7 @@ async function ensureAccount(form, fail) {
     // pour cette session. On oublie ce que l'appareil croyait, on demande
     // un vrai code, et on recommence une fois.
     if (!/CODE_FAUX/.test(String((err && err.message) || err))) throw err;
-    const { forgetVerified } = await import("./api.js?v=120");
+    const { forgetVerified } = await import("./api.js?v=121");
     forgetVerified(email);
     if (await ensureVerified(email, { optional: false }) !== "ok") return false;
     await session.login(email);
@@ -252,7 +252,7 @@ function spaceMenu(k) {
     {
       label: "Oublier sur cet appareil", icon: "logout",
       run: async () => {
-        const session = await import("./session.js?v=120");
+        const session = await import("./session.js?v=121");
         session.forgetSpace(k.id);
         toast("\"" + k.name + "\" n'apparaît plus ici. Rien n'a été supprimé.", "ok");
         drawSpacesLink();
@@ -267,9 +267,9 @@ function spaceMenu(k) {
           { ok: "Tout supprimer", danger: true, title: "Supprimer l'espace" });
         if (!ok) return;
         try {
-          const session = await import("./session.js?v=120");
+          const session = await import("./session.js?v=121");
           await session.ensureAuth();
-          const api = await import("./api.js?v=120");
+          const api = await import("./api.js?v=121");
           await api.deleteSpace(k.id);
           session.forgetSpace(k.id);
           toast("\"" + k.name + "\" a été supprimé.", "ok");
@@ -334,7 +334,7 @@ deck.addEventListener("submit", async (e) => {
     if (mine) {
       // nouveau blaze : dans l'espace d'envoi, et dans son nom "Envois de ..."
       if (renaming && pseudo !== pseudoBefore) {
-        const session = await import("./session.js?v=120");
+        const session = await import("./session.js?v=121");
         await session.renameMe(mine.id, pseudo);
         if (/^Envois de /.test(mine.name)) await session.renameSpace(mine.id, "Envois de " + pseudo).catch(() => {});
       }
@@ -343,13 +343,13 @@ deck.addEventListener("submit", async (e) => {
       return;
     }
 
-    const session = await import("./session.js?v=120");
+    const session = await import("./session.js?v=121");
     if (kind === "join") await session.joinSpace(val("code"), pseudo);
     else if (kind === "salon") await session.createSpace(val("name"), "seminaire", pseudo);
     else if (kind === "revue") {
       const created = await session.createSpace(val("project"), "revue", pseudo);
       if (form.querySelector("[name=keep]").checked) {
-        const api = await import("./api.js?v=120");
+        const api = await import("./api.js?v=121");
         await api.updateSpace(created.id, { purge_at: null }).catch((err) => {
           try { sessionStorage.setItem("seminaire.flash", errorText(err)); } catch (e3) { /* privé */ }
         });
@@ -372,7 +372,7 @@ document.addEventListener("click", async (e) => {
     const ok = await confirmSheet("Rien n'est supprimé : tu retrouveras tout en te reconnectant avec ton email.",
       { ok: "Se déconnecter", title: "Se déconnecter de cet appareil" });
     if (!ok) return;
-    const session = await import("./session.js?v=120");
+    const session = await import("./session.js?v=121");
     await session.logout();
     drawSpacesLink();
     show("send");
@@ -394,7 +394,7 @@ document.addEventListener("click", async (e) => {
 async function openInvite(token) {
   show("invite");
   const box = deck.querySelector("[data-invite-view]");
-  const session = await import("./session.js?v=120");
+  const session = await import("./session.js?v=121");
   let info;
   try {
     info = await session.inviteInfo(token);
@@ -575,7 +575,7 @@ for (const el of document.querySelectorAll("[data-icon]")) el.innerHTML = icon(e
 
 // Connecté : "Mes espaces" à jour depuis le serveur (autres appareils)
 if (accountEmail()) {
-  import("./session.js?v=120").then((m) => m.syncSpaces()).then(() => {
+  import("./session.js?v=121").then((m) => m.syncSpaces()).then(() => {
     drawSpacesLink();
     if (tab === "spaces") show("spaces");
   }).catch(() => {});
@@ -587,8 +587,37 @@ const short = location.pathname.match(/^\/(i|c)\/([A-Za-z0-9]+)\/?$/) || [];
 const rawInvite = short[1] === "i" ? short[2] : (params.get("i") || "");
 const inviteToken = /^[0-9a-fA-F]{32}$/.test(rawInvite) ? rawInvite.toLowerCase() : rawInvite;
 const invited = ((short[1] === "c" ? short[2] : params.get("c")) || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+// Pourquoi l'appli nous a renvoyés ici (app.js) : un message clair, et pas
+// de boucle /c/<code> -> appli -> /c/<code>.
+let bounce = null;
+try {
+  bounce = JSON.parse(sessionStorage.getItem("seminaire.bounce") || "null");
+  sessionStorage.removeItem("seminaire.bounce");
+} catch (err) { /* privé */ }
+const BOUNCE_TEXT = {
+  session: "Ta session a expiré sur cet appareil. Reconnecte-toi avec ton email pour retrouver tes espaces.",
+  membre: "Tu ne fais plus partie de cet espace, ou il a été supprimé."
+};
+if (bounce && BOUNCE_TEXT[bounce.why]) toast(BOUNCE_TEXT[bounce.why], "err");
+
+// /c/<code> : déjà dans cet espace (cet appareil, ou ce compte) -> on y
+// entre sans redemander ni code ni blaze.
+async function enterByCode(code) {
+  const sent = bounce && bounce.code === code;
+  const isMine = (k) => String(k.code || "").toUpperCase() === code;
+  if (sent || !(known().some(isMine) || accountEmail())) { show("join", code); return; }
+  show("invite");   // squelette le temps de la vérification
+  if (accountEmail()) {
+    try { await (await import("./session.js?v=121")).syncSpaces(); } catch (err) { /* hors ligne */ }
+  }
+  const mine = known().find(isMine);
+  if (mine) goTo(mine);
+  else show("join", code);
+}
+
 if (/^(?:[0-9a-f]{32}|[A-Za-z0-9]{12})$/.test(inviteToken)) openInvite(inviteToken);
-else if (invited) show("join", invited.slice(0, 8));
+else if (invited) enterByCode(invited.slice(0, 8));
+else if (location.hash === "#connexion") show("spaces");
 else show("send");
 
 // Légende du décor et bouton "Fond suivant" (le décor lui-même est posé

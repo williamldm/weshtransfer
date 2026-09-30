@@ -186,6 +186,15 @@ qui retomberaient sur un utilisateur anonyme ; `tools/check.py` refuse un
 (`seminaire.verifiedEmails`) est tenue par session : le serveur range la
 vérification sous l'utilisateur de la session, pas de l'appareil.
 
+Au chargement de l'appli, `restore()` distingue trois échecs (`restoreFailure()`) :
+coupure réseau ou verrou pris (la session est toujours gardée : "Pas de réseau" +
+Réessayer, rien n'est oublié), session perdue (révoquée ou expirée : retour à
+l'accueil sur l'onglet de connexion, avec un message, l'espace reste dans la
+liste) et plus membre / espace supprimé (l'espace est oublié, `/c/<code>`
+prérempli). L'accueil ouvert sur `/c/<code>` entre directement quand l'appareil
+ou le compte est déjà dans cet espace ; `seminaire.bounce` (sessionStorage)
+évite le va-et-vient si l'appli vient de renvoyer vers ce lien.
+
 ### Entrée sur invitation (salons et retours)
 
 Les salons et espaces de retours créés depuis l'accueil sont **sur

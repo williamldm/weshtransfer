@@ -3,7 +3,7 @@
 // mot de passe), il partage le compte de cette adresse : les mêmes espaces,
 // envois et blazes sur tous ses appareils.
 
-import { sb, q, invoke, requireClient } from "./db.js?v=120";
+import { sb, q, invoke, requireClient } from "./db.js?v=121";
 
 const SPACE_KEY = "seminaire.space";      // espace actif
 const KNOWN_KEY = "seminaire.spaces";     // tous les espaces rejoints sur cet appareil
@@ -253,14 +253,35 @@ export async function renameSpace(spaceId, name) {
 }
 
 // Au démarrage de l'appli : la session et l'appartenance tiennent-elles ?
-// null = il faut repasser par l'écran d'entrée ; une exception = réseau.
+// null = il faut repasser par l'écran d'entrée (restoreFailure() dit
+// pourquoi) ; une exception = réseau, on ne perd rien.
+let failure = null;
+export const restoreFailure = () => failure;
+
+function hasStoredSession() {
+  try {
+    const s = JSON.parse(localStorage.getItem("seminaire.auth") || "null");
+    return !!(s && s.refresh_token);
+  } catch (err) {
+    return false;
+  }
+}
+
 export async function restore() {
   requireClient();
+  failure = null;
   const space = getSpace();
-  if (!space) return null;
+  if (!space) { failure = "aucun"; return null; }
 
-  const { data } = await sb.auth.getSession();
-  if (!data.session) return null;
+  const { data, error } = await sb.auth.getSession();
+  if (!data.session) {
+    // getSession échoue aussi sur une coupure réseau ou un verrou pris par
+    // un autre onglet : la session est alors toujours gardée, elle n'est pas
+    // perdue. Jamais traiter ça comme "il faut tout oublier".
+    if (error && hasStoredSession()) throw new Error("RESEAU");
+    failure = "session";   // révoquée ou expirée : supabase-js l'a effacée
+    return null;
+  }
 
   const [spaceRes, meRes] = await Promise.all([
     sb.from("spaces")
@@ -275,7 +296,7 @@ export async function restore() {
   ]);
 
   if (spaceRes.error || meRes.error) throw new Error("RESEAU");
-  if (!spaceRes.data || !meRes.data) return null;
+  if (!spaceRes.data || !meRes.data) { failure = "membre"; return null; }
 
   Object.assign(space, {
     name: spaceRes.data.name,

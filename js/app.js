@@ -1,23 +1,23 @@
 // Coquille de l'appli : démarrage, routeur à hash, en-tête, bus
 // d'événements, temps réel. Chaque vue est un module avec mount().
 
-import { restore, getSpace, leaveSpace, switchTo } from "./session.js?v=120";
-import { requireClient } from "./db.js?v=120";
-import { connectSpace } from "./realtime.js?v=120";
-import { startJam } from "./jam.js?v=120";
-import { bindPlayerBar } from "./player.js?v=120";
-import { activeCount, onUploads } from "./upload.js?v=120";
-import { openPeopleSheet } from "./views/people.js?v=120";
-import { openUploadSheet } from "./views/upload-sheet.js?v=120";
-import { icon } from "./icons.js?v=120";
-import { monogram } from "./brand.js?v=120";
-import { toast, errorText, esc } from "./ui.js?v=120";
+import { restore, restoreFailure, getSpace, leaveSpace, switchTo } from "./session.js?v=121";
+import { requireClient } from "./db.js?v=121";
+import { connectSpace } from "./realtime.js?v=121";
+import { startJam } from "./jam.js?v=121";
+import { bindPlayerBar } from "./player.js?v=121";
+import { activeCount, onUploads } from "./upload.js?v=121";
+import { openPeopleSheet } from "./views/people.js?v=121";
+import { openUploadSheet } from "./views/upload-sheet.js?v=121";
+import { icon } from "./icons.js?v=121";
+import { monogram } from "./brand.js?v=121";
+import { toast, errorText, esc } from "./ui.js?v=121";
 
-import * as home from "./views/home.js?v=120";
-import * as project from "./views/project.js?v=120";
-import * as file from "./views/file.js?v=120";
-import * as send from "./views/send.js?v=120";
-import * as transfers from "./views/transfers.js?v=120";
+import * as home from "./views/home.js?v=121";
+import * as project from "./views/project.js?v=121";
+import * as file from "./views/file.js?v=121";
+import * as send from "./views/send.js?v=121";
+import * as transfers from "./views/transfers.js?v=121";
 
 // L'accueil dépend du mode de l'espace : morceaux (séminaire) ou
 // directement le composeur d'envoi (espace dédié aux envois).
@@ -241,10 +241,21 @@ async function boot() {
 
   if (!space) {
     const saved = getSpace();
-    // espace disparu (purgé) ou session perdue : on l'oublie sur cet
-    // appareil ; s'il existe encore, le code pré-rempli permet d'y revenir
+    const why = restoreFailure();
+    const code = saved && saved.code ? saved.code : "";
+    // dit à l'accueil pourquoi on y revient (message, et pas de boucle)
+    try { sessionStorage.setItem("seminaire.bounce", JSON.stringify({ why, code })); } catch (err) { /* privé */ }
+    if (why === "session") {
+      // Session perdue (révoquée ou expirée) : l'espace existe toujours et
+      // l'appareil en fait toujours partie. On ne l'oublie pas et on ne
+      // demande pas un code d'espace : il faut se reconnecter au compte.
+      location.replace("index.html#connexion");
+      return;
+    }
+    // espace disparu (purgé) ou on n'en fait plus partie : on l'oublie sur
+    // cet appareil ; s'il existe encore, le code pré-rempli permet d'y revenir
     leaveSpace();
-    location.replace(saved && saved.code ? "/c/" + encodeURIComponent(saved.code) : "index.html");
+    location.replace(code ? "/c/" + encodeURIComponent(code) : "index.html");
     return;
   }
 
@@ -299,7 +310,7 @@ async function boot() {
   window.addEventListener("hashchange", routeSmoothly);
 
   // compte : "Mes espaces" à jour depuis le serveur (autres appareils)
-  import("./session.js?v=120").then((m) => m.syncSpaces()).catch(() => {});
+  import("./session.js?v=121").then((m) => m.syncSpaces()).catch(() => {});
 
   // message laissé par l'accueil (ex. réglage refusé à la création)
   try {
