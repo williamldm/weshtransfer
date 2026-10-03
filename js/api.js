@@ -1,8 +1,8 @@
 // Accès aux données. Toutes les requêtes de l'appli passent par ici : les
 // vues ne connaissent ni PostgREST ni le Storage.
 
-import { sb, q, invoke, requireClient } from "./db.js?v=128";
-import { setFileMax } from "./files.js?v=128";
+import { sb, q, invoke, requireClient } from "./db.js?v=129";
+import { setFileMax } from "./files.js?v=129";
 
 // Toute requête passe par ici : sans config, message clair plutôt
 // qu'un "Cannot read properties of null".
@@ -392,7 +392,8 @@ export async function listContacts(sender) {
     remote = (r && r.contacts) || [];
     rememberVerified(sender);   // le serveur a ouvert le carnet : adresse prouvée
   } catch (err) {
-    if (!/EMAIL_NON_VERIFIE/.test(String(err && err.message))) throw err;
+    // adresse pas encore vérifiée ici, réseau, session : on garde au moins
+    // le carnet de cet appareil plutôt que de ne rien proposer
   }
   // fusion : la date la plus récente l'emporte
   const byEmail = new Map();

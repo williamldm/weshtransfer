@@ -7,20 +7,20 @@
 import {
   getProject, getFilesByIds, createTransfer, transferWaitSeconds,
   getTransfer, transferUrl, createProject, signFiles, cachedUrl,
-  emailTransfer, emailEnabled, listContacts, suggestContacts, senderEmail, rememberContactsLocal
-} from "../api.js?v=128";
-import { accountEmail } from "../session.js?v=128";
-import { ensureVerified } from "../verify.js?v=128";
-import { openUploadSheet } from "./upload-sheet.js?v=128";
-import { mountUploads } from "./uploads.js?v=128";
-import { onUploads, enqueue, checkFile, getJobs } from "../upload.js?v=128";
-import { categoryOf, canPreview, FILE_MAX } from "../files.js?v=128";
-import { takePending } from "../pending.js?v=128";
-import { icon } from "../icons.js?v=128";
+  emailTransfer, emailEnabled, listContacts, suggestContacts, senderEmail, rememberContactsLocal, knownVerified
+} from "../api.js?v=129";
+import { accountEmail } from "../session.js?v=129";
+import { ensureVerified } from "../verify.js?v=129";
+import { openUploadSheet } from "./upload-sheet.js?v=129";
+import { mountUploads } from "./uploads.js?v=129";
+import { onUploads, enqueue, checkFile, getJobs } from "../upload.js?v=129";
+import { categoryOf, canPreview, FILE_MAX } from "../files.js?v=129";
+import { takePending } from "../pending.js?v=129";
+import { icon } from "../icons.js?v=129";
 import {
   esc, formatBytes, formatDuration, plural, toast, errorText, copyText, shareLink,
   canShare, formatDate, daysLeft, fileBadge, fileTile
-} from "../ui.js?v=128";
+} from "../ui.js?v=129";
 
 // Dans un espace "envoi", ce composeur EST l'accueil.
 export const title = (ctx) => (ctx && ctx.space.mode === "envoi" ? ctx.space.name : "Envoyer");
@@ -235,7 +235,17 @@ export async function mount(root, ctx, params) {
     const acc = accountEmail();
     fromInput.value = senderEmail(acc);
     const sender = fromInput.value.trim().toLowerCase();
-    if (MAIL_RE.test(sender)) listContacts(sender).then((l) => { mailContacts = l; drawMailRecents(); }).catch(() => {});
+    const loadMailContacts = () => {
+      const s = fromInput.value.trim().toLowerCase();
+      if (MAIL_RE.test(s)) listContacts(s).then((l) => { mailContacts = l; drawMailRecents(); offerBook(sxRecents, s, mailContacts, loadMailContacts); }).catch(() => {});
+    };
+    // pas de compte ni d'adresse connue ici : on demande la tienne d'abord,
+    // c'est elle qui ouvre ton carnet d'adresses
+    if (!acc && !MAIL_RE.test(fromInput.value.trim())) { fromInput.hidden = false; mailBox.insertBefore(fromInput, toInput); }
+    loadMailContacts();
+    let t = null;
+    fromInput.addEventListener("input", () => { clearTimeout(t); t = setTimeout(loadMailContacts, 400); });
+    toInput.addEventListener("focus", drawMailRecents);
     toInput.addEventListener("input", () => {
       // ton email n'est demandé que s'il y a un destinataire, et pas de compte
       fromInput.hidden = !!acc || !mailTo().length;
@@ -327,7 +337,7 @@ export async function mount(root, ctx, params) {
   if (folderInput) {
     folderInput.addEventListener("change", async (e) => {
       const list = Array.from(e.target.files);
-      const m = await import("../folders.js?v=128");
+      const m = await import("../folders.js?v=129");
       toast("Préparation du dossier (zip)...", "ok");
       try { addDirect(await m.fromFolderInput(list)); } catch (err) { toast(m.folderError(err), "err"); }
       e.target.value = "";
@@ -576,10 +586,15 @@ async function mountMailOption(root, created, preset) {
   const loadContacts = async () => {
     const sender = form.from.value.trim().toLowerCase();
     if (!EMAIL.test(sender)) return;
-    try { contacts = await listContacts(sender); drawRecents(); } catch (e) { /* sans carnet */ }
+    try { contacts = await listContacts(sender); drawRecents(); offerBook(recents, sender, contacts, loadContacts); } catch (e) { /* sans carnet */ }
   };
-  box.addEventListener("toggle", () => { if (box.open) loadContacts(); });
-  form.from.addEventListener("change", loadContacts);
+  if (!acc && !EMAIL.test(form.from.value.trim())) form.insertBefore(form.from.closest(".field"), form.firstChild);
+  // chargé tout de suite (pas seulement à l'ouverture du volet), et dès
+  // que l'adresse d'expéditeur est tapée
+  loadContacts();
+  box.addEventListener("toggle", () => { if (box.open) { loadContacts(); drawRecents(); } });
+  let fromTimer = null;
+  form.from.addEventListener("input", () => { clearTimeout(fromTimer); fromTimer = setTimeout(loadContacts, 400); });
   form.to.addEventListener("input", drawRecents);
   recents.addEventListener("click", (e) => {
     const b = e.target.closest("[data-add]");
@@ -635,4 +650,21 @@ async function mountMailOption(root, created, preset) {
     form.from.value = preset.from;
     form.requestSubmit();
   }
+}
+
+// Carnet vide alors qu'une adresse d'expéditeur est saisie : elle n'est
+// peut-être pas encore vérifiée sur cet appareil (le carnet d'une adresse
+// ne s'ouvre qu'à son propriétaire). On propose de la vérifier tout de
+// suite, pour retrouver ses destinataires dès le premier envoi.
+function offerBook(box, sender, contacts, reload) {
+  if (contacts.length || accountEmail() === sender) return;
+  if (knownVerified(sender)) return;   // déjà vérifiée ici : le carnet est simplement vide
+  box.hidden = false;
+  box.innerHTML = '<button type="button" class="link-btn" data-book>Retrouver mes adresses déjà utilisées</button>';
+  box.querySelector("[data-book]").onclick = async () => {
+    if (await ensureVerified(sender, { optional: false }) !== "ok") return;
+    try { localStorage.setItem("seminaire.replyTo", sender); } catch (err) { /* privé */ }
+    box.innerHTML = "";
+    reload();
+  };
 }
