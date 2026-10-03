@@ -6,18 +6,21 @@
 
 import {
   getProject, getFilesByIds, createTransfer, transferWaitSeconds,
-  getTransfer, transferUrl, createProject, signFiles, cachedUrl
-} from "../api.js?v=123";
-import { openUploadSheet } from "./upload-sheet.js?v=123";
-import { mountUploads } from "./uploads.js?v=123";
-import { onUploads, enqueue, checkFile, getJobs } from "../upload.js?v=123";
-import { categoryOf, canPreview, FILE_MAX } from "../files.js?v=123";
-import { takePending } from "../pending.js?v=123";
-import { icon } from "../icons.js?v=123";
+  getTransfer, transferUrl, createProject, signFiles, cachedUrl,
+  emailTransfer, emailEnabled, listContacts, suggestContacts, senderEmail, rememberContactsLocal
+} from "../api.js?v=124";
+import { accountEmail } from "../session.js?v=124";
+import { ensureVerified } from "../verify.js?v=124";
+import { openUploadSheet } from "./upload-sheet.js?v=124";
+import { mountUploads } from "./uploads.js?v=124";
+import { onUploads, enqueue, checkFile, getJobs } from "../upload.js?v=124";
+import { categoryOf, canPreview, FILE_MAX } from "../files.js?v=124";
+import { takePending } from "../pending.js?v=124";
+import { icon } from "../icons.js?v=124";
 import {
   esc, formatBytes, formatDuration, plural, toast, errorText, copyText, shareLink,
   canShare, formatDate, daysLeft, fileBadge, fileTile
-} from "../ui.js?v=123";
+} from "../ui.js?v=124";
 
 // Dans un espace "envoi", ce composeur EST l'accueil.
 export const title = (ctx) => (ctx && ctx.space.mode === "envoi" ? ctx.space.name : "Envoyer");
@@ -432,6 +435,22 @@ export async function showDone(root, ctx, created, info) {
         "</div>" +
       "</div>" +
 
+      // option : l'envoyer aussi par email (le lien reste le même)
+      '<details class="done-mail" data-mail hidden>' +
+        "<summary>" + icon("mail", 18) + "<span>Envoyer aussi par email</span></summary>" +
+        '<form data-mail-form novalidate>' +
+          '<label class="field"><span class="label">À</span>' +
+            '<input class="input" name="to" type="text" inputmode="email" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="email@exemple.fr, autre@exemple.fr"></label>' +
+          '<div class="recents" data-mail-recents hidden></div>' +
+          '<label class="field"><span class="label">Ton email</span>' +
+            '<input class="input" name="from" type="text" inputmode="email" autocomplete="email" autocapitalize="off" spellcheck="false" placeholder="pour qu\'on puisse te répondre"></label>' +
+          '<p class="form-error" data-mail-err hidden></p>' +
+          '<button class="btn btn-primary btn-block" type="submit">' + icon("send", 18) + "<span>Envoyer</span></button>" +
+          '<p class="hint">Chacun reçoit un email avec le lien. Ton adresse est vérifiée par un code, une seule fois.</p>' +
+        "</form>" +
+        '<ul class="recipients" data-mail-results hidden></ul>' +
+      "</details>" +
+
       '<div class="row-2 done-actions">' +
         '<a class="btn btn-block" href="#/transfers">Mes envois</a>' +
         '<button class="btn btn-block" data-again>Nouvel envoi</button>' +
@@ -446,9 +465,94 @@ export async function showDone(root, ctx, created, info) {
     share.onclick = () => shareLink({ title: info.title, text: ctx.space.pseudo + " t'envoie : " + info.title, url });
   }
   root.querySelector("[data-url]").addEventListener("focus", (e) => e.target.select());
+  mountMailOption(root, created);
   root.querySelector("[data-again]").onclick = () => {
     // même route : on force le remontage
     ctx.navigate("#/send?new=" + Date.now());
   };
   window.scrollTo(0, 0);
+}
+
+// ------------------------------------------- option : envoyer par email
+// Le lien est déjà créé ; on peut en plus l'adresser par email. L'adresse
+// de l'expéditeur est vérifiée par code (rien ne part "de la part de"
+// quelqu'un qui ne l'a pas prouvée) ; les adresses déjà utilisées sont
+// proposées.
+async function mountMailOption(root, created) {
+  const box = root.querySelector("[data-mail]");
+  if (!box || !(await emailEnabled())) return;
+  box.hidden = false;
+  const form = box.querySelector("[data-mail-form]");
+  const err = box.querySelector("[data-mail-err]");
+  const recents = box.querySelector("[data-mail-recents]");
+  const results = box.querySelector("[data-mail-results]");
+  const EMAIL = /^[^@\s<>]+@[^@\s<>]+\.[^@\s<>]+$/;
+  const acc = accountEmail();
+  form.from.value = senderEmail(acc);
+  if (acc) form.from.closest(".field").hidden = true;
+  const typed = () => form.to.value.split(/[\s,;]+/).map((x) => x.trim().toLowerCase()).filter(Boolean);
+  const fail = (m) => { err.textContent = m; err.hidden = false; };
+
+  let contacts = [];
+  const drawRecents = () => {
+    const last = form.to.value.split(/[\s,;]+/).pop();
+    const list = suggestContacts(contacts, last, typed());
+    recents.hidden = !list.length;
+    recents.innerHTML = list.length ? '<span class="label">Récents</span>' + list.map((r) =>
+      '<button type="button" class="chip" data-add="' + esc(r.email) + '">+ ' + esc(r.email) + "</button>").join("") : "";
+  };
+  const loadContacts = async () => {
+    const sender = form.from.value.trim().toLowerCase();
+    if (!EMAIL.test(sender)) return;
+    try { contacts = await listContacts(sender); drawRecents(); } catch (e) { /* sans carnet */ }
+  };
+  box.addEventListener("toggle", () => { if (box.open) loadContacts(); });
+  form.from.addEventListener("change", loadContacts);
+  form.to.addEventListener("input", drawRecents);
+  recents.addEventListener("click", (e) => {
+    const b = e.target.closest("[data-add]");
+    if (!b) return;
+    const parts = form.to.value.split(/[\s,;]+/).filter(Boolean);
+    const last = parts[parts.length - 1];
+    if (last && !EMAIL.test(last)) parts.pop();   // on remplace ce qui était en cours de frappe
+    parts.push(b.dataset.add);
+    form.to.value = parts.join(", ") + ", ";
+    form.to.focus();
+    drawRecents();
+  });
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    err.hidden = true;
+    const emails = [...new Set(typed())];
+    const from = form.from.value.trim().toLowerCase();
+    const bad = emails.find((x) => !EMAIL.test(x));
+    if (!emails.length) { form.to.focus(); return fail("Ajoute au moins une adresse."); }
+    if (bad) return fail("Adresse invalide : " + bad);
+    if (emails.length > 20) return fail("20 destinataires au plus par envoi.");
+    if (!EMAIL.test(from)) { form.from.focus(); return fail("Ton email est nécessaire : c'est à lui qu'on répond."); }
+    const btn = form.querySelector("[type=submit]");
+    const label = btn.innerHTML;
+    btn.disabled = true;
+    try {
+      if (await ensureVerified(from, { optional: false }) !== "ok") { btn.disabled = false; return; }
+      try { localStorage.setItem("seminaire.replyTo", from); } catch (e2) { /* privé */ }
+      btn.innerHTML = '<span class="spinner"></span><span>Décollage...</span>';
+      const r = await emailTransfer(created.id, emails, from);
+      const list = (r && r.results) || [];
+      const ok = list.filter((x) => x.status === "sent").map((x) => x.email);
+      rememberContactsLocal(from, ok);
+      results.hidden = false;
+      results.innerHTML = list.map((x) => "<li><span class=\"r-mail\">" + esc(x.email) + "</span>" +
+        (x.status === "sent" ? '<span class="st st-ok">' + icon("check", 14) + " envoyé</span>" : '<span class="st st-bad">échec</span>') + "</li>").join("");
+      form.to.value = "";
+      toast(ok.length ? plural(ok.length, "email parti", "emails partis") : "Aucun email n'est parti", ok.length ? "ok" : "err");
+      contacts = await listContacts(from).catch(() => contacts);
+      drawRecents();
+    } catch (e3) {
+      fail(errorText(e3));
+    }
+    btn.disabled = false;
+    btn.innerHTML = label;
+  });
 }

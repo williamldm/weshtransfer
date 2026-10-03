@@ -1,7 +1,7 @@
 // Accès aux données. Toutes les requêtes de l'appli passent par ici : les
 // vues ne connaissent ni PostgREST ni le Storage.
 
-import { sb, q, invoke, requireClient } from "./db.js?v=123";
+import { sb, q, invoke, requireClient } from "./db.js?v=124";
 
 // Toute requête passe par ici : sans config, message clair plutôt
 // qu'un "Cannot read properties of null".
@@ -426,6 +426,14 @@ export function forgetContact(sender, email) {
   return invoke("contacts", { action: "forget", sender, email }).catch((err) => {
     if (!/EMAIL_NON_VERIFIE/.test(String(err && err.message))) throw err;
   });
+}
+
+// Envoyer par email un envoi déjà créé (option) : on ajoute les
+// destinataires, puis la fonction send-transfer fait partir les emails
+// (elle exige que l'adresse de l'expéditeur soit vérifiée).
+export async function emailTransfer(transferId, emails, replyTo) {
+  await q(db().rpc("add_transfer_recipients", { p_transfer: transferId, p_emails: emails, p_reply_to: replyTo }));
+  return invoke("send-transfer", { transfer_id: transferId });
 }
 
 let emailCheck = null;

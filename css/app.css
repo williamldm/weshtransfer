@@ -1,5 +1,5 @@
-@import url("fonts.css?v=123");
-@import url("tokens.css?v=123");
+@import url("fonts.css?v=124");
+@import url("tokens.css?v=124");
 
 /* ================================================================= base */
 *, *::before, *::after { box-sizing: border-box; }
@@ -1566,3 +1566,12 @@ body.is-viewer [data-reply], body.is-viewer [data-reply-form], body.is-viewer [d
 body.is-viewer [data-behalf], body.is-viewer [data-more], body.is-viewer [data-goto-verify], body.is-viewer [data-rv-update],
 body.is-viewer [data-help] { display: none !important; }
 body.is-viewer .rh-cover-btn { pointer-events: none; }
+
+/* envoi : option "envoyer aussi par email" */
+.done-mail { margin: var(--sp-4) 0; padding: var(--sp-3) var(--sp-4); border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--surface); text-align: left; }
+.done-mail summary { display: flex; align-items: center; gap: var(--sp-2); min-height: 36px; font-weight: 600; cursor: pointer; list-style: none; }
+.done-mail summary::-webkit-details-marker { display: none; }
+.done-mail summary svg { color: var(--accent-bright); }
+.done-mail form { display: grid; gap: var(--sp-3); margin-top: var(--sp-3); }
+.done-mail .recents { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.done-mail .recipients { margin-top: var(--sp-3); }
