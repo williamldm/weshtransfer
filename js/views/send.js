@@ -8,19 +8,19 @@ import {
   getProject, getFilesByIds, createTransfer, transferWaitSeconds,
   getTransfer, transferUrl, createProject, signFiles, cachedUrl,
   emailTransfer, emailEnabled, listContacts, suggestContacts, senderEmail, rememberContactsLocal
-} from "../api.js?v=127";
-import { accountEmail } from "../session.js?v=127";
-import { ensureVerified } from "../verify.js?v=127";
-import { openUploadSheet } from "./upload-sheet.js?v=127";
-import { mountUploads } from "./uploads.js?v=127";
-import { onUploads, enqueue, checkFile, getJobs } from "../upload.js?v=127";
-import { categoryOf, canPreview, FILE_MAX } from "../files.js?v=127";
-import { takePending } from "../pending.js?v=127";
-import { icon } from "../icons.js?v=127";
+} from "../api.js?v=128";
+import { accountEmail } from "../session.js?v=128";
+import { ensureVerified } from "../verify.js?v=128";
+import { openUploadSheet } from "./upload-sheet.js?v=128";
+import { mountUploads } from "./uploads.js?v=128";
+import { onUploads, enqueue, checkFile, getJobs } from "../upload.js?v=128";
+import { categoryOf, canPreview, FILE_MAX } from "../files.js?v=128";
+import { takePending } from "../pending.js?v=128";
+import { icon } from "../icons.js?v=128";
 import {
   esc, formatBytes, formatDuration, plural, toast, errorText, copyText, shareLink,
   canShare, formatDate, daysLeft, fileBadge, fileTile
-} from "../ui.js?v=127";
+} from "../ui.js?v=128";
 
 // Dans un espace "envoi", ce composeur EST l'accueil.
 export const title = (ctx) => (ctx && ctx.space.mode === "envoi" ? ctx.space.name : "Envoyer");
@@ -100,6 +100,12 @@ export async function mount(root, ctx, params) {
         (envoiMode ? '<p class="add-folder">Un dossier entier ? Glisse-le ici, ou <label class="link-btn">choisis-le<input type="file" webkitdirectory hidden data-upload-folder></label> : il part en zip.</p>' : "") +
       "</div>" +
 
+      // facultatif : sans adresse, on obtient juste le lien
+      '<div class="sx-mail" data-sx-mail hidden>' +
+        '<input class="input" name="to" type="text" inputmode="email" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Envoyer à (email, facultatif)" aria-label="Destinataires">' +
+        '<div class="recents" data-sx-recents hidden></div>' +
+        '<input class="input" name="from" type="text" inputmode="email" autocomplete="email" autocapitalize="off" spellcheck="false" placeholder="Ton email (pour qu\'on te réponde)" aria-label="Ton email" hidden>' +
+      "</div>" +
       '<textarea class="input sx-msg" name="message" rows="2" maxlength="2000" placeholder="Un message ? (facultatif)" aria-label="Message"></textarea>' +
 
       '<details class="sx-more">' +
@@ -208,10 +214,52 @@ export async function mount(root, ctx, params) {
     drawSubmit();
   }
 
+  // -------------------------------------- destinataires par email (option)
+  const MAIL_RE = /^[^@\s<>]+@[^@\s<>]+\.[^@\s<>]+$/;
+  const mailBox = root.querySelector("[data-sx-mail]");
+  const toInput = form.querySelector("[name=to]");
+  const fromInput = form.querySelector("[name=from]");
+  const sxRecents = root.querySelector("[data-sx-recents]");
+  function mailTo() { return toInput ? [...new Set(toInput.value.split(/[\s,;]+/).map((x) => x.trim().toLowerCase()).filter(Boolean))] : []; }
+  let mailContacts = [];
+  function drawMailRecents() {
+    const last = toInput.value.split(/[\s,;]+/).pop();
+    const list = suggestContacts(mailContacts, last, mailTo());
+    sxRecents.hidden = !list.length;
+    sxRecents.innerHTML = list.length ? '<span class="label">Récents</span>' + list.map((r) =>
+      '<button type="button" class="chip" data-add="' + esc(r.email) + '">+ ' + esc(r.email) + "</button>").join("") : "";
+  }
+  if (envoiMode) emailEnabled().then((on) => {
+    if (!on) return;
+    mailBox.hidden = false;
+    const acc = accountEmail();
+    fromInput.value = senderEmail(acc);
+    const sender = fromInput.value.trim().toLowerCase();
+    if (MAIL_RE.test(sender)) listContacts(sender).then((l) => { mailContacts = l; drawMailRecents(); }).catch(() => {});
+    toInput.addEventListener("input", () => {
+      // ton email n'est demandé que s'il y a un destinataire, et pas de compte
+      fromInput.hidden = !!acc || !mailTo().length;
+      drawMailRecents();
+      drawSubmit();
+    });
+    sxRecents.addEventListener("click", (e) => {
+      const b = e.target.closest("[data-add]");
+      if (!b) return;
+      const parts = toInput.value.split(/[\s,;]+/).filter(Boolean);
+      if (parts.length && !MAIL_RE.test(parts[parts.length - 1])) parts.pop();
+      parts.push(b.dataset.add);
+      toInput.value = parts.join(", ") + ", ";
+      toInput.dispatchEvent(new Event("input"));
+      toInput.focus();
+    });
+  });
+
   function drawSubmit() {
     if (waiting > 0) return drawPending();
     autoDays();
-    submitEl.innerHTML = icon("link", 22) + "<span>" + (state.wait > 0 ? "Prochain lien dans " + waitLabel(state.wait) : "Créer le lien") + "</span>";
+    const n = mailTo().length;
+    submitEl.innerHTML = icon(n ? "send" : "link", 22) + "<span>" + (state.wait > 0 ? "Prochain lien dans " + waitLabel(state.wait)
+      : n ? "Envoyer à " + plural(n, "personne", "personnes") : "Créer le lien") + "</span>";
     submitEl.disabled = state.sending || !state.files.length || state.wait > 0;
   }
 
@@ -279,7 +327,7 @@ export async function mount(root, ctx, params) {
   if (folderInput) {
     folderInput.addEventListener("change", async (e) => {
       const list = Array.from(e.target.files);
-      const m = await import("../folders.js?v=127");
+      const m = await import("../folders.js?v=128");
       toast("Préparation du dossier (zip)...", "ok");
       try { addDirect(await m.fromFolderInput(list)); } catch (err) { toast(m.folderError(err), "err"); }
       e.target.value = "";
@@ -352,9 +400,21 @@ export async function mount(root, ctx, params) {
     const stamp = new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }).format(new Date());
     const title = titleInput.value.trim() || (draft && draft.title) || "Envoi du " + stamp;
 
+    // par email : adresses valides, et la tienne vérifiée AVANT de créer l'envoi
+    const emails = mailTo();
+    const from = emails.length ? fromInput.value.trim().toLowerCase() : "";
+    if (emails.length) {
+      const bad = emails.find((x) => !MAIL_RE.test(x));
+      if (bad) return toast("Adresse invalide : " + bad, "err");
+      if (emails.length > 20) return toast("20 destinataires au plus par envoi", "err");
+      if (!MAIL_RE.test(from)) { fromInput.hidden = false; fromInput.focus(); return toast("Ton email est nécessaire : c'est à lui qu'on répond", "err"); }
+      if (await ensureVerified(from, { optional: false }) !== "ok") return;
+      try { localStorage.setItem("seminaire.replyTo", from); } catch (e2) { /* privé */ }
+    }
+
     state.sending = true;
     drawSubmit();
-    submitEl.innerHTML = '<span class="spinner"></span><span>Impression du billet...</span>';
+    submitEl.innerHTML = '<span class="spinner"></span><span>' + (emails.length ? "Décollage..." : "Impression du billet...") + "</span>";
 
     try {
       const created = await createTransfer({
@@ -366,7 +426,7 @@ export async function mount(root, ctx, params) {
         untilDownload: state.days === 0
       });
       stopWait();
-      showDone(root, ctx, created, { title });
+      showDone(root, ctx, created, { title, mail: emails.length ? { emails, from } : null });
     } catch (err) {
       state.sending = false;
       // quelqu'un d'autre sur la même connexion vient d'envoyer : on attend
@@ -477,7 +537,7 @@ export async function showDone(root, ctx, created, info) {
     share.onclick = () => shareLink({ title: info.title, text: ctx.space.pseudo + " t'envoie : " + info.title, url });
   }
   root.querySelector("[data-url]").addEventListener("focus", (e) => e.target.select());
-  mountMailOption(root, created);
+  mountMailOption(root, created, info.mail);
   root.querySelector("[data-again]").onclick = () => {
     // même route : on force le remontage
     ctx.navigate("#/send?new=" + Date.now());
@@ -490,7 +550,7 @@ export async function showDone(root, ctx, created, info) {
 // de l'expéditeur est vérifiée par code (rien ne part "de la part de"
 // quelqu'un qui ne l'a pas prouvée) ; les adresses déjà utilisées sont
 // proposées.
-async function mountMailOption(root, created) {
+async function mountMailOption(root, created, preset) {
   const box = root.querySelector("[data-mail]");
   if (!box || !(await emailEnabled())) return;
   box.hidden = false;
@@ -567,4 +627,12 @@ async function mountMailOption(root, created) {
     btn.disabled = false;
     btn.innerHTML = label;
   });
+
+  // adresses déjà saisies dans le formulaire d'envoi : ça part tout de suite
+  if (preset && preset.emails.length) {
+    box.open = true;
+    form.to.value = preset.emails.join(", ");
+    form.from.value = preset.from;
+    form.requestSubmit();
+  }
 }

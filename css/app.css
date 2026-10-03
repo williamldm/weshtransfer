@@ -1,5 +1,5 @@
-@import url("fonts.css?v=127");
-@import url("tokens.css?v=127");
+@import url("fonts.css?v=128");
+@import url("tokens.css?v=128");
 
 /* ================================================================= base */
 *, *::before, *::after { box-sizing: border-box; }
@@ -1580,3 +1580,6 @@ body.is-viewer .rh-cover-btn { pointer-events: none; }
 .add-folder { margin: calc(-1 * var(--sp-2)) 0 var(--sp-3); color: var(--text-faint); font-size: var(--fs-xs); }
 .add-folder .link-btn { cursor: pointer; color: var(--accent-bright); }
 .sx-files .add-folder { margin: var(--sp-2) 0 0; }
+
+.sx-mail { display: grid; gap: var(--sp-2); }
+.sx-mail .recents { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }

@@ -11,7 +11,7 @@
 //   - bouton "un dossier" : fromFolderInput(input.files).
 // Les deux rendent une liste de File (fichiers simples + un zip par dossier).
 
-import { FILE_MAX, fileMaxLabel, isBlocked } from "./files.js?v=127";
+import { FILE_MAX, fileMaxLabel, isBlocked } from "./files.js?v=128";
 
 const ZIP_MEMORY_MAX = 1024 * 1024 * 1024;   // 1 Go
 const JUNK = /(^|\/)(\.DS_Store|Thumbs\.db|desktop\.ini|\.Spotlight-V100|\.Trashes|__MACOSX)(\/|$)|(^|\/)\._/;

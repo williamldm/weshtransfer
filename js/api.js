@@ -1,8 +1,8 @@
 // Accès aux données. Toutes les requêtes de l'appli passent par ici : les
 // vues ne connaissent ni PostgREST ni le Storage.
 
-import { sb, q, invoke, requireClient } from "./db.js?v=127";
-import { setFileMax } from "./files.js?v=127";
+import { sb, q, invoke, requireClient } from "./db.js?v=128";
+import { setFileMax } from "./files.js?v=128";
 
 // Toute requête passe par ici : sans config, message clair plutôt
 // qu'un "Cannot read properties of null".
