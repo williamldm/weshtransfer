@@ -39,6 +39,20 @@ const KEY = /^spaces\/([0-9a-f-]{36})\/([0-9a-f-]{36})\/([0-9a-f-]{36})\.([a-z0-
 // limite existe par appareil ET par IP, plus un disjoncteur global.
 const GB = 1024 ** 3;
 const env = (name: string, fallback: number) => Number(Deno.env.get(name) || fallback) * GB;
+// Comptes "gros envois" (secret BIG_SENDERS : emails séparés par des
+// virgules) : fichier jusqu'à BIG_FILE_GB (5 Go) au lieu de 2, et quota
+// par jour porté au double. Le plafond de stockage total reste le même.
+const BIG_FILE = Number(Deno.env.get("BIG_FILE_GB") || 5) * 1024 ** 3;
+const bigSenders = () => new Set((Deno.env.get("BIG_SENDERS") ?? "").split(",").map((x) => x.trim().toLowerCase()).filter(Boolean));
+// deno-lint-ignore no-explicit-any
+async function isBigSender(service: any, uid: string): Promise<boolean> {
+  const list = bigSenders();
+  if (!list.size) return false;
+  const { data } = await service.auth.admin.getUserById(uid);
+  const u = data?.user;
+  return !!u && !u.is_anonymous && !!u.email_confirmed_at && list.has((u.email || "").toLowerCase());
+}
+
 const LIMITS = {
   userDay: env("UPLOAD_USER_DAY_GB", 3),       // par appareil, sur 24 h
   ipDay: env("UPLOAD_IP_DAY_GB", 3),           // par IP, sur 24 h (3 Go)
@@ -97,7 +111,8 @@ Deno.serve(async (req) => {
   try {
     // ------------------------------------------------------------ config
     if (action === "config") {
-      return json({ backend: b2 ? "b2" : "supabase", part_size: PART_SIZE });
+      const big = await isBigSender(service, uid);
+      return json({ backend: b2 ? "b2" : "supabase", part_size: PART_SIZE, max_file: big ? BIG_FILE : FILE_MAX });
     }
 
     // ------------------------------------------------------ upload B2
@@ -124,7 +139,9 @@ Deno.serve(async (req) => {
         const { data: dep } = await db.from("participants").select("viewer").eq("space_id", project.space_id).eq("user_id", uid).maybeSingle();
         if (!dep || dep.viewer) return json({ error: dep ? "ECOUTE_SEULE" : "NON_MEMBRE" }, 403);
         const spaceMax = (project as unknown as { space: { max_file_bytes: number } }).space?.max_file_bytes ?? 0;
-        const max = spaceMax ? Math.min(spaceMax, FILE_MAX) : FILE_MAX;
+        const big = await isBigSender(service, uid);
+        const max = big ? BIG_FILE : (spaceMax ? Math.min(spaceMax, FILE_MAX) : FILE_MAX);
+        const dayMax = big ? Math.max(LIMITS.userDay, BIG_FILE * 2) : 0;
         if (size > max) return json({ error: "TROP_LOURD" }, 413);
 
         // Un identifiant déjà pris = tentative d'écraser le son de quelqu'un.
@@ -142,9 +159,10 @@ Deno.serve(async (req) => {
         const { data: used, error: usedError } = await service.rpc("storage_used");
         if (usedError) return json({ error: "ERREUR_BASE", detail: usedError.message }, 500);
         if (Number(used) + size > LIMITS.total) return json({ error: "STOCKAGE_PLEIN" }, 507);
-        if (b.user_day + size > LIMITS.userDay || b.ip_day + size > LIMITS.ipDay) {
+        const userDay = dayMax || LIMITS.userDay, ipDay = dayMax || LIMITS.ipDay;
+        if (b.user_day + size > userDay || b.ip_day + size > ipDay) {
           // ce qu'il reste sur 24 h, pour un message précis
-          const left = Math.max(0, Math.min(LIMITS.userDay - b.user_day, LIMITS.ipDay - b.ip_day));
+          const left = Math.max(0, Math.min(userDay - b.user_day, ipDay - b.ip_day));
           return json({ error: "QUOTA_UPLOAD_JOUR", left }, 429);
         }
         if (b.space + size > LIMITS.space) return json({ error: "QUOTA_ESPACE" }, 413);

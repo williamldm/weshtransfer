@@ -1,7 +1,8 @@
 // Accès aux données. Toutes les requêtes de l'appli passent par ici : les
 // vues ne connaissent ni PostgREST ni le Storage.
 
-import { sb, q, invoke, requireClient } from "./db.js?v=125";
+import { sb, q, invoke, requireClient } from "./db.js?v=126";
+import { setFileMax } from "./files.js?v=126";
 
 // Toute requête passe par ici : sans config, message clair plutôt
 // qu'un "Cannot read properties of null".
@@ -265,6 +266,7 @@ let storageConf = null;
 export function storageConfig() {
   if (!storageConf) {
     storageConf = storageCall("config")
+      .then((r) => { if (r && r.max_file) setFileMax(r.max_file); return r; })
       .catch(() => ({ backend: "supabase" }));
   }
   return storageConf;

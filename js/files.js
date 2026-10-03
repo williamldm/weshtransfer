@@ -42,7 +42,21 @@ const MIME = {
 };
 
 // 2 Go par fichier, partout (le serveur applique la même limite)
-export const FILE_MAX = 2 * 1024 * 1024 * 1024;
+// 2 Go par fichier ; certains comptes ont plus (le serveur le dit dans
+// storage "config" : setFileMax). Liaison vivante : tous les modules qui
+// importent FILE_MAX voient la nouvelle valeur.
+export const FILE_MAX_BASE = 2 * 1024 * 1024 * 1024;
+const MAX_KEY = "seminaire.fileMax";
+function storedMax() {
+  try { const n = Number(localStorage.getItem(MAX_KEY)); return n > FILE_MAX_BASE && n <= 20 * 1024 ** 3 ? n : FILE_MAX_BASE; } catch (err) { return FILE_MAX_BASE; }
+}
+export let FILE_MAX = storedMax();
+export function setFileMax(n) {
+  const v = Number(n) > 0 ? Number(n) : FILE_MAX_BASE;
+  FILE_MAX = v;
+  try { if (v > FILE_MAX_BASE) localStorage.setItem(MAX_KEY, String(v)); else localStorage.removeItem(MAX_KEY); } catch (err) { /* privé */ }
+}
+export const fileMaxLabel = () => (FILE_MAX / 1024 ** 3).toLocaleString("fr-FR", { maximumFractionDigits: 1 }) + " Go";
 
 export function extOf(name) {
   const m = /\.([a-z0-9]{1,10})$/i.exec(name || "");

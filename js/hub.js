@@ -3,12 +3,12 @@
 // les espaces déjà ouverts sur cet appareil (ouvrir, oublier, supprimer).
 // session.js / api.js ne sont chargés qu'au moment d'agir.
 
-import { icon } from "./icons.js?v=125";
-import { esc, h, errorText, formatBytes, plural, actionSheet, confirmSheet, promptSheet, toast } from "./ui.js?v=125";
-import { isBlocked, FILE_MAX } from "./files.js?v=125";
-import { putPending, MAX_BYTES } from "./pending.js?v=125";
-import { mountWallpaperNote } from "./wallpapers.js?v=125";
-import { mountClaim } from "./claim-fx.js?v=125";
+import { icon } from "./icons.js?v=126";
+import { esc, h, errorText, formatBytes, plural, actionSheet, confirmSheet, promptSheet, toast } from "./ui.js?v=126";
+import { isBlocked, FILE_MAX, fileMaxLabel } from "./files.js?v=126";
+import { putPending, MAX_BYTES } from "./pending.js?v=126";
+import { mountWallpaperNote } from "./wallpapers.js?v=126";
+import { mountClaim } from "./claim-fx.js?v=126";
 
 const PSEUDO_KEY = "seminaire.pseudo";
 const MODE_LABEL = { envoi: "Envois", seminaire: "Séminaire", revue: "Verdict" };
@@ -89,9 +89,9 @@ async function ensureAccount(form, fail) {
     fail("Ton email sert de compte (sans mot de passe) : on en a besoin.");
     return false;
   }
-  const session = await import("./session.js?v=125");
+  const session = await import("./session.js?v=126");
   await session.ensureAuth();
-  const { ensureVerified } = await import("./verify.js?v=125");
+  const { ensureVerified } = await import("./verify.js?v=126");
   if (await ensureVerified(email, { optional: false }) !== "ok") return false;
   try {
     await session.login(email);
@@ -100,7 +100,7 @@ async function ensureAccount(form, fail) {
     // pour cette session. On oublie ce que l'appareil croyait, on demande
     // un vrai code, et on recommence une fois.
     if (!/CODE_FAUX/.test(String((err && err.message) || err))) throw err;
-    const { forgetVerified } = await import("./api.js?v=125");
+    const { forgetVerified } = await import("./api.js?v=126");
     forgetVerified(email);
     if (await ensureVerified(email, { optional: false }) !== "ok") return false;
     await session.login(email);
@@ -134,7 +134,7 @@ const VIEWS = {
       '<label class="add-files" data-drop>' +
         '<span class="add-circle">' + icon("plus", 26) + "</span>" +
         "<span><strong>" + (picked.length ? "Ajouter d'autres fichiers" : "Ajoute tes fichiers") + "</strong>" +
-        "<small>ou glisse-les ici · 2 Go max par fichier</small></span>" +
+        "<small>ou glisse-les ici · " + fileMaxLabel() + " max par fichier</small></span>" +
         '<input type="file" multiple hidden data-files></label>' +
       '<p class="add-folder">Un dossier entier ? Glisse-le ici, ou <label class="link-btn">choisis-le<input type="file" webkitdirectory hidden data-folder></label> : il part en zip.</p>' +
       (picked.length
@@ -234,7 +234,7 @@ function addFiles(list) {
   const refused = incoming.filter((f) => isBlocked(f.name));
   for (const f of refused) toast(f.name + " : les programmes ne sont pas acceptés", "err");
   const heavy = incoming.filter((f) => !isBlocked(f.name) && f.size > FILE_MAX);
-  for (const f of heavy) toast(f.name + " : trop lourd, 2 Go max par fichier", "err");
+  for (const f of heavy) toast(f.name + " : trop lourd, " + fileMaxLabel() + " max par fichier", "err");
   picked = picked.concat(incoming.filter((f) => !isBlocked(f.name) && f.size > 0 && f.size <= FILE_MAX));
   show("send");
 }
@@ -244,7 +244,7 @@ deck.addEventListener("input", (e) => {
 });
 deck.addEventListener("change", (e) => {
   if (e.target.matches("[data-files]")) { addFiles(e.target.files); e.target.value = ""; }
-  if (e.target.matches("[data-folder]")) { const list = Array.from(e.target.files); addFolder(() => import("./folders.js?v=125").then((m) => m.fromFolderInput(list))); e.target.value = ""; }
+  if (e.target.matches("[data-folder]")) { const list = Array.from(e.target.files); addFolder(() => import("./folders.js?v=126").then((m) => m.fromFolderInput(list))); e.target.value = ""; }
 });
 
 // glisser-déposer n'importe où sur la page
@@ -264,7 +264,7 @@ document.addEventListener("drop", (e) => {
   const maybeDir = Array.from(dt.items || []).some((it) => { const en = it.webkitGetAsEntry && it.webkitGetAsEntry(); return en && en.isDirectory; });
   if (!maybeDir) { addFiles(dt.files); return; }
   const entries = Array.from(dt.items).map((it) => ({ entry: it.webkitGetAsEntry(), file: it.getAsFile() }));
-  addFolder(() => import("./folders.js?v=125").then((m) => m.fromEntries(entries)));
+  addFolder(() => import("./folders.js?v=126").then((m) => m.fromEntries(entries)));
 });
 
 // Dossier -> zip, avec un mot pendant la préparation
@@ -273,7 +273,7 @@ async function addFolder(make) {
   try {
     addFiles(await make());
   } catch (err) {
-    const m = await import("./folders.js?v=125");
+    const m = await import("./folders.js?v=126");
     toast(m.folderError(err), "err");
   }
 }
@@ -298,7 +298,7 @@ function spaceMenu(k) {
     {
       label: "Oublier sur cet appareil", icon: "logout",
       run: async () => {
-        const session = await import("./session.js?v=125");
+        const session = await import("./session.js?v=126");
         session.forgetSpace(k.id);
         toast("\"" + k.name + "\" n'apparaît plus ici. Rien n'a été supprimé.", "ok");
         drawSpacesLink();
@@ -313,9 +313,9 @@ function spaceMenu(k) {
           { ok: "Tout supprimer", danger: true, title: "Supprimer l'espace" });
         if (!ok) return;
         try {
-          const session = await import("./session.js?v=125");
+          const session = await import("./session.js?v=126");
           await session.ensureAuth();
-          const api = await import("./api.js?v=125");
+          const api = await import("./api.js?v=126");
           await api.deleteSpace(k.id);
           session.forgetSpace(k.id);
           toast("\"" + k.name + "\" a été supprimé.", "ok");
@@ -373,7 +373,7 @@ deck.addEventListener("submit", async (e) => {
     // demande au serveur avant de créer un 2e espace Envois, qui ferait
     // disparaître les envois déjà faits de "Mes envois".
     if (kind === "send" && !mine && accountEmail()) {
-      const session = await import("./session.js?v=125");
+      const session = await import("./session.js?v=126");
       await session.syncSpaces();
       mine = known().find((k) => k.mode === "envoi");
     }
@@ -392,13 +392,13 @@ deck.addEventListener("submit", async (e) => {
       return;
     }
 
-    const session = await import("./session.js?v=125");
+    const session = await import("./session.js?v=126");
     if (kind === "join") await session.joinSpace(val("code"), pseudo);
     else if (kind === "salon") await session.createSpace(val("name"), "seminaire", pseudo);
     else if (kind === "revue") {
       const created = await session.createSpace(val("project"), "revue", pseudo);
       if (form.querySelector("[name=keep]").checked) {
-        const api = await import("./api.js?v=125");
+        const api = await import("./api.js?v=126");
         await api.updateSpace(created.id, { purge_at: null }).catch((err) => {
           try { sessionStorage.setItem("seminaire.flash", errorText(err)); } catch (e3) { /* privé */ }
         });
@@ -421,7 +421,7 @@ document.addEventListener("click", async (e) => {
     const ok = await confirmSheet("Rien n'est supprimé : tu retrouveras tout en te reconnectant avec ton email.",
       { ok: "Se déconnecter", title: "Se déconnecter de cet appareil" });
     if (!ok) return;
-    const session = await import("./session.js?v=125");
+    const session = await import("./session.js?v=126");
     await session.logout();
     drawSpacesLink();
     show("send");
@@ -433,7 +433,7 @@ document.addEventListener("click", async (e) => {
     const next = ((await promptSheet("Ton blaze, partout", before, { max: 24, ok: "Changer partout" })) || "").trim();
     if (!next || next === before) return;
     try {
-      const session = await import("./session.js?v=125");
+      const session = await import("./session.js?v=126");
       const r = await session.setBlaze(next);
       toast("Tu es " + r.blaze + " dans tous tes espaces" +
         (r.taken.length ? " (sauf " + r.taken.join(", ") + " : déjà pris par quelqu'un)" : ""), r.taken.length ? "err" : "ok");
@@ -450,7 +450,7 @@ document.addEventListener("click", async (e) => {
 async function openInvite(token) {
   show("invite");
   const box = deck.querySelector("[data-invite-view]");
-  const session = await import("./session.js?v=125");
+  const session = await import("./session.js?v=126");
   let info;
   try {
     info = await session.inviteInfo(token);
@@ -577,6 +577,15 @@ async function openInvite(token) {
   });
 }
 
+// Compte connecté : sa limite de taille (2 Go, ou plus pour un compte
+// "gros envois"), affichée dès qu'elle est connue.
+if (accountEmail()) {
+  const before = FILE_MAX;
+  import("./api.js?v=126").then((m) => m.storageConfig()).then(() => {
+    if (FILE_MAX !== before && deck.querySelector('[data-form="send"]') && !picked.length) show("send");
+  }).catch(() => {});
+}
+
 // -------------------------------------------------- compteur de CO₂
 // Pure blague : ~49 kg/h, soit un trajet Paris-Marseille en SUV toutes les
 // deux heures. Affiché au gramme près, sérieux comme un tableau de bord.
@@ -630,7 +639,7 @@ for (const el of document.querySelectorAll("[data-icon]")) el.innerHTML = icon(e
 
 // Connecté : "Mes espaces" à jour depuis le serveur (autres appareils)
 if (accountEmail()) {
-  import("./session.js?v=125").then((m) => m.syncSpaces()).then(() => {
+  import("./session.js?v=126").then((m) => m.syncSpaces()).then(() => {
     drawSpacesLink();
     if (tab === "spaces") show("spaces");
     // blaze et espace Envois du compte, sauf si on est en train de taper
@@ -665,7 +674,7 @@ async function enterByCode(code) {
   if (sent || !(known().some(isMine) || accountEmail())) { show("join", code); return; }
   show("invite");   // squelette le temps de la vérification
   if (accountEmail()) {
-    try { await (await import("./session.js?v=125")).syncSpaces(); } catch (err) { /* hors ligne */ }
+    try { await (await import("./session.js?v=126")).syncSpaces(); } catch (err) { /* hors ligne */ }
   }
   const mine = known().find(isMine);
   if (mine) goTo(mine);

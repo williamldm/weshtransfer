@@ -1,12 +1,12 @@
 // Historique des envois de l'espace : qui a reçu quoi, qui a ouvert,
 // qui a téléchargé. Mis à jour en direct.
 
-import { listTransfers, listMyTransfers, revokeTransfer, deleteTransfer, transferUrl, deleteFile, listTransferRefs } from "../api.js?v=125";
-import { icon } from "../icons.js?v=125";
+import { listTransfers, listMyTransfers, revokeTransfer, deleteTransfer, transferUrl, deleteFile, listTransferRefs } from "../api.js?v=126";
+import { icon } from "../icons.js?v=126";
 import {
   esc, formatBytes, plural, timeAgo, formatDate, daysLeft, toast, errorText, copyText, shareLink,
   canShare, confirmSheet, actionSheet
-} from "../ui.js?v=125";
+} from "../ui.js?v=126";
 
 export const title = () => "Envois";
 

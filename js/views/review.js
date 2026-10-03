@@ -15,11 +15,11 @@
 import {
   listCommentsOf, addComment, deleteComment, setCommentResolved, setCommentVerified,
   setFileApproved, updateFile, reviewFlush
-} from "../api.js?v=125";
-import { formatTime } from "../waveform.js?v=125";
-import { icon } from "../icons.js?v=125";
-import { esc, h, timeAgo, toast, errorText, plural, confirmSheet, openSheet, copyText, triggerDownload, formatBytes } from "../ui.js?v=125";
-import { enqueue, onUploads, checkFile } from "../upload.js?v=125";
+} from "../api.js?v=126";
+import { formatTime } from "../waveform.js?v=126";
+import { icon } from "../icons.js?v=126";
+import { esc, h, timeAgo, toast, errorText, plural, confirmSheet, openSheet, copyText, triggerDownload, formatBytes } from "../ui.js?v=126";
+import { enqueue, onUploads, checkFile } from "../upload.js?v=126";
 
 export const TAGS = [
   ["voix", "Voix"], ["instru", "Instru"], ["basse", "Basse"], ["batterie", "Batterie"],

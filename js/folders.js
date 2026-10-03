@@ -11,7 +11,7 @@
 //   - bouton "un dossier" : fromFolderInput(input.files).
 // Les deux rendent une liste de File (fichiers simples + un zip par dossier).
 
-import { FILE_MAX, isBlocked } from "./files.js?v=125";
+import { FILE_MAX, fileMaxLabel, isBlocked } from "./files.js?v=126";
 
 const JUNK = /(^|\/)(\.DS_Store|Thumbs\.db|desktop\.ini|\.Spotlight-V100|\.Trashes|__MACOSX)(\/|$)|(^|\/)\._/;
 
@@ -81,6 +81,6 @@ export async function fromFolderInput(fileList) {
 export function folderError(err) {
   const code = String((err && err.message) || err);
   if (/DOSSIER_VIDE/.test(code)) return "Ce dossier est vide.";
-  if (/DOSSIER_TROP_LOURD/.test(code)) return "Ce dossier dépasse 2 Go : envoie-le en plusieurs morceaux.";
+  if (/DOSSIER_TROP_LOURD/.test(code)) return "Ce dossier dépasse " + fileMaxLabel() + " : envoie-le en plusieurs morceaux.";
   return "Impossible de lire ce dossier. Essaie de le compresser dans le Finder (clic droit, Compresser).";
 }

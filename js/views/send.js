@@ -8,19 +8,19 @@ import {
   getProject, getFilesByIds, createTransfer, transferWaitSeconds,
   getTransfer, transferUrl, createProject, signFiles, cachedUrl,
   emailTransfer, emailEnabled, listContacts, suggestContacts, senderEmail, rememberContactsLocal
-} from "../api.js?v=125";
-import { accountEmail } from "../session.js?v=125";
-import { ensureVerified } from "../verify.js?v=125";
-import { openUploadSheet } from "./upload-sheet.js?v=125";
-import { mountUploads } from "./uploads.js?v=125";
-import { onUploads, enqueue, checkFile, getJobs } from "../upload.js?v=125";
-import { categoryOf, canPreview, FILE_MAX } from "../files.js?v=125";
-import { takePending } from "../pending.js?v=125";
-import { icon } from "../icons.js?v=125";
+} from "../api.js?v=126";
+import { accountEmail } from "../session.js?v=126";
+import { ensureVerified } from "../verify.js?v=126";
+import { openUploadSheet } from "./upload-sheet.js?v=126";
+import { mountUploads } from "./uploads.js?v=126";
+import { onUploads, enqueue, checkFile, getJobs } from "../upload.js?v=126";
+import { categoryOf, canPreview, FILE_MAX } from "../files.js?v=126";
+import { takePending } from "../pending.js?v=126";
+import { icon } from "../icons.js?v=126";
 import {
   esc, formatBytes, formatDuration, plural, toast, errorText, copyText, shareLink,
   canShare, formatDate, daysLeft, fileBadge, fileTile
-} from "../ui.js?v=125";
+} from "../ui.js?v=126";
 
 // Dans un espace "envoi", ce composeur EST l'accueil.
 export const title = (ctx) => (ctx && ctx.space.mode === "envoi" ? ctx.space.name : "Envoyer");
@@ -94,7 +94,7 @@ export async function mount(root, ctx, params) {
         '<label class="sx-add" data-dropzone>' +
           '<span class="sx-add-ic">' + icon("plus", 20) + "</span>" +
           '<span class="sx-add-txt"><strong data-add-label>Ajoute tes fichiers</strong><small data-total>ou glisse-les ici · ' +
-            formatBytes(Math.min(ctx.space.maxFileBytes || FILE_MAX, FILE_MAX)) + " max</small></span>" +
+            formatBytes(Math.max(FILE_MAX, Math.min(ctx.space.maxFileBytes || FILE_MAX, FILE_MAX))) + " max</small></span>" +
           (envoiMode ? '<input type="file" multiple hidden data-upload>' : '<input type="file" multiple hidden data-upload-sheet>') +
         "</label>" +
         (envoiMode ? '<p class="add-folder">Un dossier entier ? Glisse-le ici, ou <label class="link-btn">choisis-le<input type="file" webkitdirectory hidden data-upload-folder></label> : il part en zip.</p>' : "") +
@@ -203,7 +203,7 @@ export async function mount(root, ctx, params) {
     const total = state.files.reduce((sum, f) => sum + (f.size_bytes || 0), 0);
     totalEl.textContent = state.files.length
       ? plural(state.files.length, "fichier", "fichiers") + " · " + formatBytes(total)
-      : "ou glisse-les ici · " + formatBytes(Math.min(ctx.space.maxFileBytes || FILE_MAX, FILE_MAX)) + " max";
+      : "ou glisse-les ici · " + formatBytes(Math.max(FILE_MAX, Math.min(ctx.space.maxFileBytes || FILE_MAX, FILE_MAX))) + " max";
     addLabel.textContent = state.files.length ? "Ajouter d'autres fichiers" : "Ajoute tes fichiers";
     drawSubmit();
   }
@@ -279,7 +279,7 @@ export async function mount(root, ctx, params) {
   if (folderInput) {
     folderInput.addEventListener("change", async (e) => {
       const list = Array.from(e.target.files);
-      const m = await import("../folders.js?v=125");
+      const m = await import("../folders.js?v=126");
       toast("Préparation du dossier (zip)...", "ok");
       try { addDirect(await m.fromFolderInput(list)); } catch (err) { toast(m.folderError(err), "err"); }
       e.target.value = "";
