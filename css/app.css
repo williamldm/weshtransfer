@@ -1,5 +1,5 @@
-@import url("fonts.css?v=124");
-@import url("tokens.css?v=124");
+@import url("fonts.css?v=125");
+@import url("tokens.css?v=125");
 
 /* ================================================================= base */
 *, *::before, *::after { box-sizing: border-box; }
@@ -1575,3 +1575,8 @@ body.is-viewer .rh-cover-btn { pointer-events: none; }
 .done-mail form { display: grid; gap: var(--sp-3); margin-top: var(--sp-3); }
 .done-mail .recents { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .done-mail .recipients { margin-top: var(--sp-3); }
+
+/* envoyer un dossier entier (zippé dans le navigateur) */
+.add-folder { margin: calc(-1 * var(--sp-2)) 0 var(--sp-3); color: var(--text-faint); font-size: var(--fs-xs); }
+.add-folder .link-btn { cursor: pointer; color: var(--accent-bright); }
+.sx-files .add-folder { margin: var(--sp-2) 0 0; }

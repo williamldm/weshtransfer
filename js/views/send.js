@@ -8,19 +8,19 @@ import {
   getProject, getFilesByIds, createTransfer, transferWaitSeconds,
   getTransfer, transferUrl, createProject, signFiles, cachedUrl,
   emailTransfer, emailEnabled, listContacts, suggestContacts, senderEmail, rememberContactsLocal
-} from "../api.js?v=124";
-import { accountEmail } from "../session.js?v=124";
-import { ensureVerified } from "../verify.js?v=124";
-import { openUploadSheet } from "./upload-sheet.js?v=124";
-import { mountUploads } from "./uploads.js?v=124";
-import { onUploads, enqueue, checkFile, getJobs } from "../upload.js?v=124";
-import { categoryOf, canPreview, FILE_MAX } from "../files.js?v=124";
-import { takePending } from "../pending.js?v=124";
-import { icon } from "../icons.js?v=124";
+} from "../api.js?v=125";
+import { accountEmail } from "../session.js?v=125";
+import { ensureVerified } from "../verify.js?v=125";
+import { openUploadSheet } from "./upload-sheet.js?v=125";
+import { mountUploads } from "./uploads.js?v=125";
+import { onUploads, enqueue, checkFile, getJobs } from "../upload.js?v=125";
+import { categoryOf, canPreview, FILE_MAX } from "../files.js?v=125";
+import { takePending } from "../pending.js?v=125";
+import { icon } from "../icons.js?v=125";
 import {
   esc, formatBytes, formatDuration, plural, toast, errorText, copyText, shareLink,
   canShare, formatDate, daysLeft, fileBadge, fileTile
-} from "../ui.js?v=124";
+} from "../ui.js?v=125";
 
 // Dans un espace "envoi", ce composeur EST l'accueil.
 export const title = (ctx) => (ctx && ctx.space.mode === "envoi" ? ctx.space.name : "Envoyer");
@@ -97,6 +97,7 @@ export async function mount(root, ctx, params) {
             formatBytes(Math.min(ctx.space.maxFileBytes || FILE_MAX, FILE_MAX)) + " max</small></span>" +
           (envoiMode ? '<input type="file" multiple hidden data-upload>' : '<input type="file" multiple hidden data-upload-sheet>') +
         "</label>" +
+        (envoiMode ? '<p class="add-folder">Un dossier entier ? Glisse-le ici, ou <label class="link-btn">choisis-le<input type="file" webkitdirectory hidden data-upload-folder></label> : il part en zip.</p>' : "") +
       "</div>" +
 
       '<textarea class="input sx-msg" name="message" rows="2" maxlength="2000" placeholder="Un message ? (facultatif)" aria-label="Message"></textarea>' +
@@ -272,6 +273,17 @@ export async function mount(root, ctx, params) {
   const directInput = root.querySelector("[data-upload]");
   if (directInput) {
     directInput.addEventListener("change", (e) => { addDirect(e.target.files); e.target.value = ""; });
+  }
+
+  const folderInput = root.querySelector("[data-upload-folder]");
+  if (folderInput) {
+    folderInput.addEventListener("change", async (e) => {
+      const list = Array.from(e.target.files);
+      const m = await import("../folders.js?v=125");
+      toast("Préparation du dossier (zip)...", "ok");
+      try { addDirect(await m.fromFolderInput(list)); } catch (err) { toast(m.folderError(err), "err"); }
+      e.target.value = "";
+    });
   }
 
   // Fichiers glissés sur la page
