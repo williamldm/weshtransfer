@@ -8,19 +8,19 @@ import {
   getProject, getFilesByIds, createTransfer, transferWaitSeconds,
   getTransfer, transferUrl, createProject, signFiles, cachedUrl,
   emailTransfer, emailEnabled, listContacts, suggestContacts, senderEmail, rememberContactsLocal
-} from "../api.js?v=126";
-import { accountEmail } from "../session.js?v=126";
-import { ensureVerified } from "../verify.js?v=126";
-import { openUploadSheet } from "./upload-sheet.js?v=126";
-import { mountUploads } from "./uploads.js?v=126";
-import { onUploads, enqueue, checkFile, getJobs } from "../upload.js?v=126";
-import { categoryOf, canPreview, FILE_MAX } from "../files.js?v=126";
-import { takePending } from "../pending.js?v=126";
-import { icon } from "../icons.js?v=126";
+} from "../api.js?v=127";
+import { accountEmail } from "../session.js?v=127";
+import { ensureVerified } from "../verify.js?v=127";
+import { openUploadSheet } from "./upload-sheet.js?v=127";
+import { mountUploads } from "./uploads.js?v=127";
+import { onUploads, enqueue, checkFile, getJobs } from "../upload.js?v=127";
+import { categoryOf, canPreview, FILE_MAX } from "../files.js?v=127";
+import { takePending } from "../pending.js?v=127";
+import { icon } from "../icons.js?v=127";
 import {
   esc, formatBytes, formatDuration, plural, toast, errorText, copyText, shareLink,
   canShare, formatDate, daysLeft, fileBadge, fileTile
-} from "../ui.js?v=126";
+} from "../ui.js?v=127";
 
 // Dans un espace "envoi", ce composeur EST l'accueil.
 export const title = (ctx) => (ctx && ctx.space.mode === "envoi" ? ctx.space.name : "Envoyer");
@@ -279,7 +279,7 @@ export async function mount(root, ctx, params) {
   if (folderInput) {
     folderInput.addEventListener("change", async (e) => {
       const list = Array.from(e.target.files);
-      const m = await import("../folders.js?v=126");
+      const m = await import("../folders.js?v=127");
       toast("Préparation du dossier (zip)...", "ok");
       try { addDirect(await m.fromFolderInput(list)); } catch (err) { toast(m.folderError(err), "err"); }
       e.target.value = "";
@@ -411,7 +411,7 @@ export async function mount(root, ctx, params) {
     if (readd) {
       sessionStorage.removeItem("seminaire.readd");
       toast(readd === "lourd"
-        ? "Tes fichiers étaient trop lourds pour être gardés en route : ajoute-les ici."
+        ? "Fichier lourd : choisis-le à nouveau ici, l'envoi démarre aussitôt."
         : "Ajoute tes fichiers ici pour les envoyer.", "err");
     }
   }

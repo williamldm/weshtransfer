@@ -11,8 +11,9 @@
 //   - bouton "un dossier" : fromFolderInput(input.files).
 // Les deux rendent une liste de File (fichiers simples + un zip par dossier).
 
-import { FILE_MAX, fileMaxLabel, isBlocked } from "./files.js?v=126";
+import { FILE_MAX, fileMaxLabel, isBlocked } from "./files.js?v=127";
 
+const ZIP_MEMORY_MAX = 1024 * 1024 * 1024;   // 1 Go
 const JUNK = /(^|\/)(\.DS_Store|Thumbs\.db|desktop\.ini|\.Spotlight-V100|\.Trashes|__MACOSX)(\/|$)|(^|\/)\._/;
 
 function readAll(reader) {
@@ -43,6 +44,8 @@ async function zipFolder(name, items) {
   if (!kept.length) throw new Error("DOSSIER_VIDE");
   const total = kept.reduce((n, it) => n + it.file.size, 0);
   if (total > FILE_MAX) throw new Error("DOSSIER_TROP_LOURD");
+  // le zip se construit en mémoire : au-delà, l'onglet saute (Safari surtout)
+  if (total > ZIP_MEMORY_MAX) throw new Error("DOSSIER_A_COMPRESSER");
   const { downloadZip } = await import("https://cdn.jsdelivr.net/npm/client-zip@2.5.1/+esm");
   const blob = await downloadZip(kept.map((it) => ({ name: it.path, input: it.file, lastModified: new Date(it.file.lastModified) }))).blob();
   return new File([blob], name + ".zip", { type: "application/zip", lastModified: Date.now() });
@@ -81,6 +84,7 @@ export async function fromFolderInput(fileList) {
 export function folderError(err) {
   const code = String((err && err.message) || err);
   if (/DOSSIER_VIDE/.test(code)) return "Ce dossier est vide.";
+  if (/DOSSIER_A_COMPRESSER/.test(code)) return "Ce dossier dépasse 1 Go : compresse-le dans le Finder (clic droit, Compresser), puis envoie le .zip. Le navigateur n'a pas assez de mémoire pour le faire lui-même.";
   if (/DOSSIER_TROP_LOURD/.test(code)) return "Ce dossier dépasse " + fileMaxLabel() + " : envoie-le en plusieurs morceaux.";
   return "Impossible de lire ce dossier. Essaie de le compresser dans le Finder (clic droit, Compresser).";
 }

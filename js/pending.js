@@ -5,7 +5,10 @@
 
 const DB = "weshtransfer";
 const STORE = "pending";
-export const MAX_BYTES = 1.5 * 1024 * 1024 * 1024;
+// 200 Mo : garder un fichier d'une page à l'autre le RECOPIE dans le
+// navigateur. Au-delà, Safari manque de mémoire et recharge l'onglet
+// ("une erreur est survenue") avant même que l'envoi commence.
+export const MAX_BYTES = 200 * 1024 * 1024;
 const TTL = 10 * 60 * 1000;
 
 function open() {
