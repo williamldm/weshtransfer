@@ -56,31 +56,39 @@ function remaining(q) {
   return Math.floor(start + exp - Date.now() / 1000);
 }
 
-// fin de fichier atteinte ? 200 complet, ou 206 qui se termine au dernier
-// octet (reprise d'un téléchargement interrompu)
+// Un téléchargement est "complet" seulement s'il couvre TOUT le fichier :
+// une réponse 200, ou une 206 qui va du premier au dernier octet. Une
+// plage qui touche juste la fin (un navigateur ou un lecteur de zip qui
+// lit le répertoire central) ne compte JAMAIS : sinon elle détruirait le
+// fichier d'un envoi "jusqu'au premier téléchargement" avant qu'il soit
+// récupéré (corrigé le 04/10/2026).
 function reachesEnd(res) {
   if (res.status === 200) return Number(res.headers.get("Content-Length")) || 0;
   const m = /^bytes (\d+)-(\d+)\/(\d+)$/.exec(res.headers.get("Content-Range") || "");
-  if (res.status === 206 && m && Number(m[2]) === Number(m[3]) - 1) return Number(m[2]) - Number(m[1]) + 1;
+  if (res.status === 206 && m && Number(m[1]) === 0 && Number(m[2]) === Number(m[3]) - 1) return Number(m[3]);
   return 0;
 }
 
-// Compte les octets qui partent vers le visiteur. `done(n, complet)` est
-// appelé une seule fois : à la fin du fichier (complet = true) ou quand le
-// visiteur interrompt (complet = false, n = ce qui est déjà parti).
-function metered(body, done) {
-  const reader = body.getReader();
-  let n = 0, over = false;
-  const finish = (complete) => { if (!over) { over = true; done(n, complete); } };
-  return new ReadableStream({
-    async pull(controller) {
-      const { done: end, value } = await reader.read();
-      if (end) { finish(true); controller.close(); return; }
-      n += value.byteLength;
-      controller.enqueue(value);
-    },
-    cancel(reason) { finish(false); return reader.cancel(reason); },
-  });
+// IMPORTANT : le fichier doit traverser le Worker SANS qu'aucun code JS ne
+// touche chaque morceau. Un ReadableStream écrit en JS (lu morceau par
+// morceau) fait grimper le temps de calcul du Worker ; au-delà de la limite
+// (10 ms de calcul sur l'offre gratuite) Cloudflare coupe la réponse en
+// plein milieu : un fichier de 2 Go s'arrêtait vers 80 Mo, d'où des zip
+// "endommagés" (constaté le 04/10/2026, empreinte différente à 2,13 Go).
+// On utilise donc un tuyau natif (IdentityTransformStream + pipeTo) : zéro
+// calcul par morceau. La taille servie est connue d'avance (Content-Length
+// ou Content-Range) ; pipeTo se termine quand tout est parti.
+function relay(res, done) {
+  const { readable, writable } = new IdentityTransformStream();
+  res.body.pipeTo(writable).then(() => done(true), () => done(false));
+  return readable;
+}
+
+// octets que cette réponse va envoyer
+function servedBytes(res) {
+  const m = /^bytes (\d+)-(\d+)\/(\d+)$/.exec(res.headers.get("Content-Range") || "");
+  if (res.status === 206 && m) return Number(m[2]) - Number(m[1]) + 1;
+  return Number(res.headers.get("Content-Length")) || 0;
 }
 
 function kindOf(type) {
@@ -128,15 +136,17 @@ export default {
     const kind = kindOf(res.headers.get("Content-Type") || "");
     let body = res.body;
     if (body && res.ok && request.method === "GET") {
-      body = metered(body, (n, complete) => {
-        if (env.BW_SECRET && n > 0) {
+      const n = servedBytes(res);
+      body = relay(res, (complete) => {
+        // compteur de bande passante (admin) : seulement ce qui est parti en entier
+        if (complete && env.BW_SECRET && n > 0) {
           ctx.waitUntil(fetch(BW_URL, {
             method: "POST",
             headers: { "Content-Type": "application/json", "x-bw-secret": env.BW_SECRET },
             body: JSON.stringify({ kind, delivered: n, origin: fromOrigin ? n : 0 }),
           }).catch(() => {}));
         }
-        // "jusqu'au premier téléchargement" : seulement si tout est parti
+        // "jusqu'au premier téléchargement" : seulement si TOUT est parti
         if (expected && complete && n === expected) {
           ctx.waitUntil(fetch(COMPLETE_URL, {
             method: "POST",
