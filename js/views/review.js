@@ -14,12 +14,12 @@
 
 import {
   listCommentsOf, addComment, deleteComment, setCommentResolved, setCommentVerified,
-  setFileApproved, updateFile, reviewFlush
-} from "../api.js?v=129";
-import { formatTime } from "../waveform.js?v=129";
-import { icon } from "../icons.js?v=129";
-import { esc, h, timeAgo, toast, errorText, plural, confirmSheet, openSheet, copyText, triggerDownload, formatBytes } from "../ui.js?v=129";
-import { enqueue, onUploads, checkFile } from "../upload.js?v=129";
+  setFileApproved, getFileApproval, updateFile, reviewFlush
+} from "../api.js?v=130";
+import { formatTime } from "../waveform.js?v=130";
+import { icon } from "../icons.js?v=130";
+import { esc, h, timeAgo, toast, errorText, plural, confirmSheet, openSheet, copyText, triggerDownload, formatBytes } from "../ui.js?v=130";
+import { enqueue, onUploads, checkFile } from "../upload.js?v=130";
 
 export const TAGS = [
   ["voix", "Voix"], ["instru", "Instru"], ["basse", "Basse"], ["batterie", "Batterie"],
@@ -205,6 +205,11 @@ export function createReview(o) {
     const ids = versions.filter((v) => v.version_no <= file.version_no).map((v) => v.id);
     if (!ids.includes(file.id)) ids.push(file.id);
     all = await listCommentsOf(ids);
+    // un nouveau retour lève la validation côté base : on relit l'état
+    try {
+      const a = await getFileApproval(file.id);
+      if (a) { file.approved_at = a.approved_at; file.approved_by = a.approved_by; file.approved_on_behalf = a.approved_on_behalf; }
+    } catch (err) { /* on garde l'affichage actuel */ }
     draw();
   }
 

@@ -1,18 +1,18 @@
 // Un morceau : ses versions de la plus récente à la plus ancienne, chacune
 // avec sa mini-waveform jouable d'un tap.
 
-import { getProject, signFiles, cachedUrl, cachedDownload, updateProject, deleteProject, deleteFile } from "../api.js?v=129";
-import { mountUploads } from "./uploads.js?v=129";
-import { openUploadSheet } from "./upload-sheet.js?v=129";
-import { Waveform } from "../waveform.js?v=129";
-import { play, toggle, isCurrent, onPlayer, seekRatio, state as playerState, trackFromFile } from "../player.js?v=129";
-import { saveZip, canStreamToDisk, MEMORY_LIMIT } from "../zip.js?v=129";
-import { icon } from "../icons.js?v=129";
-import { isAudio, canPreview } from "../files.js?v=129";
+import { getProject, signFiles, cachedUrl, cachedDownload, updateProject, deleteProject, deleteFile } from "../api.js?v=130";
+import { mountUploads } from "./uploads.js?v=130";
+import { openUploadSheet } from "./upload-sheet.js?v=130";
+import { Waveform } from "../waveform.js?v=130";
+import { play, toggle, isCurrent, onPlayer, seekRatio, state as playerState, trackFromFile } from "../player.js?v=130";
+import { saveZip, canStreamToDisk, MEMORY_LIMIT } from "../zip.js?v=130";
+import { icon } from "../icons.js?v=130";
+import { isAudio, canPreview } from "../files.js?v=130";
 import {
   esc, fileBadge, fileTile, timeAgo, formatBytes, formatDuration, plural, promptSheet,
   confirmSheet, actionSheet, toast, errorText, triggerDownload
-} from "../ui.js?v=129";
+} from "../ui.js?v=130";
 
 export const title = () => "Morceau";
 

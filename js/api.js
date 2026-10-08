@@ -1,8 +1,8 @@
 // Accès aux données. Toutes les requêtes de l'appli passent par ici : les
 // vues ne connaissent ni PostgREST ni le Storage.
 
-import { sb, q, invoke, requireClient } from "./db.js?v=129";
-import { setFileMax } from "./files.js?v=129";
+import { sb, q, invoke, requireClient } from "./db.js?v=130";
+import { setFileMax } from "./files.js?v=130";
 
 // Toute requête passe par ici : sans config, message clair plutôt
 // qu'un "Cannot read properties of null".
@@ -138,6 +138,11 @@ export function saveAlbumTitle(spaceId, title) {
 
 export function isEngineer(projectId) {
   return q(db().rpc("is_engineer", { p_project: projectId }));
+}
+
+// La validation peut tomber toute seule (nouveau retour sur un mix validé)
+export function getFileApproval(id) {
+  return q(db().from("files").select("approved_at, approved_by, approved_on_behalf").eq("id", id).maybeSingle());
 }
 
 export function setFileApproved(id, approved) {
