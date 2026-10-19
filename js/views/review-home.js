@@ -6,17 +6,17 @@
 import {
   listProjects, listReviewComments, deleteProjectFully, listParticipants, updateProject,
   reviewNotifyStatus, reviewSubscribe, reviewUnsubscribe, signFiles, cachedDownload, myPrefs, savePref
-} from "../api.js?v=130";
-import { saveZip, canStreamToDisk, MEMORY_LIMIT } from "../zip.js?v=130";
-import { mountUploads } from "./uploads.js?v=130";
-import { openUploadSheet } from "./upload-sheet.js?v=130";
-import { stateOf, isEngineerOf } from "./review.js?v=130";
-import { ensureVerified } from "../verify.js?v=130";
-import { accountEmail } from "../session.js?v=130";
-import { albumOf, onCover, setCover, clearCover, setAlbumTitle } from "../cover.js?v=130";
-import { playQueue, onPlayer, isCurrent, state as playerState, toggle, trackFromFile } from "../player.js?v=130";
-import { icon } from "../icons.js?v=130";
-import { esc, h, plural, toast, errorText, formatDuration, actionSheet, confirmSheet, promptSheet, openSheet, triggerDownload } from "../ui.js?v=130";
+} from "../api.js?v=131";
+import { saveZip, canStreamToDisk, MEMORY_LIMIT } from "../zip.js?v=131";
+import { mountUploads } from "./uploads.js?v=131";
+import { openUploadSheet } from "./upload-sheet.js?v=131";
+import { stateOf, isEngineerOf } from "./review.js?v=131";
+import { ensureVerified } from "../verify.js?v=131";
+import { accountEmail } from "../session.js?v=131";
+import { albumOf, onCover, setCover, clearCover, setAlbumTitle } from "../cover.js?v=131";
+import { playQueue, onPlayer, isCurrent, state as playerState, toggle, trackFromFile } from "../player.js?v=131";
+import { icon } from "../icons.js?v=131";
+import { esc, h, plural, toast, errorText, formatDuration, actionSheet, confirmSheet, promptSheet, openSheet, triggerDownload } from "../ui.js?v=131";
 
 // Pochette générée : un aplat dont la teinte dépend du nom, les initiales
 // en grand. Pas de dégradé (identité sobre).
@@ -61,9 +61,92 @@ function statusOf(p, stats, engineer) {
 // Fond d'en-tête façon plateforme de streaming : la pochette, floutée et
 // assombrie ; sans pochette, un aplat de la teinte du titre.
 // Visuel d'attente d'un Verdict, tant que l'artiste n'a pas mis sa
-// pochette : un vinyle qui sort d'une pochette violette (couleurs du site),
-// le nom du projet dessus. Même dessin partout, taille suivant la classe.
-export function albumArt(text, cls) {
+// pochette. `art` (space_covers.art, tiré au hasard à la création du
+// Verdict) choisit le dessin : 0 ou rien = le vinyle d'origine, 1 à 10 =
+// les autres. Le nom du projet est écrit dessus ; taille suivant la classe.
+const W = "rgba(255,255,255,";
+// fond plein + dessin, dans un carré 100 x 100 ; le bas reste assez sombre
+// pour le titre (voile ajouté par albumArt)
+const ARTS = [
+  // 0. vinyle qui sort de la pochette violette
+  () => "",
+  // 1. cassette
+  () => '<rect width="100" height="100" fill="#E8573A"/>' +
+    '<rect x="16" y="14" width="68" height="44" rx="5" fill="#1B1414"/>' +
+    '<rect x="23" y="20" width="54" height="13" rx="2" fill="#F4E3C3"/>' +
+    '<rect x="23" y="26" width="54" height="2" fill="#E8573A"/>' +
+    '<circle cx="36" cy="44" r="6.5" fill="#F4E3C3"/><circle cx="64" cy="44" r="6.5" fill="#F4E3C3"/>' +
+    '<circle cx="36" cy="44" r="2.4" fill="#1B1414"/><circle cx="64" cy="44" r="2.4" fill="#1B1414"/>' +
+    '<rect x="42" y="41" width="16" height="6" rx="1" fill="' + W + '.15)"/>' +
+    '<path d="M28 58l4-6h36l4 6z" fill="#2B2222"/>',
+  // 2. forme d'onde
+  () => '<rect width="100" height="100" fill="#0E3B3A"/>' +
+    [8, 14, 22, 34, 26, 40, 30, 18, 36, 24, 12, 28, 20, 10, 6].map((hgt, i) =>
+      '<rect x="' + (9 + i * 5.6) + '" y="' + (38 - hgt / 2) + '" width="3" height="' + hgt + '" rx="1.5" fill="' + (i % 4 === 1 ? "#F2C14E" : "#5FD3C0") + '"/>').join(""),
+  // 3. coucher de soleil rayé
+  () => '<rect width="100" height="100" fill="#2A1238"/>' +
+    '<circle cx="50" cy="46" r="30" fill="#FF7A59"/>' +
+    '<path d="M20.6 40A30 30 0 0 1 79.4 40z" fill="#FFC15E"/>' +
+    [52, 59, 65, 70].map((y, i) => '<rect x="18" y="' + y + '" width="64" height="' + (2 + i * .8) + '" fill="#2A1238"/>').join("") +
+    '<rect x="0" y="62" width="100" height="38" fill="#2A1238"/>',
+  // 4. haut-parleur
+  () => '<rect width="100" height="100" fill="#1F2A1B"/>' +
+    '<rect x="24" y="8" width="52" height="62" rx="6" fill="#2F3D29"/>' +
+    '<circle cx="50" cy="23" r="7" fill="#151C12"/><circle cx="50" cy="23" r="2.5" fill="#B8E35A"/>' +
+    '<circle cx="50" cy="49" r="16" fill="#151C12"/><circle cx="50" cy="49" r="11" fill="#B8E35A"/>' +
+    '<circle cx="50" cy="49" r="5" fill="#151C12"/>',
+  // 5. console : faders
+  () => '<rect width="100" height="100" fill="#1A3E8C"/>' +
+    [0, 1, 2, 3, 4, 5].map((i) => {
+      const x = 17 + i * 13.2, y = [40, 22, 50, 30, 18, 44][i];
+      return '<rect x="' + (x - .8) + '" y="12" width="1.6" height="56" rx=".8" fill="' + W + '.25)"/>' +
+        '<rect x="' + (x - 4.5) + '" y="' + y + '" width="9" height="6" rx="1.5" fill="' + (i === 4 ? "#FF5D73" : "#F3F1EA") + '"/>';
+    }).join(""),
+  // 6. égaliseur en blocs
+  () => '<rect width="100" height="100" fill="#121212"/>' +
+    [3, 5, 7, 6, 4, 6, 8, 5, 3].map((n, i) =>
+      Array.from({ length: n }, (_, j) => '<rect x="' + (12 + i * 8.6) + '" y="' + (66 - j * 7) + '" width="6.6" height="5" rx="1" fill="' +
+        (j >= 6 ? "#FF4D4D" : j >= 4 ? "#FFD23F" : "#3DDC84") + '"/>').join("")).join(""),
+  // 7. casque
+  () => '<rect width="100" height="100" fill="#C9183C"/><g transform="translate(0 -8)">' +
+    '<path d="M26 54V44a24 24 0 0 1 48 0v10" fill="none" stroke="#1C0A10" stroke-width="5" stroke-linecap="round"/>' +
+    '<rect x="19" y="46" width="14" height="22" rx="6" fill="#1C0A10"/><rect x="67" y="46" width="14" height="22" rx="6" fill="#1C0A10"/>' +
+    '<rect x="23" y="50" width="6" height="14" rx="3" fill="#FFB3C1"/><rect x="71" y="50" width="6" height="14" rx="3" fill="#FFB3C1"/></g>',
+  // 8. micro
+  () => '<rect width="100" height="100" fill="#0D1B3D"/>' +
+    '<circle cx="50" cy="36" r="34" fill="none" stroke="#E2B84B" stroke-opacity=".18" stroke-width="1"/>' +
+    '<circle cx="50" cy="36" r="25" fill="none" stroke="#E2B84B" stroke-opacity=".28" stroke-width="1"/>' +
+    '<rect x="40" y="12" width="20" height="32" rx="10" fill="#E2B84B"/>' +
+    [20, 26, 32, 38].map((y) => '<rect x="42" y="' + y + '" width="16" height="1.3" fill="#0D1B3D" opacity=".45"/>').join("") +
+    '<path d="M34 36a16 16 0 0 0 32 0" fill="none" stroke="#E2B84B" stroke-width="2.5" stroke-linecap="round"/>' +
+    '<rect x="48.8" y="52" width="2.4" height="12" fill="#E2B84B"/>',
+  // 9. formes géométriques
+  () => '<rect width="100" height="100" fill="#F1E9D8"/>' +
+    '<circle cx="34" cy="34" r="22" fill="#E8573A"/>' +
+    '<rect x="50" y="14" width="34" height="34" fill="#1F4E8C"/>' +
+    '<path d="M44 74L66 36L88 74z" fill="#F2B632"/>' +
+    '<circle cx="66" cy="31" r="6" fill="#F1E9D8"/>',
+  // 10. ondes néon
+  () => '<rect width="100" height="100" fill="#14081F"/>' +
+    [["#FF3CAC", 0], ["#784BA0", 6], ["#2B86C5", 12]].map(([c, d]) =>
+      '<path d="M0 ' + (34 + d) + ' C 15 ' + (10 + d) + ', 30 ' + (10 + d) + ', 45 ' + (34 + d) + ' S 75 ' + (58 + d) + ', 100 ' + (30 + d) + '" fill="none" stroke="' + c + '" stroke-width="3" stroke-linecap="round"/>').join(""),
+];
+export const ART_COUNT = ARTS.length - 1;
+
+let artSeq = 0;
+export function albumArt(text, cls, art) {
+  const n = Number(art) > 0 && Number(art) < ARTS.length ? Number(art) : 0;
+  const label = '<span class="cover-art-text"><span class="cover-art-kicker">Verdict</span>' +
+    '<span class="cover-art-title">' + esc(text || "") + "</span></span>";
+  if (n) {
+    const id = "cva" + (++artSeq);
+    return '<span class="cover cover-art is-art' + n + " " + (cls || "") + '" aria-hidden="true">' +
+      '<svg viewBox="0 0 100 100" preserveAspectRatio="xMidYMid slice" focusable="false">' + ARTS[n]() +
+        '<defs><linearGradient id="' + id + '" x1="0" y1="0" x2="0" y2="1">' +
+          '<stop offset=".5" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".6"/></linearGradient></defs>' +
+        '<rect width="100" height="100" fill="url(#' + id + ')"/>' +
+      "</svg>" + label + "</span>";
+  }
   const grooves = [29, 25, 21, 17].map((r) =>
     '<circle cx="63" cy="42" r="' + r + '" fill="none" stroke="rgba(255,255,255,.07)" stroke-width=".7"/>').join("");
   return '<span class="cover cover-art ' + (cls || "") + '" aria-hidden="true">' +
@@ -73,10 +156,7 @@ export function albumArt(text, cls) {
       '<circle cx="63" cy="42" r="10.5" fill="#7B5CE6"/>' +
       '<circle cx="63" cy="42" r="10.5" fill="none" stroke="rgba(255,255,255,.18)" stroke-width=".6"/>' +
       '<circle cx="63" cy="42" r="1.7" fill="#0B0910"/>' +
-    "</svg>" +
-    '<span class="cover-art-text"><span class="cover-art-kicker">Verdict</span>' +
-      '<span class="cover-art-title">' + esc(text || "") + "</span></span>" +
-  "</span>";
+    "</svg>" + label + "</span>";
 }
 
 export function backdrop(image, text) {
@@ -106,6 +186,7 @@ export async function mountReviewHome(root, ctx) {
   let engineer = !!s.isHost;
   let coverImg = null;
   let albumTitle = null;
+  let albumArtNo = 0;
   let hostName = "";
   let loaded = false;
   const titleOf = () => albumTitle || s.name;
@@ -174,7 +255,7 @@ export async function mountReviewHome(root, ctx) {
         '<p class="welcome-lead">' + (hostName ? "<b>" + esc(hostName) + "</b> t'a invité" : "Tu es invité") +
           " à écouter ses mix et à dire ce qui ne va pas. Avant d'y aller, habille ton projet :</p>" +
         '<label class="welcome-cover" data-wc-pick>' +
-          '<span data-wc-preview>' + (coverImg ? cover(titleOf(), "cover-xl", coverImg) : albumArt(titleOf(), "cover-xl")) + "</span>" +
+          '<span data-wc-preview>' + (coverImg ? cover(titleOf(), "cover-xl", coverImg) : albumArt(titleOf(), "cover-xl", albumArtNo)) + "</span>" +
           '<input type="file" accept="image/*" hidden data-wc-file>' +
           '<span class="welcome-cover-hint">' + (coverImg ? "Changer la cover" : "Choisir une image") + "</span>" +
         "</label>" +
@@ -215,7 +296,7 @@ export async function mountReviewHome(root, ctx) {
     const empty = !coverImg;
     coverBox.innerHTML =
       '<button type="button" class="rh-cover-btn' + (empty && !engineer && !welcomed() ? " is-empty" : "") + '" data-cover aria-label="' + (empty ? "Ajouter une cover" : "Changer la cover") + '">' +
-        (empty ? albumArt(titleOf(), "cover-xl") : cover(s.name, "cover-xl", coverImg)) +
+        (empty ? albumArt(titleOf(), "cover-xl", albumArtNo) : cover(s.name, "cover-xl", coverImg)) +
         (empty && !engineer && !welcomed()
           ? '<span class="cover-cta" aria-hidden="true">' + icon("plus", 14) + "<span>Ajoute ta cover</span></span>"
           : '<span class="rh-cover-edit" aria-hidden="true">' + icon(empty ? "image" : "edit", 16) + "</span>") +
@@ -423,7 +504,7 @@ export async function mountReviewHome(root, ctx) {
 
   engActions.addEventListener("click", async (e) => {
     if (e.target.closest("[data-share-verdict]")) {
-      const { openShareSheet } = await import("./people.js?v=130");
+      const { openShareSheet } = await import("./people.js?v=131");
       openShareSheet(ctx);
       return;
     }
@@ -641,7 +722,7 @@ export async function mountReviewHome(root, ctx) {
   drawCover();
   drawHelp();
   drawAlbum();
-  const albumReady = albumOf(s.id).then((a) => { coverImg = a.image; albumTitle = a.title; drawCover(); drawAlbum(); if (loaded) draw(); });
+  const albumReady = albumOf(s.id).then((a) => { coverImg = a.image; albumTitle = a.title; albumArtNo = a.art || 0; drawCover(); drawAlbum(); if (loaded) draw(); });
   const offCover = onCover((id, img, a) => {
     if (id !== s.id) return;
     coverImg = img;

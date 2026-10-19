@@ -1,18 +1,18 @@
 // Écoute d'une version : grande waveform, transport, commentaires
 // horodatés façon SoundCloud ("à 1:23, la voix sature").
 
-import { getFile, listComments, addComment, deleteComment, signFiles, cachedUrl, cachedDownload, deleteFile, updateFile } from "../api.js?v=130";
-import { createReview } from "./review.js?v=130";
-import { cover, backdrop, albumArt } from "./review-home.js?v=130";
-import { albumOf } from "../cover.js?v=130";
-import { Waveform, formatTime } from "../waveform.js?v=130";
-import { play, toggle, isCurrent, onPlayer, seekRatio, seekSeconds, skip, state as playerState, trackFromFile } from "../player.js?v=130";
-import { icon } from "../icons.js?v=130";
-import { isAudio, canPreview, categoryOf } from "../files.js?v=130";
+import { getFile, listComments, addComment, deleteComment, signFiles, cachedUrl, cachedDownload, deleteFile, updateFile } from "../api.js?v=131";
+import { createReview } from "./review.js?v=131";
+import { cover, backdrop, albumArt } from "./review-home.js?v=131";
+import { albumOf } from "../cover.js?v=131";
+import { Waveform, formatTime } from "../waveform.js?v=131";
+import { play, toggle, isCurrent, onPlayer, seekRatio, seekSeconds, skip, state as playerState, trackFromFile } from "../player.js?v=131";
+import { icon } from "../icons.js?v=131";
+import { isAudio, canPreview, categoryOf } from "../files.js?v=131";
 import {
   esc, h, fileBadge, fileTile, timeAgo, formatBytes, avatar, toast, errorText, triggerDownload, plural,
   confirmSheet, actionSheet, openSheet
-} from "../ui.js?v=130";
+} from "../ui.js?v=131";
 
 export const title = () => "Écoute";
 
@@ -197,6 +197,8 @@ export async function mount(root, ctx, params) {
         if (a.image) {
           coverSlot.innerHTML = cover(title, "cover-lg", a.image);
           root.querySelector("[data-rv-backdrop]").innerHTML = backdrop(a.image, title);
+        } else if (a.art) {
+          coverSlot.innerHTML = albumArt(title, "cover-lg", a.art);
         }
         root.querySelector("[data-rv-album]").textContent = "Verdict · " + (a.title || ctx.space.name);
       });

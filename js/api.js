@@ -1,8 +1,8 @@
 // Accès aux données. Toutes les requêtes de l'appli passent par ici : les
 // vues ne connaissent ni PostgREST ni le Storage.
 
-import { sb, q, invoke, requireClient } from "./db.js?v=130";
-import { setFileMax } from "./files.js?v=130";
+import { sb, q, invoke, requireClient } from "./db.js?v=131";
+import { setFileMax } from "./files.js?v=131";
 
 // Toute requête passe par ici : sans config, message clair plutôt
 // qu'un "Cannot read properties of null".
@@ -123,8 +123,8 @@ export function reviewFlush(spaceId) {
 // Album d'un Verdict : pochette et titre (une ligne par espace, chacun
 // facultatif)
 export function getAlbum(spaceId) {
-  return q(db().from("space_covers").select("image, title").eq("space_id", spaceId).maybeSingle())
-    .then((r) => ({ image: (r && r.image) || null, title: (r && r.title) || null }));
+  return q(db().from("space_covers").select("image, title, art").eq("space_id", spaceId).maybeSingle())
+    .then((r) => ({ image: (r && r.image) || null, title: (r && r.title) || null, art: (r && r.art) || 0 }));
 }
 export function saveCover(spaceId, image) {
   return q(db().from("space_covers").upsert({ space_id: spaceId, image, updated_at: new Date().toISOString() }));
