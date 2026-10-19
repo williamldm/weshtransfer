@@ -3,7 +3,7 @@
 // mot de passe), il partage le compte de cette adresse : les mêmes espaces,
 // envois et blazes sur tous ses appareils.
 
-import { sb, q, invoke, requireClient } from "./db.js?v=132";
+import { sb, q, invoke, requireClient } from "./db.js?v=133";
 
 const SPACE_KEY = "seminaire.space";      // espace actif
 const KNOWN_KEY = "seminaire.spaces";     // tous les espaces rejoints sur cet appareil
@@ -263,15 +263,24 @@ export async function syncSpaces() {
   const uid = await currentUserId();
   if (!uid) return knownSpaces();
   const { data, error } = await sb.from("participants")
-    .select("id, pseudo, is_host, viewer, space:spaces(id, name, code, mode)")
+    .select("id, pseudo, is_host, viewer, space:spaces(id, name, code, mode, created_at)")
     .eq("user_id", uid);
   if (error) return knownSpaces();
   const order = knownSpaces().map((k) => k.id);
-  const rank = (id) => (order.indexOf(id) === -1 ? 999 : order.indexOf(id));
+  // Les espaces que cet appareil ne connaissait pas (créés ailleurs) passent
+  // en tête, le plus récent d'abord ; ensuite l'ordre local.
+  const rank = (id) => order.indexOf(id);
+  const born = new Map((data || []).filter((p) => p.space).map((p) => [p.space.id, String(p.space.created_at || "")]));
   const list = (data || []).filter((p) => p.space)
     .map((p) => ({ id: p.space.id, name: p.space.name, code: p.space.code, mode: p.space.mode, isHost: !!p.is_host,
       pseudo: p.pseudo || "", viewer: !!p.viewer }))
-    .sort((a, b) => rank(a.id) - rank(b.id));
+    .sort((a, b) => {
+      const ra = rank(a.id), rb = rank(b.id);
+      if (ra === -1 && rb === -1) return born.get(b.id).localeCompare(born.get(a.id));
+      if (ra === -1) return -1;
+      if (rb === -1) return 1;
+      return ra - rb;
+    });
   write(KNOWN_KEY, list.slice(0, 50));
   // Connecté : le blaze est celui du compte (pas un blaze tapé une fois sur
   // cet appareil). Un espace resté sous un autre nom (avant la règle "un
