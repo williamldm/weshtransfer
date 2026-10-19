@@ -4,7 +4,7 @@
 // (qui fait tourner quoi, où en est la lecture) passent en broadcast :
 // rien n'est écrit en base.
 
-import { sb } from "./db.js?v=131";
+import { sb } from "./db.js?v=132";
 
 let live = null;
 

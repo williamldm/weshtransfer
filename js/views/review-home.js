@@ -6,17 +6,17 @@
 import {
   listProjects, listReviewComments, deleteProjectFully, listParticipants, updateProject,
   reviewNotifyStatus, reviewSubscribe, reviewUnsubscribe, signFiles, cachedDownload, myPrefs, savePref
-} from "../api.js?v=131";
-import { saveZip, canStreamToDisk, MEMORY_LIMIT } from "../zip.js?v=131";
-import { mountUploads } from "./uploads.js?v=131";
-import { openUploadSheet } from "./upload-sheet.js?v=131";
-import { stateOf, isEngineerOf } from "./review.js?v=131";
-import { ensureVerified } from "../verify.js?v=131";
-import { accountEmail } from "../session.js?v=131";
-import { albumOf, onCover, setCover, clearCover, setAlbumTitle } from "../cover.js?v=131";
-import { playQueue, onPlayer, isCurrent, state as playerState, toggle, trackFromFile } from "../player.js?v=131";
-import { icon } from "../icons.js?v=131";
-import { esc, h, plural, toast, errorText, formatDuration, actionSheet, confirmSheet, promptSheet, openSheet, triggerDownload } from "../ui.js?v=131";
+} from "../api.js?v=132";
+import { saveZip, canStreamToDisk, MEMORY_LIMIT } from "../zip.js?v=132";
+import { mountUploads } from "./uploads.js?v=132";
+import { openUploadSheet } from "./upload-sheet.js?v=132";
+import { stateOf, isEngineerOf } from "./review.js?v=132";
+import { ensureVerified } from "../verify.js?v=132";
+import { accountEmail } from "../session.js?v=132";
+import { albumOf, onCover, setCover, clearCover, setAlbumTitle } from "../cover.js?v=132";
+import { playQueue, onPlayer, isCurrent, state as playerState, toggle, trackFromFile } from "../player.js?v=132";
+import { icon } from "../icons.js?v=132";
+import { esc, h, plural, toast, errorText, formatDuration, actionSheet, confirmSheet, promptSheet, openSheet, triggerDownload } from "../ui.js?v=132";
 
 // Pochette générée : un aplat dont la teinte dépend du nom, les initiales
 // en grand. Pas de dégradé (identité sobre).
@@ -89,12 +89,25 @@ const ARTS = [
     '<path d="M20.6 40A30 30 0 0 1 79.4 40z" fill="#FFC15E"/>' +
     [52, 59, 65, 70].map((y, i) => '<rect x="18" y="' + y + '" width="64" height="' + (2 + i * .8) + '" fill="#2A1238"/>').join("") +
     '<rect x="0" y="62" width="100" height="38" fill="#2A1238"/>',
-  // 4. haut-parleur
-  () => '<rect width="100" height="100" fill="#1F2A1B"/>' +
-    '<rect x="24" y="8" width="52" height="62" rx="6" fill="#2F3D29"/>' +
-    '<circle cx="50" cy="23" r="7" fill="#151C12"/><circle cx="50" cy="23" r="2.5" fill="#B8E35A"/>' +
-    '<circle cx="50" cy="49" r="16" fill="#151C12"/><circle cx="50" cy="49" r="11" fill="#B8E35A"/>' +
-    '<circle cx="50" cy="49" r="5" fill="#151C12"/>',
+  // 4. lignes de crête : une onde par ligne, chaque ligne cache celle
+  // du dessus (façon relevé de signal), le relief tiré du titre
+  (rnd) => {
+    let out = '<rect width="100" height="100" fill="#0E0E10"/>';
+    const peaks = [rnd() * 14 - 7, rnd() * 10 - 5];
+    for (let k = 0; k < 16; k++) {
+      const base = 17 + k * 2.8;
+      let d = "M12 " + base;
+      for (let x = 12; x <= 88; x += 1.5) {
+        const c = Math.exp(-Math.pow((x - 50 - peaks[0]) / (8 + peaks[1]), 2));
+        const y = base - c * (5 + rnd() * 8) - rnd() * c * 2.5 - rnd() * .35;
+        d += " L" + x + " " + y.toFixed(2);
+      }
+      // le remplissage cache la ligne du dessus ; seul le tracé est dessiné
+      out += '<path d="' + d + ' L88 100 L12 100z" fill="#0E0E10"/>' +
+        '<path d="' + d + '" fill="none" stroke="#EDE6D6" stroke-width=".55" stroke-linejoin="round"/>';
+    }
+    return out;
+  },
   // 5. console : faders
   () => '<rect width="100" height="100" fill="#1A3E8C"/>' +
     [0, 1, 2, 3, 4, 5].map((i) => {
@@ -102,36 +115,92 @@ const ARTS = [
       return '<rect x="' + (x - .8) + '" y="12" width="1.6" height="56" rx=".8" fill="' + W + '.25)"/>' +
         '<rect x="' + (x - 4.5) + '" y="' + y + '" width="9" height="6" rx="1.5" fill="' + (i === 4 ? "#FF5D73" : "#F3F1EA") + '"/>';
     }).join(""),
-  // 6. égaliseur en blocs
-  () => '<rect width="100" height="100" fill="#121212"/>' +
-    [3, 5, 7, 6, 4, 6, 8, 5, 3].map((n, i) =>
-      Array.from({ length: n }, (_, j) => '<rect x="' + (12 + i * 8.6) + '" y="' + (66 - j * 7) + '" width="6.6" height="5" rx="1" fill="' +
-        (j >= 6 ? "#FF4D4D" : j >= 4 ? "#FFD23F" : "#3DDC84") + '"/>').join("")).join(""),
+  // 6. courbe d'égalisation sur papier millimétré (fréquences en log)
+  (rnd) => {
+    const fx = (f) => 8 + 84 * Math.log10(f / 20) / 3;
+    const zero = 36, dB = 1.6;
+    let out = '<rect width="100" height="100" fill="#EFE8DA"/>';
+    for (const f of [20, 30, 40, 50, 60, 70, 80, 90, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000, 9000, 10000, 20000]) {
+      const major = /^(20|100|1000|10000|20000)$/.test(String(f));
+      out += '<rect x="' + fx(f).toFixed(2) + '" y="12" width="' + (major ? .35 : .18) + '" height="48" fill="#8A7F6A" opacity="' + (major ? .55 : .3) + '"/>';
+    }
+    for (let g = -12; g <= 12; g += 6) out += '<rect x="8" y="' + (zero - g * dB).toFixed(2) + '" width="84" height="' + (g ? .18 : .4) + '" fill="#8A7F6A" opacity="' + (g ? .35 : .7) + '"/>';
+    for (const [f, t] of [[100, "100"], [1000, "1k"], [10000, "10k"]]) {
+      out += '<text x="' + (fx(f) + .8).toFixed(2) + '" y="9.6" font-size="4.2" fill="#7A705C" style="font-family:var(--mono)">' + t + "</text>";
+    }
+    const bands = [[60 + rnd() * 120, rnd() * 16 - 6, .7], [400 + rnd() * 1600, rnd() * 18 - 11, 1.1], [4000 + rnd() * 8000, rnd() * 14 - 4, .9]];
+    let d = "";
+    for (let x = 8; x <= 92; x += 1) {
+      const lf = Math.log10(20) + (x - 8) / 84 * 3;
+      let g = 0;
+      for (const [f, gain, w] of bands) g += gain * Math.exp(-Math.pow((lf - Math.log10(f)) / (w * .35), 2));
+      d += (d ? " L" : "M") + x + " " + (zero - g * dB).toFixed(2);
+    }
+    return out + '<path d="' + d + ' L92 ' + zero + ' L8 ' + zero + 'z" fill="#D9442B" opacity=".14"/>' +
+      '<path d="' + d + '" fill="none" stroke="#D9442B" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>';
+  },
   // 7. casque
   () => '<rect width="100" height="100" fill="#C9183C"/><g transform="translate(0 -8)">' +
     '<path d="M26 54V44a24 24 0 0 1 48 0v10" fill="none" stroke="#1C0A10" stroke-width="5" stroke-linecap="round"/>' +
     '<rect x="19" y="46" width="14" height="22" rx="6" fill="#1C0A10"/><rect x="67" y="46" width="14" height="22" rx="6" fill="#1C0A10"/>' +
     '<rect x="23" y="50" width="6" height="14" rx="3" fill="#FFB3C1"/><rect x="71" y="50" width="6" height="14" rx="3" fill="#FFB3C1"/></g>',
-  // 8. micro
-  () => '<rect width="100" height="100" fill="#0D1B3D"/>' +
-    '<circle cx="50" cy="36" r="34" fill="none" stroke="#E2B84B" stroke-opacity=".18" stroke-width="1"/>' +
-    '<circle cx="50" cy="36" r="25" fill="none" stroke="#E2B84B" stroke-opacity=".28" stroke-width="1"/>' +
-    '<rect x="40" y="12" width="20" height="32" rx="10" fill="#E2B84B"/>' +
-    [20, 26, 32, 38].map((y) => '<rect x="42" y="' + y + '" width="16" height="1.3" fill="#0D1B3D" opacity=".45"/>').join("") +
-    '<path d="M34 36a16 16 0 0 0 32 0" fill="none" stroke="#E2B84B" stroke-width="2.5" stroke-linecap="round"/>' +
-    '<rect x="48.8" y="52" width="2.4" height="12" fill="#E2B84B"/>',
-  // 9. formes géométriques
-  () => '<rect width="100" height="100" fill="#F1E9D8"/>' +
-    '<circle cx="34" cy="34" r="22" fill="#E8573A"/>' +
-    '<rect x="50" y="14" width="34" height="34" fill="#1F4E8C"/>' +
-    '<path d="M44 74L66 36L88 74z" fill="#F2B632"/>' +
-    '<circle cx="66" cy="31" r="6" fill="#F1E9D8"/>',
-  // 10. ondes néon
-  () => '<rect width="100" height="100" fill="#14081F"/>' +
-    [["#FF3CAC", 0], ["#784BA0", 6], ["#2B86C5", 12]].map(([c, d]) =>
-      '<path d="M0 ' + (34 + d) + ' C 15 ' + (10 + d) + ', 30 ' + (10 + d) + ', 45 ' + (34 + d) + ' S 75 ' + (58 + d) + ', 100 ' + (30 + d) + '" fill="none" stroke="' + c + '" stroke-width="3" stroke-linecap="round"/>').join(""),
+  // 8. diagramme polaire d'un micro (cardioïde, super, hyper), en plan
+  (rnd) => {
+    const cx = 50, cy = 37, R = 27;
+    const a = [.5, .37, .25][Math.floor(rnd() * 3)];
+    let out = '<rect width="100" height="100" fill="#14306A"/>';
+    for (const r of [R / 4, R / 2, R * 3 / 4, R]) out += '<circle cx="' + cx + '" cy="' + cy + '" r="' + r + '" fill="none" stroke="' + W + '.22)" stroke-width=".3"/>';
+    for (let t = 0; t < 180; t += 30) {
+      const c = Math.cos(t * Math.PI / 180) * R, sn = Math.sin(t * Math.PI / 180) * R;
+      out += '<line x1="' + (cx - c).toFixed(2) + '" y1="' + (cy - sn).toFixed(2) + '" x2="' + (cx + c).toFixed(2) + '" y2="' + (cy + sn).toFixed(2) + '" stroke="' + W + '.16)" stroke-width=".3"/>';
+    }
+    let d = "";
+    for (let t = 0; t <= 360; t += 3) {
+      const th = t * Math.PI / 180;
+      const r = Math.abs(a + (1 - a) * Math.cos(th)) * R;
+      d += (d ? " L" : "M") + (cx + r * Math.sin(th)).toFixed(2) + " " + (cy - r * Math.cos(th)).toFixed(2);
+    }
+    out += '<circle cx="' + cx + '" cy="' + cy + '" r="' + (R * .82).toFixed(2) + '" fill="none" stroke="#F2B632" stroke-width=".6" stroke-dasharray="1.6 1.4"/>';
+    return out + '<path d="' + d + 'z" fill="' + W + '.08)" stroke="#F5F1E6" stroke-width="1.1" stroke-linejoin="round"/>' +
+      '<text x="' + cx + '" y="' + (cy - R - 2) + '" font-size="4" text-anchor="middle" fill="' + W + '.6)" style="font-family:var(--mono)">0°</text>';
+  },
+  // 9. les initiales du projet, en très grand, coupées par le bord
+  (rnd, text) => {
+    const hue = hueOf(text);
+    return '<rect width="100" height="100" fill="hsl(' + hue + ',52%,55%)"/>' +
+      '<text x="-3" y="66" font-size="74" font-weight="800" letter-spacing="-5" fill="hsl(' + hue + ',58%,20%)" style="font-family:var(--display)">' +
+        esc(initials(text)) + "</text>" +
+      '<rect x="8" y="9" width="22" height=".6" fill="hsl(' + hue + ',58%,20%)"/>';
+  },
+  // 10. trame de points (demi-teinte) autour d'un point tiré du titre
+  (rnd) => {
+    // la source : les points grossissent en s'en approchant
+    const cx = 20 + rnd() * 60, cy = 14 + rnd() * 26;
+    let out = '<rect width="100" height="100" fill="#E94F2E"/>';
+    for (let i = 0; i < 16; i++) {
+      for (let j = 0; j < 16; j++) {
+        const x = 3 + i * 6.25, y = 3 + j * 6.25;
+        const k = Math.max(0, 1 - Math.hypot(x - cx, y - cy) / 62);
+        const r = 3.05 * Math.pow(k, 1.3);
+        if (r > .22) out += '<circle cx="' + x.toFixed(2) + '" cy="' + y.toFixed(2) + '" r="' + r.toFixed(2) + '" fill="#1A1414"/>';
+      }
+    }
+    return out;
+  },
 ];
 export const ART_COUNT = ARTS.length - 1;
+
+// hasard reproductible : le même titre donne toujours le même dessin
+function seeded(text) {
+  let a = 2166136261;
+  for (const ch of String(text || "?")) a = Math.imul(a ^ ch.charCodeAt(0), 16777619);
+  return () => {
+    a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
 
 let artSeq = 0;
 export function albumArt(text, cls, art) {
@@ -141,7 +210,7 @@ export function albumArt(text, cls, art) {
   if (n) {
     const id = "cva" + (++artSeq);
     return '<span class="cover cover-art is-art' + n + " " + (cls || "") + '" aria-hidden="true">' +
-      '<svg viewBox="0 0 100 100" preserveAspectRatio="xMidYMid slice" focusable="false">' + ARTS[n]() +
+      '<svg viewBox="0 0 100 100" preserveAspectRatio="xMidYMid slice" focusable="false">' + ARTS[n](seeded(text), text) +
         '<defs><linearGradient id="' + id + '" x1="0" y1="0" x2="0" y2="1">' +
           '<stop offset=".5" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".6"/></linearGradient></defs>' +
         '<rect width="100" height="100" fill="url(#' + id + ')"/>' +
@@ -504,7 +573,7 @@ export async function mountReviewHome(root, ctx) {
 
   engActions.addEventListener("click", async (e) => {
     if (e.target.closest("[data-share-verdict]")) {
-      const { openShareSheet } = await import("./people.js?v=131");
+      const { openShareSheet } = await import("./people.js?v=132");
       openShareSheet(ctx);
       return;
     }
