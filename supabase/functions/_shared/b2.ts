@@ -69,6 +69,12 @@ async function call(b2: B2, url: URL, init: RequestInit = {}): Promise<string> {
 // `expires` + 3 h.
 const SIGN_WINDOW = 3 * 3600;
 
+// Valeur étendue (RFC 5987) : encodeURIComponent laisse passer ' ( ) * !,
+// que B2 refuse ("must use valid extended value syntax") : un nom comme
+// "L'été (v2).wav" rendait le lien de téléchargement inutilisable.
+const rfc5987 = (name: string) =>
+  encodeURIComponent(name).replace(/['()*!]/g, (c) => "%" + c.charCodeAt(0).toString(16).toUpperCase());
+
 export async function presignGet(b2: B2, key: string, expires: number, downloadName?: string): Promise<string> {
   const now = Math.floor(Date.now() / 1000);
   const start = now - (now % SIGN_WINDOW);
@@ -79,7 +85,7 @@ export async function presignGet(b2: B2, key: string, expires: number, downloadN
   if (downloadName) {
     url.searchParams.set(
       "response-content-disposition",
-      `attachment; filename*=UTF-8''${encodeURIComponent(downloadName)}`,
+      `attachment; filename*=UTF-8''${rfc5987(downloadName)}`,
     );
   }
   const signed = await b2.aws.sign(url.toString(), { method: "GET", aws: { signQuery: true, datetime } });
