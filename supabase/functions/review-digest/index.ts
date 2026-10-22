@@ -52,12 +52,20 @@ async function artistDigest(db: any, cfg: MailConfig, sub: Sub, space: any, forc
     db.from("files").select("id, version_no, label, project_id, created_at, uploader:participants(pseudo), project:projects(title)")
       .eq("space_id", space.id).eq("status", "ready").gt("created_at", since)
       .neq("uploaded_by", sub.participant_id).order("version_no", { ascending: false }),
-    db.from("comments").select("id, file_id, created_at, file:files(project_id)")
+    db.from("comments").select("id, parent_id, file_id, created_at, file:files(project_id)")
       .eq("space_id", space.id).not("parent_id", "is", null).gt("created_at", since)
       .neq("author_id", sub.participant_id),
   ]);
   const fs = (files ?? []) as any[];
-  const rs = (replies ?? []) as any[];
+  // seulement les réponses à SES retours : la réponse de l'artiste à
+  // l'ingé, ou celle d'un tiers, n'est pas pour lui
+  let rs = (replies ?? []) as any[];
+  if (rs.length) {
+    const { data: parents } = await db.from("comments").select("id").eq("author_id", sub.participant_id)
+      .in("id", [...new Set(rs.map((r) => r.parent_id))]);
+    const mine = new Set(((parents ?? []) as any[]).map((c) => c.id));
+    rs = rs.filter((r) => mine.has(r.parent_id));
+  }
   if (!fs.length && !rs.length) return "rien";
 
   // l'ingé est-il encore en train de déposer ?
@@ -100,7 +108,7 @@ async function artistDigest(db: any, cfg: MailConfig, sub: Sub, space: any, forc
   if (!list.length) return "rien";
 
   const engineer = list.find((p) => p.engineer)?.engineer ?? null;
-  const mail = newVersionsMail({ site: cfg.site, spaceName: space.name, engineer, projects: list });
+  const mail = newVersionsMail({ site: cfg.site, spaceName: space.name, engineer, projects: list, repliesOnly: !fs.length });
   const [sent] = await sendEmails(cfg, [{ to: sub.email, subject: mail.subject, html: mail.html, text: mail.text }], { kind: "versions" });
   if (!sent.ok) return "échec : " + sent.error;
   const now = new Date().toISOString();
