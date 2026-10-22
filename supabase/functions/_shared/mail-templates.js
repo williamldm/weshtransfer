@@ -637,12 +637,14 @@ export function newVersionsMail(input) {
   // seulement des réponses à ses retours, aucun nouveau fichier
   if (input.repliesOnly) {
     const r = input.projects.reduce((t, p) => t + (p.replies || 0), 0);
-    const title = one ? `${LQ}${one.title}${RQ}` : `${LQ}${input.spaceName}${RQ}`;
+    const rawTitle = one ? one.title : input.spaceName;
+    const title = `${LQ}${rawTitle}${RQ}`;               // texte brut : sujet, version texte
+    const htmlTitle = `${LQ}${esc(rawTitle)}${RQ}`;       // titre saisi par un utilisateur : échappé
     const subject = `${r > 1 ? "Réponses" : "Réponse"} à tes retours sur ${title}`;
     const body =
       eyebrow("Verdict · " + esc(input.spaceName)) +
       heading(`${esc(who)} a répondu à tes retours.`) +
-      para(`${r} réponse${r > 1 ? "s" : ""} sur ${one ? title : "tes morceaux"}. Aucune nouvelle version pour l'instant.`) +
+      para(`${r} réponse${r > 1 ? "s" : ""} sur ${one ? htmlTitle : "tes morceaux"}. Aucune nouvelle version pour l'instant.`) +
       button(input.projects[0].link, "Voir les réponses&nbsp;&rarr;");
     const footer = `<p style="margin:0;">Tu reçois cet email parce que tu participes au verdict ${LQ}${esc(input.spaceName)}${RQ}. Pour ne plus le recevoir : l'icône enveloppe, en haut de l'espace.</p>`;
     const html = layout({ site, title: subject, preheader: `${who} a répondu à tes retours.`, body, footer });
