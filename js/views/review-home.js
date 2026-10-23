@@ -6,17 +6,17 @@
 import {
   listProjects, listReviewComments, deleteProjectFully, listParticipants, updateProject,
   reviewNotifyStatus, reviewSubscribe, reviewUnsubscribe, signFiles, cachedDownload, myPrefs, savePref
-} from "../api.js?v=133";
-import { saveZip, canStreamToDisk, MEMORY_LIMIT } from "../zip.js?v=133";
-import { mountUploads } from "./uploads.js?v=133";
-import { openUploadSheet } from "./upload-sheet.js?v=133";
-import { stateOf, isEngineerOf } from "./review.js?v=133";
-import { ensureVerified } from "../verify.js?v=133";
-import { accountEmail } from "../session.js?v=133";
-import { albumOf, onCover, setCover, clearCover, setAlbumTitle } from "../cover.js?v=133";
-import { playQueue, onPlayer, isCurrent, state as playerState, toggle, trackFromFile } from "../player.js?v=133";
-import { icon } from "../icons.js?v=133";
-import { esc, h, plural, toast, errorText, formatDuration, actionSheet, confirmSheet, promptSheet, openSheet, triggerDownload } from "../ui.js?v=133";
+} from "../api.js?v=134";
+import { saveZip, canStreamToDisk, MEMORY_LIMIT } from "../zip.js?v=134";
+import { mountUploads } from "./uploads.js?v=134";
+import { openUploadSheet } from "./upload-sheet.js?v=134";
+import { stateOf, isEngineerOf } from "./review.js?v=134";
+import { ensureVerified } from "../verify.js?v=134";
+import { accountEmail } from "../session.js?v=134";
+import { albumOf, onCover, setCover, clearCover, setAlbumTitle } from "../cover.js?v=134";
+import { playQueue, onPlayer, isCurrent, state as playerState, toggle, trackFromFile } from "../player.js?v=134";
+import { icon } from "../icons.js?v=134";
+import { esc, h, plural, toast, errorText, formatDuration, actionSheet, confirmSheet, promptSheet, openSheet, triggerDownload } from "../ui.js?v=134";
 
 // Pochette générée : un aplat dont la teinte dépend du nom, les initiales
 // en grand. Pas de dégradé (identité sobre).
@@ -313,12 +313,17 @@ export async function mountReviewHome(root, ctx) {
   };
 
   // Accueil de l'artiste, la première fois : titre de l'album et pochette
+  // Vu une fois : sur l'appareil ET sur le compte (participants.prefs.welcome),
+  // pour ne pas le remontrer sur un autre appareil ou après un nettoyage.
+  let welcomeSeen = false;
   function welcomed() {
-    if (s.viewer) return true;   // écoute seule : pas de pochette ni de titre à choisir
+    if (s.viewer || welcomeSeen || coverImg) return true;   // écoute seule, déjà vu, ou pochette déjà posée
     try { return localStorage.getItem(WELCOME_KEY + s.id) === "1"; } catch (err) { return false; }
   }
   function openWelcome() {
+    welcomeSeen = true;
     try { localStorage.setItem(WELCOME_KEY + s.id, "1"); } catch (err) { /* privé */ }
+    if (s.participantId) savePref(s.participantId, "welcome", { v: "seen", at: new Date().toISOString() }).catch(() => {});
     const body = h(
       '<div class="welcome">' +
         '<p class="welcome-lead">' + (hostName ? "<b>" + esc(hostName) + "</b> t'a invité" : "Tu es invité") +
@@ -573,7 +578,7 @@ export async function mountReviewHome(root, ctx) {
 
   engActions.addEventListener("click", async (e) => {
     if (e.target.closest("[data-share-verdict]")) {
-      const { openShareSheet } = await import("./people.js?v=133");
+      const { openShareSheet } = await import("./people.js?v=134");
       openShareSheet(ctx);
       return;
     }
@@ -835,7 +840,13 @@ export async function mountReviewHome(root, ctx) {
   // l'artiste qui arrive : on lui propose d'habiller l'album
   if (!engineer && !welcomed()) {
     await Promise.all([albumReady, hostReady]);
-    if (root.isConnected) openWelcome();
+    // déjà vu sur un autre appareil ?
+    try {
+      const rows = await myPrefs();
+      welcomeSeen = (rows || []).some((x) => x.id === s.participantId && x.prefs && x.prefs.welcome);
+    } catch (err) { /* hors ligne : on garde le choix local */ }
+    if (welcomeSeen) drawCover();
+    if (root.isConnected && !welcomed()) openWelcome();
   }
   return () => { offUploads(); offDb(); offPlayer(); offCover(); };
 }
