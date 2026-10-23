@@ -78,8 +78,11 @@ function reachesEnd(res) {
 // On utilise donc un tuyau natif (IdentityTransformStream + pipeTo) : zéro
 // calcul par morceau. La taille servie est connue d'avance (Content-Length
 // ou Content-Range) ; pipeTo se termine quand tout est parti.
-function relay(res, done) {
-  const { readable, writable } = new IdentityTransformStream();
+// FixedLengthStream (natif lui aussi) garde le Content-Length : sans lui,
+// les réponses partent sans longueur, et Safari lit mal l'audio (forme
+// d'onde décalée, fin du morceau mal placée ; constaté le 23/10/2026).
+function relay(res, n, done) {
+  const { readable, writable } = n > 0 ? new FixedLengthStream(n) : new IdentityTransformStream();
   res.body.pipeTo(writable).then(() => done(true), () => done(false));
   return readable;
 }
@@ -137,7 +140,7 @@ export default {
     let body = res.body;
     if (body && res.ok && request.method === "GET") {
       const n = servedBytes(res);
-      body = relay(res, (complete) => {
+      body = relay(res, n, (complete) => {
         // compteur de bande passante (admin) : seulement ce qui est parti en entier
         if (complete && env.BW_SECRET && n > 0) {
           ctx.waitUntil(fetch(BW_URL, {
@@ -159,6 +162,8 @@ export default {
     const out = new Response(body, res);
     for (const [k, v] of Object.entries(cors)) out.headers.set(k, v);
     for (const [k, v] of Object.entries(hardening)) out.headers.set(k, v);
+    // les lecteurs audio et vidéo (Safari surtout) en ont besoin pour se déplacer
+    if (res.ok) out.headers.set("Accept-Ranges", "bytes");
     // "sandbox" empêcherait le lecteur PDF du navigateur de s'ouvrir
     if (/^application\/pdf/i.test(out.headers.get("Content-Type") || "")) {
       out.headers.set("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'");
