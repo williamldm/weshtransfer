@@ -1,23 +1,23 @@
 // Coquille de l'appli : démarrage, routeur à hash, en-tête, bus
 // d'événements, temps réel. Chaque vue est un module avec mount().
 
-import { restore, restoreFailure, getSpace, leaveSpace, switchTo } from "./session.js?v=135";
-import { requireClient } from "./db.js?v=135";
-import { connectSpace } from "./realtime.js?v=135";
-import { startJam } from "./jam.js?v=135";
-import { bindPlayerBar } from "./player.js?v=135";
-import { activeCount, onUploads } from "./upload.js?v=135";
-import { openPeopleSheet } from "./views/people.js?v=135";
-import { openUploadSheet } from "./views/upload-sheet.js?v=135";
-import { icon } from "./icons.js?v=135";
-import { monogram } from "./brand.js?v=135";
-import { toast, errorText, esc } from "./ui.js?v=135";
+import { restore, restoreFailure, getSpace, leaveSpace, switchTo } from "./session.js?v=136";
+import { requireClient } from "./db.js?v=136";
+import { connectSpace } from "./realtime.js?v=136";
+import { startJam } from "./jam.js?v=136";
+import { bindPlayerBar } from "./player.js?v=136";
+import { activeCount, onUploads } from "./upload.js?v=136";
+import { openPeopleSheet } from "./views/people.js?v=136";
+import { openUploadSheet } from "./views/upload-sheet.js?v=136";
+import { icon } from "./icons.js?v=136";
+import { monogram } from "./brand.js?v=136";
+import { toast, errorText, esc } from "./ui.js?v=136";
 
-import * as home from "./views/home.js?v=135";
-import * as project from "./views/project.js?v=135";
-import * as file from "./views/file.js?v=135";
-import * as send from "./views/send.js?v=135";
-import * as transfers from "./views/transfers.js?v=135";
+import * as home from "./views/home.js?v=136";
+import * as project from "./views/project.js?v=136";
+import * as file from "./views/file.js?v=136";
+import * as send from "./views/send.js?v=136";
+import * as transfers from "./views/transfers.js?v=136";
 
 // L'accueil dépend du mode de l'espace : morceaux (séminaire) ou
 // directement le composeur d'envoi (espace dédié aux envois).
@@ -226,7 +226,7 @@ function bindDrop() {
     if (!hasDir) { give(dt.files); return; }
     const entries = Array.from(dt.items).filter((it) => it.kind === "file").map((it) => ({ entry: it.webkitGetAsEntry(), file: it.getAsFile() }));
     toast("Préparation du dossier (zip)...", "ok");
-    import("./folders.js?v=135").then((m) => m.fromEntries(entries).then(give, (err) => toast(m.folderError(err), "err")));
+    import("./folders.js?v=136").then((m) => m.fromEntries(entries).then(give, (err) => toast(m.folderError(err), "err")));
   });
 }
 
@@ -318,9 +318,9 @@ async function boot() {
   window.addEventListener("hashchange", routeSmoothly);
 
   // compte : "Mes espaces" à jour depuis le serveur (autres appareils)
-  import("./session.js?v=135").then((m) => m.syncSpaces()).catch(() => {});
+  import("./session.js?v=136").then((m) => m.syncSpaces()).catch(() => {});
   // limite de taille de ce compte (2 Go, ou plus pour les comptes "gros envois")
-  import("./api.js?v=135").then((m) => m.storageConfig()).catch(() => {});
+  import("./api.js?v=136").then((m) => m.storageConfig()).catch(() => {});
 
   // message laissé par l'accueil (ex. réglage refusé à la création)
   try {

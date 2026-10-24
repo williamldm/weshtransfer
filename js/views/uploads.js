@@ -1,9 +1,9 @@
 // Rendu de la file d'upload (liste de progression), réutilisé par
 // l'accueil et la page d'un morceau.
 
-import { onUploads, getJobs, cancel, retry, dismiss } from "../upload.js?v=135";
-import { icon } from "../icons.js?v=135";
-import { esc, formatBytes } from "../ui.js?v=135";
+import { onUploads, getJobs, cancel, retry, dismiss } from "../upload.js?v=136";
+import { icon } from "../icons.js?v=136";
+import { esc, formatBytes } from "../ui.js?v=136";
 
 const STATE_LABEL = {
   queued: "En attente",

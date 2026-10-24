@@ -1,26 +1,26 @@
 // Envoi façon WeTransfer, par lien seul : des fichiers, un mot si on veut,
 // et un lien à partager (WhatsApp, SMS...) pour écouter et télécharger,
 // sans compte. Rien ne part par email. Un lien vit 7 jours au plus ; une
-// même connexion (IP) crée un envoi toutes les 10 minutes (serveur :
+// même connexion (IP) crée jusqu'à 4 envois par 10 minutes (serveur :
 // migration 20260930000001).
 
 import {
   getProject, getFilesByIds, createTransfer, transferWaitSeconds,
   getTransfer, transferUrl, createProject, signFiles, cachedUrl,
   emailTransfer, emailEnabled, listContacts, suggestContacts, senderEmail, rememberContactsLocal, knownVerified
-} from "../api.js?v=135";
-import { accountEmail } from "../session.js?v=135";
-import { ensureVerified } from "../verify.js?v=135";
-import { openUploadSheet } from "./upload-sheet.js?v=135";
-import { mountUploads } from "./uploads.js?v=135";
-import { onUploads, enqueue, checkFile, getJobs } from "../upload.js?v=135";
-import { categoryOf, canPreview, FILE_MAX } from "../files.js?v=135";
-import { takePending } from "../pending.js?v=135";
-import { icon } from "../icons.js?v=135";
+} from "../api.js?v=136";
+import { accountEmail } from "../session.js?v=136";
+import { ensureVerified } from "../verify.js?v=136";
+import { openUploadSheet } from "./upload-sheet.js?v=136";
+import { mountUploads } from "./uploads.js?v=136";
+import { onUploads, enqueue, checkFile, getJobs } from "../upload.js?v=136";
+import { categoryOf, canPreview, FILE_MAX } from "../files.js?v=136";
+import { takePending } from "../pending.js?v=136";
+import { icon } from "../icons.js?v=136";
 import {
   esc, formatBytes, formatDuration, plural, toast, errorText, copyText, shareLink,
   canShare, formatDate, daysLeft, fileBadge, fileTile
-} from "../ui.js?v=135";
+} from "../ui.js?v=136";
 
 // Dans un espace "envoi", ce composeur EST l'accueil.
 export const title = (ctx) => (ctx && ctx.space.mode === "envoi" ? ctx.space.name : "Envoyer");
@@ -42,7 +42,7 @@ const DAY_JOKES = {
 // Le nom d'un fichier sans son extension : "Nuit blanche - mix v3"
 const baseName = (name) => String(name || "").replace(/\.[a-z0-9]{1,10}$/i, "").trim() || String(name || "");
 
-// "dans 7 min" : attente avant le prochain envoi (une IP, un envoi par 10 min)
+// "dans 7 min" : attente avant le prochain envoi (une IP, 4 envois par 10 min)
 const waitLabel = (s) => (s >= 60 ? Math.ceil(s / 60) + " min" : s + " s");
 
 export async function mount(root, ctx, params) {
@@ -337,7 +337,7 @@ export async function mount(root, ctx, params) {
   if (folderInput) {
     folderInput.addEventListener("change", async (e) => {
       const list = Array.from(e.target.files);
-      const m = await import("../folders.js?v=135");
+      const m = await import("../folders.js?v=136");
       toast("Préparation du dossier (zip)...", "ok");
       try { addDirect(await m.fromFolderInput(list)); } catch (err) { toast(m.folderError(err), "err"); }
       e.target.value = "";
@@ -404,7 +404,7 @@ export async function mount(root, ctx, params) {
     e.preventDefault();
     if (!state.files.length) return toast("Ajoute au moins un fichier", "err");
     if (waiting > 0) return toast("Attends la fin des uploads en cours", "err");
-    if (state.wait > 0) return toast("Un envoi toutes les 10 minutes : prochain lien dans " + waitLabel(state.wait), "err");
+    if (state.wait > 0) return toast("4 envois toutes les 10 minutes : prochain lien dans " + waitLabel(state.wait), "err");
 
     // sans titre : celui du morceau, sinon la date (rien à remplir en plus)
     const stamp = new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }).format(new Date());
@@ -452,7 +452,7 @@ export async function mount(root, ctx, params) {
   function stopWait() { if (waitTimer) { clearInterval(waitTimer); waitTimer = null; } }
   function drawWait() {
     waitEl.innerHTML = state.wait > 0
-      ? icon("clock", 14) + " Un envoi toutes les 10 minutes par connexion : ton prochain lien dans " + esc(waitLabel(state.wait)) + ". Tes fichiers peuvent déjà charger."
+      ? icon("clock", 14) + " 4 envois toutes les 10 minutes par connexion : ton prochain lien dans " + esc(waitLabel(state.wait)) + ". Tes fichiers peuvent déjà charger."
       : icon("link", 14) + " Tu obtiens un lien à partager, valable 7 jours au plus.";
   }
   async function checkWait() {

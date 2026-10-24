@@ -76,7 +76,7 @@ Réglages du bucket (posés par l'API `b2_update_bucket`) :
   téléchargement fichier par fichier ou tout en zip, sans compte. Ni compte ni
   email pour envoyer, et rien ne part par email (ni aux destinataires, ni à
   l'expéditeur). Un lien vit 7 jours au plus ("jusqu'au premier
-  téléchargement" compris) ; une même IP crée un envoi toutes les 10 minutes
+  téléchargement" compris) ; une même IP crée 4 envois par 10 minutes
   (`create_transfer`, `transfer_wait_seconds()` : l'appli prévient avant
   l'upload). Migration `20260930000001_seminar_link_only.sql`.
 - **Temps réel** : nouveaux sons, commentaires, statuts d'envoi, présence.
