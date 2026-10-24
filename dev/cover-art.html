@@ -1,9 +1,9 @@
 <!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<link rel="stylesheet" href="../css/app.css?v=134">
+<link rel="stylesheet" href="../css/app.css?v=135">
 <style>body{background:#0b0910;padding:16px;display:grid;grid-template-columns:repeat(5,168px);gap:16px}.cover{display:flex}</style>
 <div id="g"></div>
 <script type="module">
-import { albumArt } from "../js/views/review-home.js?v=134";
+import { albumArt } from "../js/views/review-home.js?v=135";
 const titles=["Morgan x Blasphé","Mais c'est la vie","Un mec timide","Les cigales jouent un air de blues"];
 const order=[0,1,2,3,5,7,4,6,8,9,10,4,6,8,9,10];
 document.body.innerHTML = order.map((n,i)=>albumArt(i>10?titles[(i+1)%4]:titles[i%4],"cover-xl",n)).join("");

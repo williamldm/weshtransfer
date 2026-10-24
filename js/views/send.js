@@ -8,19 +8,19 @@ import {
   getProject, getFilesByIds, createTransfer, transferWaitSeconds,
   getTransfer, transferUrl, createProject, signFiles, cachedUrl,
   emailTransfer, emailEnabled, listContacts, suggestContacts, senderEmail, rememberContactsLocal, knownVerified
-} from "../api.js?v=134";
-import { accountEmail } from "../session.js?v=134";
-import { ensureVerified } from "../verify.js?v=134";
-import { openUploadSheet } from "./upload-sheet.js?v=134";
-import { mountUploads } from "./uploads.js?v=134";
-import { onUploads, enqueue, checkFile, getJobs } from "../upload.js?v=134";
-import { categoryOf, canPreview, FILE_MAX } from "../files.js?v=134";
-import { takePending } from "../pending.js?v=134";
-import { icon } from "../icons.js?v=134";
+} from "../api.js?v=135";
+import { accountEmail } from "../session.js?v=135";
+import { ensureVerified } from "../verify.js?v=135";
+import { openUploadSheet } from "./upload-sheet.js?v=135";
+import { mountUploads } from "./uploads.js?v=135";
+import { onUploads, enqueue, checkFile, getJobs } from "../upload.js?v=135";
+import { categoryOf, canPreview, FILE_MAX } from "../files.js?v=135";
+import { takePending } from "../pending.js?v=135";
+import { icon } from "../icons.js?v=135";
 import {
   esc, formatBytes, formatDuration, plural, toast, errorText, copyText, shareLink,
   canShare, formatDate, daysLeft, fileBadge, fileTile
-} from "../ui.js?v=134";
+} from "../ui.js?v=135";
 
 // Dans un espace "envoi", ce composeur EST l'accueil.
 export const title = (ctx) => (ctx && ctx.space.mode === "envoi" ? ctx.space.name : "Envoyer");
@@ -337,7 +337,7 @@ export async function mount(root, ctx, params) {
   if (folderInput) {
     folderInput.addEventListener("change", async (e) => {
       const list = Array.from(e.target.files);
-      const m = await import("../folders.js?v=134");
+      const m = await import("../folders.js?v=135");
       toast("Préparation du dossier (zip)...", "ok");
       try { addDirect(await m.fromFolderInput(list)); } catch (err) { toast(m.folderError(err), "err"); }
       e.target.value = "";
@@ -517,9 +517,14 @@ export async function showDone(root, ctx, created, info) {
         "</div>" +
       "</div>" +
 
-      // option : l'envoyer aussi par email (le lien reste le même)
+      // déjà envoyé par email depuis le formulaire : le résultat, bien visible
+      '<div class="done-sent" data-mail-sent hidden><p class="label">Envoyé par email</p>' +
+        '<ul class="recipients" data-mail-results hidden></ul></div>' +
+
+      // option : l'envoyer aussi par email (le lien reste le même) ; déjà
+      // fait depuis le formulaire, on ne propose plus que d'autres personnes
       '<details class="done-mail" data-mail hidden>' +
-        "<summary>" + icon("mail", 18) + "<span>Envoyer aussi par email</span></summary>" +
+        "<summary>" + icon("mail", 18) + "<span>" + (info.mail ? "Envoyer à d'autres personnes" : "Envoyer aussi par email") + "</span></summary>" +
         '<form data-mail-form novalidate>' +
           '<label class="field"><span class="label">À</span>' +
             '<input class="input" name="to" type="text" inputmode="email" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="email@exemple.fr, autre@exemple.fr"></label>' +
@@ -530,7 +535,6 @@ export async function showDone(root, ctx, created, info) {
           '<button class="btn btn-primary btn-block" type="submit">' + icon("send", 18) + "<span>Envoyer</span></button>" +
           '<p class="hint">Chacun reçoit un email avec le lien. Ton adresse est vérifiée par un code, une seule fois.</p>' +
         "</form>" +
-        '<ul class="recipients" data-mail-results hidden></ul>' +
       "</details>" +
 
       '<div class="row-2 done-actions">' +
@@ -567,7 +571,8 @@ async function mountMailOption(root, created, preset) {
   const form = box.querySelector("[data-mail-form]");
   const err = box.querySelector("[data-mail-err]");
   const recents = box.querySelector("[data-mail-recents]");
-  const results = box.querySelector("[data-mail-results]");
+  const sent = root.querySelector("[data-mail-sent]");
+  const results = root.querySelector("[data-mail-results]");
   const EMAIL = /^[^@\s<>]+@[^@\s<>]+\.[^@\s<>]+$/;
   const acc = accountEmail();
   form.from.value = senderEmail(acc);
@@ -630,6 +635,7 @@ async function mountMailOption(root, created, preset) {
       const ok = list.filter((x) => x.status === "sent").map((x) => x.email);
       rememberContactsLocal(from, ok);
       results.hidden = false;
+      sent.hidden = false;
       results.innerHTML = list.map((x) => "<li><span class=\"r-mail\">" + esc(x.email) + "</span>" +
         (x.status === "sent" ? '<span class="st st-ok">' + icon("check", 14) + " envoyé</span>" : '<span class="st st-bad">échec</span>') + "</li>").join("");
       form.to.value = "";
@@ -645,7 +651,6 @@ async function mountMailOption(root, created, preset) {
 
   // adresses déjà saisies dans le formulaire d'envoi : ça part tout de suite
   if (preset && preset.emails.length) {
-    box.open = true;
     form.to.value = preset.emails.join(", ");
     form.from.value = preset.from;
     form.requestSubmit();
