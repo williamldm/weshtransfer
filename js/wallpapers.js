@@ -4,29 +4,29 @@
 // tools/scenes.py, sauf la centrale (img/scene.svg), l'originale. Le ?v=
 // suit la version du site : un décor retouché s'affiche tout de suite.
 
-import { isThc } from "./mode.js?v=141";
+import { isThc } from "./mode.js?v=142";
 
 const POLLUTION = [
-  { file: "img/scenes/plateforme.svg?v=141", title: "Plateforme pétrolière, torchère allumée", joke: "Chaque envoi rallume la torchère." },
-  { file: "img/scenes/serveurs.svg?v=141", title: "Ferme de serveurs dans le désert", joke: "Refroidie à l'eau potable, évidemment." },
-  { file: "img/scene.svg?v=141", title: "Centrale thermique, la nuit", joke: "Ce fond d'écran consomme plus que ton frigo." },
-  { file: "img/scenes/aeroport.svg?v=141", title: "Aéroport, jets privés", joke: "Un jet par fichier. Deux pour les WAV." },
-  { file: "img/scenes/ski.svg?v=141", title: "Station de ski, en août", joke: "Neige artificielle, 24 degrés dehors." },
-  { file: "img/scenes/autoroute.svg?v=141", title: "Périphérique, 23 h", joke: "Tous en SUV, clim à fond, seul à bord." },
-  { file: "img/scenes/croisiere.svg?v=141", title: "Paquebot de croisière, 6 000 cabines", joke: "Buffet à volonté. Fioul lourd aussi." },
-  { file: "img/scenes/fusee.svg?v=141", title: "Tourisme spatial, vol de 11 minutes", joke: "Une vie d'émissions pour un selfie en apesanteur." },
-  { file: "img/scenes/golf.svg?v=141", title: "Golf dans le désert", joke: "18 trous, 4 millions de litres d'eau par jour." }
+  { file: "img/scenes/plateforme.svg?v=142", title: "Plateforme pétrolière, torchère allumée", joke: "Chaque envoi rallume la torchère." },
+  { file: "img/scenes/serveurs.svg?v=142", title: "Ferme de serveurs dans le désert", joke: "Refroidie à l'eau potable, évidemment." },
+  { file: "img/scene.svg?v=142", title: "Centrale thermique, la nuit", joke: "Ce fond d'écran consomme plus que ton frigo." },
+  { file: "img/scenes/aeroport.svg?v=142", title: "Aéroport, jets privés", joke: "Un jet par fichier. Deux pour les WAV." },
+  { file: "img/scenes/ski.svg?v=142", title: "Station de ski, en août", joke: "Neige artificielle, 24 degrés dehors." },
+  { file: "img/scenes/autoroute.svg?v=142", title: "Périphérique, 23 h", joke: "Tous en SUV, clim à fond, seul à bord." },
+  { file: "img/scenes/croisiere.svg?v=142", title: "Paquebot de croisière, 6 000 cabines", joke: "Buffet à volonté. Fioul lourd aussi." },
+  { file: "img/scenes/fusee.svg?v=142", title: "Tourisme spatial, vol de 11 minutes", joke: "Une vie d'émissions pour un selfie en apesanteur." },
+  { file: "img/scenes/golf.svg?v=142", title: "Golf dans le désert", joke: "18 trous, 4 millions de litres d'eau par jour." }
 ];
 
 // Mode THC (js/mode.js) : ses décors à lui, même mécanique.
 const THC = [
-  { file: "img/scenes/thc-salon.svg?v=141", title: "Le salon, tard", jokes: ["Il reste du fichier ? Non, c'était le dernier.", "La télé tourne depuis mardi.", "Quelqu'un a vu la télécommande ? Et le briquet ?"] },
-  { file: "img/scenes/thc-serre.svg?v=141", title: "La chambre de culture", jokes: ["Chaque envoi arrose une plante.", "24 degrés, 55 % d'humidité, 100 % d'amour.", "La facture d'électricité, on n'en parle pas."] },
-  { file: "img/scenes/thc-van.svg?v=141", title: "Le combi, quelque part", jokes: ["On repart demain. Ou après-demain.", "Peace, love et 4G qui capte mal.", "Le GPS dit de faire demi-tour. On l'écoute pas."] },
-  { file: "img/scenes/thc-balcon.svg?v=141", title: "Le balcon, côté hamac", jokes: ["Les voisins disent que ça sent le basilic.", "Vue sur la ville, pieds dans le vide.", "Le hamac n'a jamais rendu personne productif."] },
-  { file: "img/scenes/thc-studio.svg?v=141", title: "Le home studio", jokes: ["Trois heures sur la même boucle. Elle est parfaite.", "On enregistre demain. Promis.", "L'encens, c'est pour l'acoustique."] },
-  { file: "img/scenes/thc-cuisine.svg?v=141", title: "La cuisine, 4 h 20", jokes: ["La fringale n'a pas d'horaires.", "Le chat juge. Il a raison.", "Pizza froide, céréales, cornichons : menu complet."] },
-  { file: "img/scenes/thc-champ.svg?v=141", title: "La plantation, pleine lune", jokes: ["Du chanvre industriel, monsieur l'agent.", "L'épouvantail est plus détendu que nous.", "Récolte prévue en octobre. Si on y pense."] }
+  { file: "img/scenes/thc-serre.svg?v=142", title: "La chambre de culture", jokes: ["Chaque envoi arrose une plante.", "24 degrés, 55 % d'humidité, zéro voisin au courant.", "La facture d'électricité, on n'en parle pas."] },
+  { file: "img/scenes/thc-champ.svg?v=142", title: "La plantation, pleine lune", jokes: ["Du chanvre industriel, monsieur l'agent.", "Récolte prévue en octobre. Si on y pense.", "Douze rangs. On en déclare deux."] },
+  { file: "img/scenes/thc-salon.svg?v=142", title: "Le salon, tard", jokes: ["Il reste du fichier ? Non, c'était le dernier.", "La télé tourne depuis mardi.", "Quelqu'un a vu la télécommande ? Et le briquet ?"] },
+  { file: "img/scenes/thc-sechoir.svg?v=142", title: "Le séchoir", jokes: ["Dix jours la tête en bas. Comme nous lundi.", "3,5 grammes, pesés trois fois.", "Ça sent jusque chez la voisine. Elle a rien dit."] },
+  { file: "img/scenes/thc-balcon.svg?v=142", title: "Le balcon, côté hamac", jokes: ["Les voisins disent que ça sent le basilic.", "Vue sur la ville, pieds dans le vide.", "Le hamac n'a jamais rendu personne productif."] },
+  { file: "img/scenes/thc-studio.svg?v=142", title: "Le home studio", jokes: ["Trois heures sur la même boucle. Elle est parfaite.", "On enregistre demain. Promis.", "La plante a un meilleur sens du rythme que le batteur."] },
+  { file: "img/scenes/thc-cuisine.svg?v=142", title: "La cuisine, 4 h 20", jokes: ["La fringale n'a pas d'horaires.", "Le chat juge. Il a raison.", "Pizza froide, céréales, cornichons : menu complet."] }
 ];
 
 export const WALLPAPERS = isThc ? THC : POLLUTION;
@@ -158,6 +158,9 @@ export function mountWallpaperNote(note) {
     if (dots) for (const b of dots.children) b.setAttribute("aria-current", String(Number(b.dataset.wp) === i));
   };
   show(r ? r.index : currentWallpaper());
+  // mode THC : le décor se joue (js/thc-play.js), on le dit
+  const play = note.querySelector("[data-wp-play]");
+  if (play && isThc && window.matchMedia && window.matchMedia("(hover: hover)").matches) play.hidden = false;
   if (!r) return;
   r.onChange(show);
   const btn = note.querySelector("[data-wp-next]");

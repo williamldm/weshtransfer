@@ -10,7 +10,7 @@
 // Le texte reste lisible par les lecteurs d'écran (aria-label), le découpage
 // en lettres leur est caché. Rien ne bouge avec "réduire les animations".
 
-import { isThc } from "./mode.js?v=141";
+import { isThc } from "./mode.js?v=142";
 
 // Le grand titre change d'une visite à l'autre. [début, partie en feu, fin] :
 // la partie du milieu est celle qui brûle, elle finit la phrase quand il
@@ -191,7 +191,7 @@ export function mountClaim(claim) {
     new IntersectionObserver((entries) => { visible = entries[0].isIntersecting; }).observe(claim);
   }
   let fx = null;
-  import("./scene-fx.js?v=141").then((m) => { fx = m; }).catch(() => {});
+  import("./scene-fx.js?v=142").then((m) => { fx = m; }).catch(() => {});
   setInterval(() => {
     const ls = letters();
     if (!fx || !visible || document.hidden || !ls.length) return;

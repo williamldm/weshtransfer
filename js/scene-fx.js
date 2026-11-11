@@ -11,13 +11,13 @@
 // Rien ne tourne quand rien ne bouge (la boucle s'arrête d'elle-même), rien
 // du tout avec "réduire les animations", ni onglet caché.
 
-import { WALLPAPERS } from "./wallpapers.js?v=141";
+import { WALLPAPERS } from "./wallpapers.js?v=142";
 
 const MAX_PARTICLES = 240;
 const SHIFT_X = 16;   // px, amplitude de la profondeur
 const SHIFT_Y = 10;
 // ce qui n'est pas du décor : on n'y sème rien (invisible derrière la carte)
-const NOT_SCENE = ".deck, .app-main, #tp, .hub-below, .player, .sheet, .sheet-wrap, .toast-wrap, " +
+export const NOT_SCENE = ".deck, .app-main, #tp, .hub-below, .player, .sheet, .sheet-wrap, .toast-wrap, " +
   ".app-header, a, button, input, textarea, select, label, summary, [role=dialog]";
 
 // ------------------------------------------------------------ les matières
@@ -74,6 +74,18 @@ const KINDS = {
     make: (x, y, vx, vy) => ({ x, y, vx: vx * 0.15 + rand(-0.5, 0.5), vy: rand(-1.3, -0.5), s: rand(2, 3.6), gs: -0.008, a: rand(0.7, 1), life: rand(120, 200), flicker: true }),
     wind: 0.004, lift: -0.006
   },
+  leaf: {         // mode THC : une plante frôlée perd quelques feuilles
+    colors: ["#2c9249", "#45b360", "#206b38"], shape: "leaf", blend: "source-over",
+    every: 10, burst: 14,
+    make: (x, y, vx, vy) => ({ x, y, vx: vx * 0.2 + rand(-0.9, 0.9), vy: rand(-1.2, 0.2), s: rand(4, 7.5), gs: 0, a: rand(0.8, 1), life: rand(110, 170), sway: rand(0, 6.28), rot: rand(0, 6.28), vr: rand(-0.08, 0.08) }),
+    wind: 0, lift: 0.03
+  },
+  spark: {        // mode THC : la pierre du briquet
+    colors: ["#ffe9a8", "#f2c46b", "#e8904a"], shape: "dot", blend: "lighter",
+    every: 6, burst: 10,
+    make: (x, y, vx, vy) => ({ x, y, vx: rand(-1.6, 1.6), vy: rand(-2.2, 0.4), s: rand(1.2, 2.4), gs: -0.02, a: 1, life: rand(18, 34), flicker: true }),
+    wind: 0, lift: 0.06
+  },
   water: {        // golf : l'arrosage automatique, des gouttes qui retombent
     colors: ["#bfe3ff", "#8fc7ff", "#ffffff"], shape: "dot", blend: "source-over",
     every: 6, burst: 40,
@@ -92,13 +104,13 @@ const KIND_OF = {
   "img/scenes/croisiere.svg": "smoke",
   "img/scenes/fusee.svg": "embers",
   "img/scenes/golf.svg": "water",
-  "img/scenes/thc-salon.svg": "haze",
   "img/scenes/thc-serre.svg": "haze",
-  "img/scenes/thc-van.svg": "joint",
+  "img/scenes/thc-champ.svg": "haze",
+  "img/scenes/thc-salon.svg": "haze",
+  "img/scenes/thc-sechoir.svg": "haze",
   "img/scenes/thc-balcon.svg": "haze",
   "img/scenes/thc-studio.svg": "haze",
-  "img/scenes/thc-cuisine.svg": "haze",
-  "img/scenes/thc-champ.svg": "joint"
+  "img/scenes/thc-cuisine.svg": "haze"
 };
 
 // Sprite flou pré-rendu par couleur : bien moins cher qu'un dégradé par
@@ -224,6 +236,13 @@ function draw(p, k) {
   if (k.shape === "square") {
     ctx.fillStyle = p.c;
     ctx.fillRect(Math.round(p.x), Math.round(p.y), p.s, p.s);
+  } else if (k.shape === "leaf") {
+    // une foliole : amande qui tournoie en tombant
+    p.rot += p.vr || 0;
+    ctx.fillStyle = p.c;
+    ctx.beginPath();
+    ctx.ellipse(p.x, p.y, p.s, p.s * 0.3, p.rot, 0, Math.PI * 2);
+    ctx.fill();
   } else if (k.shape === "dot") {
     const img = sprite(p.c);
     ctx.drawImage(img, p.x - p.s * 1.6, p.y - p.s * 1.6, p.s * 3.2, p.s * 3.2);
@@ -375,6 +394,32 @@ export function emitAt(clientX, clientY, n) {
   const y = clientY - r.top;
   if (x < 0 || y < 0 || x > r.width || y > r.height) return;
   spawn(x, y, 0, -0.4, n || 1);
+}
+
+// Même chose avec une matière choisie (le jeu du mode THC : feuilles,
+// étincelles, fumée), quel que soit le décor. spread : vitesse de départ
+// dans toutes les directions (bouffée) ; sinon ça monte doucement.
+export function emitKindAt(name, clientX, clientY, n, spread) {
+  const k = KINDS[name];
+  if (!scene || !k) return;
+  const r = scene.getBoundingClientRect();
+  const x = clientX - r.left;
+  const y = clientY - r.top;
+  if (x < 0 || y < 0 || x > r.width || y > r.height) return;
+  for (let i = 0; i < (n || 1) && parts.length < MAX_PARTICLES; i++) {
+    const p = k.make(x, y, 0, -0.4);
+    if (spread) {
+      const ang = rand(0, Math.PI * 2);
+      const sp = rand(0.3, spread);
+      p.vx += Math.cos(ang) * sp;
+      p.vy += Math.sin(ang) * sp - 0.4;
+    }
+    p.k = k;
+    p.c = k.colors[(Math.random() * k.colors.length) | 0];
+    p.age = 0;
+    parts.push(p);
+  }
+  wake();
 }
 
 // Pour les tests : fait avancer la boucle sans attendre l'écran.

@@ -29,12 +29,18 @@ def f(x):
     return ("%.1f" % x).rstrip("0").rstrip(".")
 
 
-def svg(label, css, body):
+def svg(label, css, body, still=False):
+    """still : aucun style d'animation dans le fichier. Le navigateur dessine
+    alors l'image une seule fois, au lieu de la redessiner à chaque image
+    (indispensable pour les décors très chargés)."""
+    if still:
+        return ('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1000" preserveAspectRatio="xMidYMax slice" '
+                'role="img" aria-label="' + label + '">\n' + body + "</svg>\n")
     return ('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1000" preserveAspectRatio="xMidYMax slice" '
             'role="img" aria-label="' + label + '">\n<style>' + BASE_CSS + css + REDUCED + "</style>\n" + body + "</svg>\n")
 
 
-def sky(seed, moon=(1330, 170), stars=90, top=560):
+def sky(seed, moon=(1330, 170), stars=90, top=560, twinkle=True):
     """Ciel de nuit : aplat, lueur violette qui monte de l'horizon (la
     pollution lumineuse, forcément), étoiles dont quelques-unes scintillent,
     croissant de lune dans son halo."""
@@ -47,7 +53,8 @@ def sky(seed, moon=(1330, 170), stars=90, top=560):
         out.append('<circle cx="%d" cy="%d" r="%s"/>' % (rnd.randint(0, 1600), rnd.randint(20, top), rnd.choice(["1", "1", "1.4", "1.8"])))
     out.append('</g><g fill="#8279A6">')
     for i in range(9):
-        out.append('<circle class="tw" style="animation-delay:-%ss" cx="%d" cy="%d" r="1.8"/>' % (f(rnd.random() * 5), rnd.randint(0, 1600), rnd.randint(20, top - 120)))
+        tw = ' class="tw" style="animation-delay:-%ss"' % f(rnd.random() * 5)
+        out.append('<circle%s cx="%d" cy="%d" r="1.8"/>' % (tw if twinkle else "", rnd.randint(0, 1600), rnd.randint(20, top - 120)))
     out.append("</g>")
     if moon:
         x, y = moon
@@ -574,81 +581,162 @@ SCENES = {
 
 
 # ================================================================ mode THC
-# Direction parallèle, version fumette : des gros plans chaleureux (salon,
-# chambre de culture, combi, balcon, cuisine, home studio, plantation),
-# un côté hippie assumé (mandalas, guirlandes, peace and love), palette
-# verte, et le violet de la marque comme lumière des lampes. Les décors
-# sortent dans img/scenes/thc-*.svg.
+# Direction parallèle, version fumette. Deux images fortes en perspective
+# (la chambre de culture, la plantation sous la lune) et des intérieurs en
+# gros plan (salon, séchoir, balcon, home studio, cuisine). Les plants sont
+# dessinés pour de vrai : feuilles dentelées en éventail, branches
+# latérales, têtes avec leurs pistils. Rien n'est allumé dans le dessin :
+# c'est le visiteur qui cueille, roule et allume (js/thc-play.js), sur les
+# zones listées dans js/thc-spots.js (écrit par ce script).
 LAMP, PINK = "#B05CFF", "#E26BD8"
-LEAF1, LEAF2, LEAF3 = "#1F6B38", "#2F9E4F", "#5FD068"
+LEAFS = ["#102F1B", "#18482A", "#206B38", "#2C9249", "#45B360"]
+BUD1, BUD2 = "#4FA65A", "#6DC074"
 THC_PALETTE = dict(BG="#0B0F0C", HILL="#121915", HILL2="#19221C", MASS="#233028", MASS2="#1D2922", MASS3="#19241E",
                    EDGE="#34463B", TRIM="#263229", SMOKE=["#3F5747", "#37503F", "#48614F"], VIOLET="#5FD068",
                    WHITE="#ECF2EC", RED="#E8674A", FLAME="#E8904A", FLAME2="#F2C46B", GROUND="#070A08")
 
 THC_CSS = """
 .breath{animation:breath 6s ease-in-out infinite alternate}
-@keyframes breath{from{opacity:.65}to{opacity:1}}
-.ember{animation:ember 4s ease-in-out infinite}
-@keyframes ember{0%,100%{opacity:.5}40%{opacity:1}}
-.spin{animation:spin 140s linear infinite;transform-box:fill-box;transform-origin:50% 50%}
-@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes breath{from{opacity:.7}to{opacity:1}}
 .sway{animation:sway 7s ease-in-out infinite alternate;transform-box:fill-box;transform-origin:50% 100%}
-@keyframes sway{from{transform:rotate(-1.4deg)}to{transform:rotate(1.4deg)}}
-.flame{animation:flick 1.1s ease-in-out infinite alternate;transform-box:fill-box;transform-origin:50% 100%}
-@keyframes flick{0%{transform:scale(1,1)}40%{transform:scale(.9,1.14)}100%{transform:scale(1.08,.9)}}
+@keyframes sway{from{transform:rotate(-1.2deg)}to{transform:rotate(1.2deg)}}
+.hang{animation:hang 6s ease-in-out infinite alternate;transform-box:fill-box;transform-origin:50% 0%}
+@keyframes hang{from{transform:rotate(-1.6deg)}to{transform:rotate(1.6deg)}}
 """
 
-
-def thc_defs():
-    """Feuille en éventail (sept folioles) et tête, dessinées une fois."""
-    def leaflet(L, W):
-        return "M0 0C%s %s %s %s 0 %sC%s %s %s %s 0 0Z" % (f(W), f(-L * .22), f(W * .75), f(-L * .7), f(-L), f(-W * .75), f(-L * .7), f(-W), f(-L * .22))
-    fan = "".join('<path transform="rotate(%d)" d="%s"/>' % (a, leaflet(L, L * .15))
-                  for a, L in ((0, 42), (-31, 37), (31, 37), (-62, 28), (62, 28), (-96, 17), (96, 17)))
-    bud = "".join('<ellipse cx="%s" cy="%s" rx="%s" ry="%s"/>' % p for p in
-                  ((0, -7, 9, 9), (-6, -17, 7.5, 8), (6, -22, 7.5, 8), (-3, -32, 7, 8.5), (4, -41, 6, 8), (0, -52, 4.5, 8), (0, -62, 2.6, 6)))
-    return ('<defs><g id="fan"><g stroke="none">%s</g><path d="M0 0V13" fill="none" stroke-width="2.2"/></g><g id="bud">%s</g>'
-            '<linearGradient id="lc" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="%s" stop-opacity=".36"/><stop offset="1" stop-color="%s" stop-opacity="0"/></linearGradient>'
-            '<linearGradient id="pc" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="%s" stop-opacity=".32"/><stop offset="1" stop-color="%s" stop-opacity="0"/></linearGradient>'
-            '<linearGradient id="wc" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="%s" stop-opacity=".3"/><stop offset="1" stop-color="%s" stop-opacity="0"/></linearGradient>'
-            '<radialGradient id="warm"><stop offset="0" stop-color="%s" stop-opacity=".5"/><stop offset="1" stop-color="%s" stop-opacity="0"/></radialGradient></defs>'
-            % (fan, bud, LAMP, LAMP, PINK, PINK, "#ECF2EC", "#ECF2EC", "#E8904A", "#E8904A"))
+_spots = []
 
 
-def fanleaf(x, y, rot, sc, col):
-    return '<use href="#fan" transform="translate(%s %s) rotate(%s) scale(%s)" fill="%s" stroke="%s"/>' % (f(x), f(y), f(rot), f(sc), col, col)
+def spot(kind, x, y, w, h, **kw):
+    """Zone cliquable, en coordonnées du décor : x au centre, y en bas."""
+    d = dict(t=kind, x=int(round(x)), y=int(round(y)), w=int(round(w)), h=int(round(h)))
+    d.update((k, int(round(v))) for k, v in kw.items())
+    _spots.append(d)
 
 
-def plant(x, base, h, seed=1, c1=None, c2=None, buds=True, sway=True):
-    """Un pied : tige, étages de feuilles en éventail de plus en plus petites,
-    têtes aux nœuds du haut et grosse tête au sommet."""
-    c1, c2 = c1 or LEAF1, c2 or LEAF2
-    rnd = random.Random(seed)
-    k = h / 260.0
-    out = ['<g transform="translate(%s %s)"><g%s>' % (f(x), f(base), ' class="sway" style="animation-delay:-%ss"' % f(rnd.random() * 7) if sway else ""),
-           '<path d="M0 0V%s" stroke="%s" stroke-width="%s" stroke-linecap="round"/>' % (f(-h), c1, f(max(2.4, 4.5 * k)))]
-    n = max(3, int(h / 44))
+def _leaflet(L, W, n):
+    """Foliole lancéolée à bords dentelés, pointe en haut."""
+    def prof(t):
+        return W * math.sin(math.pi * min(1.0, t) ** .72)
+    right = []
     for i in range(n):
-        t = (i + .6) / n
-        y = -h * t
-        sc = (1.5 - .95 * t) * k
+        t = i / float(n)
+        right.append((prof(t) * .68, -L * t))
+        right.append((prof(min(t + .8 / n, .97)), -L * min(t + .92 / n, .985)))
+    pts = [(0, 0)] + right + [(0, -L)] + [(-x, y) for x, y in reversed(right)]
+    return "M" + "L".join("%s %s" % (f(x), f(y)) for x, y in pts) + "Z"
+
+
+def _fan(fid, spec, L0=44):
+    paths, ribs = "", ""
+    for ang, rel in spec:
+        L = L0 * rel
+        paths += '<path transform="rotate(%d)" d="%s"/>' % (ang, _leaflet(L, L * .14, max(3, int(6 * rel))))
+        if abs(ang) < 40:
+            ribs += '<path transform="rotate(%d)" d="M0 0V%s"/>' % (ang, f(-L * .9))
+    return ('<g id="%s"><g stroke="none">%s</g><g fill="none" stroke="#000" stroke-opacity=".3" stroke-width=".9">%s</g>'
+            '<path d="M0 0V16" fill="none" stroke-width="2"/></g>' % (fid, paths, ribs))
+
+
+def _cola(cid, seed, H=62):
+    """Une tête : calices empilés, reflets, pistils orange, petites feuilles."""
+    rnd = random.Random(seed)
+    blobs, hi, hairs, sugar = "", "", "", ""
+    n = 11
+    for k in range(n):
+        t = k / float(n - 1)
+        y = -4 - t * H
+        r = 11 * (1 - t) ** .55 + 2.4
+        cx = rnd.uniform(-r * .45, r * .45)
+        blobs += '<circle cx="%s" cy="%s" r="%s"/>' % (f(cx), f(y), f(r))
+        if k % 2 == 0:
+            hi += '<circle cx="%s" cy="%s" r="%s"/>' % (f(cx - r * .3), f(y - r * .25), f(r * .46))
+        for sd in (-1, 1):
+            if rnd.random() < .6:
+                hairs += "M%s %sq%s -3 %s -8" % (f(cx + sd * r * .8), f(y), f(sd * 3), f(sd * rnd.uniform(1, 5)))
+    for k in range(4):
+        t = rnd.uniform(.05, .8)
+        sd = 1 if k % 2 else -1
+        sugar += '<path transform="translate(%s %s) rotate(%s)" d="%s"/>' % (f(sd * 3), f(-4 - t * H), f(sd * rnd.uniform(45, 80)), _leaflet(15 * (1 - t * .5) + 5, 2.6, 4))
+    return ('<g id="%s"><g fill="currentColor">%s</g>%s<g fill="#fff" fill-opacity=".13">%s</g>'
+            '<path d="%s" fill="none" stroke="#E8904A" stroke-width="1.1" stroke-linecap="round"/></g>' % (cid, sugar, blobs, hi, hairs))
+
+
+def _plantdef(pid, seed, n=7, branches=True, branch_leaves=True, fans=("fan7", "fan9", "fan7"), spread=.42):
+    """Un pied de 300 de haut, posé à l'origine : tige, grandes feuilles
+    sur pétiole à chaque nœud, branches latérales qui remontent avec leur
+    tête au bout, grosse tête au sommet. Les étages du bas sont plus sombres."""
+    rnd = random.Random(seed)
+    h = 300.0
+    lean = rnd.uniform(-10, 10)
+    stems, leaves, colas = [], [], []
+    stems.append('<path d="M0 0Q%s %s %s %s" stroke-width="5.2"/>' % (f(lean * .2), f(-h * .4), f(lean), f(-h * .78)))
+    for i in range(n):
+        t = (i + 1.0) / (n + 1)
+        y = -h * .78 * t
+        xs = lean * t * t
+        tone = min(4, 2 + int(t * 2.6))
         for side in (-1, 1):
-            ang = side * (68 - 26 * t + rnd.uniform(-9, 9))
-            pl = (44 - 22 * t) * k
-            ex, ey = math.sin(math.radians(ang)) * pl, y - math.cos(math.radians(ang)) * pl
-            col = c2 if (i + (side > 0)) % 2 else c1
-            out.append('<path d="M0 %s L%s %s" stroke="%s" stroke-width="%s"/>' % (f(y), f(ex), f(ey), c1, f(max(1.6, 2.4 * k))))
-            out.append(fanleaf(ex, ey, ang + side * 16, sc, col))
-            if buds and t > .5:
-                out.append('<use href="#bud" transform="translate(%s %s) rotate(%s) scale(%s)" fill="%s"/>' % (f(side * 3 * k), f(y - 2), f(side * 24), f(.5 * k), LEAF3))
-    if buds:
-        out.append(fanleaf(0, -h + 16 * k, -42, .62 * k, c2) + fanleaf(0, -h + 16 * k, 42, .62 * k, c1))
-        out.append('<use href="#bud" transform="translate(0 %s) scale(%s)" fill="%s"/>' % (f(-h + 14 * k), f(1.15 * k), LEAF3))
-        out.append("".join('<circle cx="%s" cy="%s" r="%s" fill="%s"/>' % (f(rnd.uniform(-6, 6) * k), f(-h + 14 * k - rnd.uniform(8, 56) * k), f(1.3 * k), FLAME) for _ in range(5)))
-    else:
-        out.append(fanleaf(0, -h, 0, .8 * k, c2))
-    out.append("</g></g>")
-    return "".join(out)
+            a = side * (70 + rnd.uniform(-12, 12))
+            pl = 48 - 22 * t
+            ex, ey = xs + math.sin(math.radians(a)) * pl, y - math.cos(math.radians(a)) * pl * .6
+            stems.append('<path d="M%s %sL%s %s" stroke-width="2"/>' % (f(xs), f(y), f(ex), f(ey)))
+            leaves.append((t, '<use href="#%s" transform="translate(%s %s) rotate(%s) scale(%s)" fill="%s" stroke="%s"/>'
+                           % (rnd.choice(fans), f(ex), f(ey), f(side * rnd.uniform(46, 74)), f(1.95 - 1.0 * t),
+                              LEAFS[max(0, tone - 1 - (1 if rnd.random() < .4 else 0))], LEAFS[1])))
+            if branches and i >= 1:
+                bl = ((1 - t) ** .7 * spread + .06) * h
+                ba = side * (48 - 14 * t + rnd.uniform(-6, 6))
+                sn, cs = math.sin(math.radians(ba)), math.cos(math.radians(ba))
+                bx, by = xs + sn * bl, y - cs * bl
+                qx, qy = xs + sn * bl * .7, y - cs * bl * .3
+                stems.append('<path d="M%s %sQ%s %s %s %s" stroke-width="%s"/>' % (f(xs), f(y), f(qx), f(qy), f(bx), f(by), f(max(1.4, 3 * (1 - t * .5)))))
+                if branch_leaves:
+                    for u in (.5, .85):
+                        px = (1 - u) ** 2 * xs + 2 * u * (1 - u) * qx + u * u * bx
+                        py = (1 - u) ** 2 * y + 2 * u * (1 - u) * qy + u * u * by
+                        leaves.append((t + u * .1, '<use href="#%s" transform="translate(%s %s) rotate(%s) scale(%s)" fill="%s" stroke="%s"/>'
+                                       % (rnd.choice(("fan5", "fan7")), f(px), f(py), f(side * rnd.uniform(38, 96)), f((1.25 - .55 * t) * (1.1 - u * .3)),
+                                          LEAFS[max(0, tone - (1 if rnd.random() < .5 else 0))], LEAFS[1])))
+                colas.append('<use href="#cola%d" transform="translate(%s %s) rotate(%s) scale(%s)" fill="%s" color="%s"/>'
+                             % (rnd.randint(1, 2), f(bx), f(by + 4), f(ba * .35), f(.36 + .26 * (1 - t)), BUD1 if rnd.random() < .6 else BUD2, LEAFS[3]))
+    for a in (-58, 55, -22, 26):
+        leaves.append((1.5, '<use href="#fan5" transform="translate(%s %s) rotate(%d) scale(.9)" fill="%s" stroke="%s"/>' % (f(lean), f(-h * .76), a, LEAFS[4 if a in (-22, 26) else 3], LEAFS[1])))
+    colas.append('<use href="#cola1" transform="translate(%s %s) scale(.9)" fill="%s" color="%s"/>' % (f(lean), f(-h * .76), BUD2, LEAFS[4]))
+    leaves.sort(key=lambda p: p[0])
+    return ('<g id="%s"><g fill="none" stroke="%s" stroke-linecap="round">%s</g>%s%s</g>'
+            % (pid, LEAFS[1], "".join(stems), "".join(l for _, l in leaves), "".join(colas)))
+
+
+def thc_defs(plants=("A", "B")):
+    lib = {
+        "A": lambda: _plantdef("plA", 11),
+        "B": lambda: _plantdef("plB", 23, spread=.33),
+        "M": lambda: _plantdef("plM", 31, n=5, branch_leaves=False, fans=("fan7", "fan5")),
+        "S": lambda: _plantdef("plS", 41, n=3, branches=False, fans=("fan5",)),
+    }
+    grad = lambda gid, col, op: ('<linearGradient id="%s" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="%s" stop-opacity="%s"/>'
+                                 '<stop offset="1" stop-color="%s" stop-opacity="0"/></linearGradient>' % (gid, col, op, col))
+    rad = lambda gid, col, op: ('<radialGradient id="%s"><stop offset="0" stop-color="%s" stop-opacity="%s"/>'
+                                '<stop offset="1" stop-color="%s" stop-opacity="0"/></radialGradient>' % (gid, col, op, col))
+    return ("<defs>"
+            + _fan("fan9", ((0, 1), (-25, .94), (25, .94), (-50, .8), (50, .8), (-77, .56), (77, .56), (-104, .3), (104, .3)))
+            + _fan("fan7", ((0, 1), (-27, .93), (27, .93), (-54, .74), (54, .74), (-83, .46), (83, .46)))
+            + _fan("fan5", ((0, 1), (-31, .86), (31, .86), (-64, .56), (64, .56)))
+            + _fan("fan3", ((0, 1), (-36, .68), (36, .68)))
+            + _cola("cola1", 5) + _cola("cola2", 9)
+            + grad("lc", LAMP, ".36") + grad("pc", PINK, ".32") + grad("wc", "#ECF2EC", ".3")
+            + rad("warm", "#E8904A", ".5") + rad("glowP", LAMP, ".5") + rad("glowK", PINK, ".4") + rad("moonH", "#CFE3CC", ".22")
+            + "".join(lib[p]() for p in plants) + "</defs>")
+
+
+def useplant(pid, x, base, sc=1.0, flip=False, op=1.0, sway=False, delay=0.0, hot=True):
+    if hot and sc >= .45:
+        spot("plant", x, base, 210 * sc, 300 * sc)
+    inner = '<use href="#pl%s"/>' % pid
+    if sway:
+        inner = '<g class="sway" style="animation-delay:-%ss">%s</g>' % (f(delay), inner)
+    return '<g transform="translate(%s %s) scale(%s %s)"%s>%s</g>' % (f(x), f(base), f(-sc if flip else sc), f(sc), "" if op >= 1 else ' opacity="%s"' % f(op), inner)
 
 
 def pot(x, base, w=80, hgt=58, col=None):
@@ -658,75 +746,8 @@ def pot(x, base, w=80, hgt=58, col=None):
                f(x - w / 2 - 4), f(base - hgt - 4), f(w + 8), EDGE, f(x), f(base - hgt), f(w / 2 - 6)))
 
 
-def potted(x, base, h, seed=1, w=80, hgt=58, **kw):
-    return pot(x, base, w, hgt) + plant(x, base - hgt, h, seed, **kw)
-
-
-def mandala(cx, cy, r, cols=None, spin=True):
-    cols = cols or (PINK, FLAME2, LAMP, LEAF3)
-    out = ['<g transform="translate(%s %s)"><g%s fill="none">' % (f(cx), f(cy), ' class="spin"' if spin else "")]
-    rings = ((8, 0.14, 0.42), (12, 0.42, 0.7), (18, 0.7, 1.0))
-    for i, (n, a, bq) in enumerate(rings):
-        a, bq = r * a, r * bq
-        w = (a + bq) * math.pi / n * .46
-        d = "M0 %s C%s %s %s %s 0 %s C%s %s %s %s 0 %sZ" % (f(-a), f(w), f(-a - (bq - a) * .3), f(w), f(-a - (bq - a) * .75), f(-bq), f(-w), f(-a - (bq - a) * .75), f(-w), f(-a - (bq - a) * .3), f(-a))
-        col = cols[i % len(cols)]
-        out.append('<g fill="%s" fill-opacity=".14" stroke="%s" stroke-opacity=".75" stroke-width="2">%s</g>'
-                   % (col, col, "".join('<path transform="rotate(%s)" d="%s"/>' % (f(k * 360 / n), d) for k in range(n))))
-    out.append('<circle r="%s" stroke="%s" stroke-opacity=".6" stroke-width="2"/><circle r="%s" stroke="%s" stroke-opacity=".5" stroke-width="2"/>'
-               '<circle r="%s" fill="%s" fill-opacity=".7" stroke="none"/></g></g>' % (f(r * 1.05), cols[3 % len(cols)], f(r * .42), cols[1], f(r * .09), cols[1]))
-    return "".join(out)
-
-
-def tapestry(x, y, w, h, r=None):
-    out = ['<rect x="%s" y="%s" width="%s" height="%s" fill="%s" stroke="%s" stroke-width="3"/>' % (f(x), f(y), f(w), f(h), MASS3, TRIM),
-           '<rect x="%s" y="%s" width="%s" height="%s" fill="none" stroke="%s" stroke-opacity=".4" stroke-width="2"/>' % (f(x + 10), f(y + 10), f(w - 20), f(h - 20), PINK),
-           "".join('<path d="M%s %s v12" stroke="%s" stroke-width="2"/>' % (f(x + 6 + k * 12), f(y + h), TRIM) for k in range(int(w / 12))),
-           mandala(x + w / 2, y + h / 2, r or min(w, h) * .4)]
-    return "".join(out)
-
-
-def garland(x0, y0, x1, y1, sag, n, cols=None):
-    cols = cols or (FLAME2, PINK, LEAF3, FLAME2, LAMP)
-    cx, cy = (x0 + x1) / 2, (y0 + y1) / 2 + sag * 2
-    out = ['<path d="M%s %s Q%s %s %s %s" fill="none" stroke="%s" stroke-width="1.5"/>' % (f(x0), f(y0), f(cx), f(cy), f(x1), f(y1), EDGE)]
-    for k in range(1, n):
-        t = k / n
-        px = (1 - t) ** 2 * x0 + 2 * t * (1 - t) * cx + t * t * x1
-        py = (1 - t) ** 2 * y0 + 2 * t * (1 - t) * cy + t * t * y1
-        out.append('<circle class="tw" style="animation-delay:-%ss;animation-duration:3.2s" cx="%s" cy="%s" r="4" fill="%s"/>' % (f(k * .43), f(px), f(py + 5), cols[k % len(cols)]))
-    return "".join(out)
-
-
-def peace(cx, cy, r, col, w=4):
-    d = r * .7071
-    return ('<g fill="none" stroke="%s" stroke-width="%s"><circle cx="%s" cy="%s" r="%s"/><path d="M%s %s V%s M%s %s L%s %s M%s %s L%s %s"/></g>'
-            % (col, f(w), f(cx), f(cy), f(r), f(cx), f(cy - r), f(cy + r), f(cx), f(cy), f(cx - d), f(cy + d), f(cx), f(cy), f(cx + d), f(cy + d)))
-
-
-def flower(cx, cy, r, col, heart=None):
-    return ("".join('<circle cx="%s" cy="%s" r="%s" fill="%s"/>' % (f(cx + math.cos(a) * r), f(cy + math.sin(a) * r), f(r * .72), col)
-                    for a in (k * math.pi * 2 / 5 for k in range(5))) + '<circle cx="%s" cy="%s" r="%s" fill="%s"/>' % (f(cx), f(cy), f(r * .6), heart or FLAME2))
-
-
-def hanger(x, top, length, seed=1):
-    """Suspension en macramé : trois cordes, un pot, une plante qui retombe."""
-    rnd = random.Random(seed)
-    y = top + length
-    out = ['<path d="M%s %s L%s %s M%s %s L%s %s M%s %s V%s" stroke="%s" stroke-width="2" fill="none"/>' % (f(x), f(top), f(x - 24), f(y), f(x), f(top), f(x + 24), f(y), f(x), f(top), f(y), EDGE),
-           '<path d="M%s %s H%s L%s %s Q%s %s %s %s Z" fill="%s"/>' % (f(x - 26), f(y), f(x + 26), f(x + 18), f(y + 26), f(x), f(y + 36), f(x - 18), f(y + 26), MASS),
-           '<path d="M%s %s v16 M%s %s v22 M%s %s v16" stroke="%s" stroke-width="2"/>' % (f(x - 8), f(y + 30), f(x), f(y + 32), f(x + 8), f(y + 30), EDGE)]
-    for side in (-1, 1):
-        for k in range(2):
-            l = rnd.randint(50, 110)
-            ex = x + side * (22 + k * 12 + rnd.randint(0, 10))
-            out.append('<path d="M%s %s Q%s %s %s %s" fill="none" stroke="%s" stroke-width="2.4"/>' % (f(x + side * 8), f(y), f(ex + side * 12), f(y - 8), f(ex), f(y + l), LEAF1))
-            for j in range(3, l, 17):
-                t = j / l
-                out.append('<ellipse cx="%s" cy="%s" rx="7" ry="4" fill="%s" transform="rotate(%s %s %s)"/>'
-                           % (f(ex + side * 7 * (1 - t)), f(y + j), LEAF2 if (j // 17) % 2 else LEAF1, f(side * 35), f(ex + side * 7 * (1 - t)), f(y + j)))
-    out.append(fanleaf(x - 6, y, -24, .5, LEAF2) + fanleaf(x + 6, y, 22, .55, LEAF1) + fanleaf(x, y, 0, .6, LEAF3))
-    return "".join(out)
+def potted(pid, x, base, sc, w=80, hgt=58, **kw):
+    return pot(x, base, w, hgt) + useplant(pid, x, base - hgt, sc, **kw)
 
 
 def night_window(x, y, w, h, seed=3):
@@ -742,40 +763,122 @@ def room():
     return '<rect width="1600" height="1000" fill="%s"/><rect width="1600" height="830" fill="%s"/><rect y="812" width="1600" height="18" fill="%s"/>' % (BG, HILL, HILL2)
 
 
-def joint(x, y, ang=-20, sc=1.0):
-    """Un joint : cône de papier, filtre en carton, petite braise au bout."""
-    return ('<g transform="translate(%s %s) rotate(%s) scale(%s)"><path d="M0 -2.6 L44 -5.5 Q49 0 44 5.5 L0 2.6 Z" fill="%s"/><path d="M12 -3.4 L14 3.5 M24 -4.2 L26 4.3" stroke="#C9D2C9" stroke-width="1"/>'
-            '<rect x="-11" y="-2.6" width="12" height="5.2" rx="1" fill="%s"/><path d="M43 -5.4 Q49 0 43 5.4 Q40 0 43 -5.4 Z" fill="#3A3F3B"/>'
-            '<g class="ember"><circle cx="46" cy="0" r="3.4" fill="%s"/><circle cx="46" cy="0" r="10" fill="%s" fill-opacity=".16"/></g></g>'
-            % (f(x), f(y), f(ang), f(sc), WHITE, FLAME2, FLAME, FLAME))
+# ------------------------------------------------- 1. la chambre de culture
+def thc_serre():
+    VX, VY = 1090.0, 480.0
+
+    def P(xr, s, floor=True):
+        return VX + xr * s, VY + ((850 - VY) if floor else (96 - VY)) * s
+
+    def poly(pts, fill):
+        return '<path d="M%s Z" fill="%s"/>' % (" L".join("%s %s" % (f(x), f(y)) for x, y in pts), fill)
+
+    b = ['<rect width="1600" height="1000" fill="#08060D"/>', thc_defs(("A", "B", "M", "S"))]
+    NEAR, FAR, HW = 1.6, .1, 900
+    # la pièce : sol, plafond, murs, fond
+    b.append(poly([P(-HW, NEAR), P(-HW, FAR), P(HW, FAR), P(HW, NEAR)], "#0E0B14"))
+    b.append(poly([P(-HW, NEAR, False), P(-HW, FAR, False), P(HW, FAR, False), P(HW, NEAR, False)], "#07050B"))
+    b.append(poly([P(-HW, NEAR, False), P(-HW, FAR, False), P(-HW, FAR), P(-HW, NEAR)], "#120D1B"))
+    b.append(poly([P(HW, NEAR, False), P(HW, FAR, False), P(HW, FAR), P(HW, NEAR)], "#120D1B"))
+    b.append(poly([P(-HW, FAR, False), P(HW, FAR, False), P(HW, FAR), P(-HW, FAR)], "#2A1840"))
+    b.append('<circle cx="%s" cy="%s" r="640" fill="url(#glowP)"/><circle cx="%s" cy="%s" r="300" fill="url(#glowK)"/>' % (f(VX), f(VY), f(VX), f(VY + 20)))
+    # joints des panneaux et rigoles d'arrosage, qui filent vers le fond
+    for s in (.14, .2, .29, .42, .62, .9, 1.3):
+        (x0, y0), (x1, y1) = P(-HW, s, False), P(-HW, s)
+        (x2, y2), (x3, y3) = P(HW, s, False), P(HW, s)
+        b.append('<path d="M%s %sL%s %sM%s %sL%s %s" stroke="#1D1529" stroke-width="%s"/>' % (f(x0), f(y0), f(x1), f(y1), f(x2), f(y2), f(x3), f(y3), f(max(1, 3 * s))))
+    for xr in (-470, -130, 130, 470):
+        (x0, y0), (x1, y1) = P(xr, NEAR), P(xr, FAR)
+        b.append('<path d="M%s %sL%s %s" stroke="#1B1526" stroke-width="2"/>' % (f(x0), f(y0), f(x1), f(y1)))
+    # rampes de LED, du fond vers nous, et leur lumière qui tombe
+    depths = (.13, .18, .25, .34, .47, .65, .9, 1.25)
+    for i, s in enumerate(depths):
+        col, g = ((LAMP, "lc"), (PINK, "pc"))[i % 2]
+        (x0, yc), (x1, _) = P(-640, s, False), P(640, s, False)
+        yc += 46 * s
+        _, yf = P(0, s)
+        b.append('<path d="M%s %sH%sL%s %sH%sZ" fill="url(#%s)" opacity=".55"/>' % (f(x0), f(yc), f(x1), f(x1 + 70 * s), f(yf), f(x0 - 70 * s), g))
+        b.append('<rect x="%s" y="%s" width="%s" height="%s" rx="%s" fill="%s"/><rect x="%s" y="%s" width="%s" height="%s" fill="#fff" opacity=".55"/>'
+                 % (f(x0), f(yc - 13 * s), f(x1 - x0), f(13 * s), f(3 * s), col, f(x0), f(yc - 5 * s), f(x1 - x0), f(max(1, 2.2 * s))))
+        for xr in (-560, 560):
+            hx, hy = P(xr, s, False)
+            b.append('<path d="M%s %sV%s" stroke="#241A33" stroke-width="%s"/>' % (f(hx), f(hy), f(yc - 13 * s), f(max(1, 2 * s))))
+    # les rangs : quatre files de pots, du fond vers nous
+    rows = (-640, -300, 300, 640)
+    k = 0
+    for s in (.16, .21, .28, .37, .5, .68, .92, 1.25):
+        for xr in rows:
+            x, y = P(xr, s)
+            if x < -200 or x > 1800:
+                continue
+            k += 1
+            pid = "S" if s < .3 else ("M" if s < .6 else ("A" if k % 2 else "B"))
+            pw, ph = 96 * s, 62 * s
+            b.append('<rect x="%s" y="%s" width="%s" height="%s" rx="%s" fill="#15101C"/><rect x="%s" y="%s" width="%s" height="%s" rx="%s" fill="#2A2038"/>'
+                     % (f(x - pw / 2), f(y - ph), f(pw), f(ph), f(8 * s), f(x - pw / 2), f(y - ph), f(pw), f(8 * s), f(4 * s)))
+            b.append(useplant(pid, x, y - ph + 4 * s, s * 1.02, flip=(k % 3 == 0), op=min(1.0, .34 + .8 * s)))
+    # premier plan : feuillage sombre, hors champ
+    b.append('<use href="#fan9" transform="translate(1575 1010) rotate(-34) scale(8)" fill="#06110A" stroke="#06110A"/>'
+             '<use href="#fan7" transform="translate(470 1040) rotate(28) scale(7)" fill="#06110A" stroke="#06110A"/>')
+    return svg("Une chambre de culture en perspective : des rangs de plants sous les rampes violettes", "", "\n".join(b), still=True)
 
 
-def ashtray(x, y, sc=1.0):
-    """Cendrier posé sur une surface (y), un joint calé sur le bord, sa fumée."""
-    ang = -17
-    jx, jy = x - 6 * sc, y - 15 * sc
-    tx, ty = jx + math.cos(math.radians(ang)) * 46 * sc, jy + math.sin(math.radians(ang)) * 46 * sc
-    return ('<path d="M%s %s H%s L%s %s H%s Z" fill="%s"/><rect x="%s" y="%s" width="%s" height="%s" rx="2" fill="#4A6152"/>'
-            % (f(x - 28 * sc), f(y - 14 * sc), f(x + 28 * sc), f(x + 21 * sc), f(y), f(x - 21 * sc), EDGE,
-               f(x - 30 * sc), f(y - 17 * sc), f(60 * sc), f(5 * sc))
-            + joint(jx, jy, ang, sc) + plume(tx + 2, ty - 8 * sc, 7 * sc, 6, 22))
+# ----------------------------------------------------------- 2. la plantation
+def thc_champ():
+    VX, VY = 1130.0, 640.0
+
+    def P(xr, s):
+        return VX + xr * s, VY + 212 * s
+
+    b = [sky(113, moon=None, top=520, twinkle=False), thc_defs(("A", "B", "M", "S"))]
+    # la lune, énorme
+    b.append('<circle cx="1160" cy="330" r="330" fill="url(#moonH)"/><circle cx="1160" cy="330" r="150" fill="#C3D4BF"/>'
+             '<circle cx="1110" cy="286" r="26" fill="#AFC2AB"/><circle cx="1210" cy="372" r="36" fill="#AFC2AB"/><circle cx="1196" cy="262" r="15" fill="#AFC2AB"/>'
+             '<circle cx="1096" cy="390" r="17" fill="#AFC2AB"/><circle cx="1262" cy="306" r="10" fill="#AFC2AB"/>')
+    b.append(hills(612, 648))
+    # serre tunnel au loin, éclairée de l'intérieur ; cabane et cuve
+    b.append('<path d="M560 648 Q660 546 760 648 Z" fill="%s" opacity=".5"/><path d="M560 648 Q660 546 760 648 Z" fill="url(#glowK)"/>%s'
+             % (LAMP, "".join('<path d="M%d 648 Q%d %d %d 648" fill="none" stroke="#0B0F0C" stroke-width="2"/>' % (560 + k * 14, 660, 546 + k * 6, 760 - k * 14) for k in range(1, 6))))
+    b.append('<path d="M1440 648 V584 L1492 554 L1544 584 V648 Z" fill="%s"/><rect x="1474" y="600" width="36" height="28" fill="%s" opacity=".7"/>'
+             '<path d="M1386 648 L1392 576 M1422 648 L1416 576" stroke="%s" stroke-width="4"/><rect x="1380" y="536" width="48" height="44" rx="5" fill="%s"/>' % (MASS, FLAME2, TRIM, MASS2))
+    b.append('<rect y="640" width="1600" height="360" fill="#0A0F0B"/>')
+    # sillons
+    for xr in range(-1150, 1151, 230):
+        (x0, y0), (x1, y1) = P(xr - 115, 2.1), P(xr - 115, .05)
+        b.append('<path d="M%s %sL%s %s" stroke="#111A13" stroke-width="3"/>' % (f(x0), f(y0), f(x1), f(y1)))
+    # brume à l'horizon
+    b.append('<rect y="570" width="1600" height="90" fill="url(#wc)" opacity=".16" transform="translate(0 1230) scale(1 -1)"/>')
+    # les rangs, du fond vers nous
+    k = 0
+    for s in (.1, .14, .19, .26, .36, .5, .7, 1.0, 1.42):
+        for xr in range(-1150, 1151, 230):
+            x, y = P(xr, s)
+            if x < 380 or x > 1700:
+                continue
+            k += 1
+            pid = "S" if s < .3 else ("M" if s < .6 else ("A" if k % 2 else "B"))
+            b.append('<ellipse cx="%s" cy="%s" rx="%s" ry="%s" fill="#070B08"/>' % (f(x), f(y), f(52 * s), f(9 * s)))
+            b.append(useplant(pid, x, y, s * .86, flip=(k % 3 == 0), op=min(1.0, .42 + .7 * s)))
+    # lucioles
+    rnd = random.Random(8)
+    b.append("".join('<circle cx="%d" cy="%d" r="2.4" fill="%s" opacity="%s"/>'
+                     % (rnd.randint(520, 1590), rnd.randint(540, 820), FLAME2, f(rnd.uniform(.4, 1))) for _ in range(18)))
+    return svg("Une plantation en rangs jusqu'à l'horizon, sous une lune énorme", "", "\n".join(b), still=True)
 
 
+# ------------------------------------------------------------- 3. le salon
 def thc_salon():
     css = THC_CSS + """
 .lava{animation:lava 9s ease-in-out infinite alternate;transform-box:fill-box;transform-origin:50% 50%}
 @keyframes lava{from{transform:translateY(0) scale(1)}to{transform:translateY(-46px) scale(.8,1.25)}}
-.bub{animation:bub 2.2s ease-in infinite;opacity:0}
-@keyframes bub{0%{opacity:0;transform:translateY(0)}20%{opacity:.8}100%{opacity:0;transform:translateY(-70px)}}
 .tv{animation:tv 3s steps(1) infinite}
 @keyframes tv{0%{opacity:.5}33%{opacity:.7}66%{opacity:.4}}
 """
-    b = [room(), thc_defs()]
-    b.append(garland(520, 214, 1600, 226, 26, 26))
+    b = [room(), thc_defs(("A",))]
     b.append(night_window(640, 260, 250, 290))
-    # tenture au mandala, un peu de travers
-    b.append('<g transform="rotate(-3 1400 380)">%s</g>' % tapestry(1310, 270, 190, 220, 74))
-    b.append(hanger(980, 200, 150, 5))
+    # l'affiche, de travers
+    b.append('<g transform="rotate(-4 1420 380)"><rect x="1340" y="280" width="160" height="200" fill="%s" stroke="%s" stroke-width="4"/>'
+             '<use href="#fan9" transform="translate(1420 428) scale(1.7)" fill="%s" stroke="%s"/></g>' % (MASS3, TRIM, LEAFS[4], LEAFS[2]))
     # lampe à lave
     b.append('<circle cx="1245" cy="630" r="160" fill="%s" opacity=".05"/>' % LAMP)
     b.append('<path d="M1220 700 L1232 560 Q1245 520 1258 560 L1270 700 Z" fill="%s" opacity=".28"/><path d="M1210 700 H1280 L1272 730 H1218 Z" fill="%s"/><rect x="1236" y="530" width="18" height="12" rx="3" fill="%s"/>'
@@ -785,112 +888,80 @@ def thc_salon():
     b.append('<rect x="1180" y="730" width="330" height="100" rx="4" fill="%s"/><rect x="1180" y="730" width="330" height="6" fill="%s"/>' % (MASS2, EDGE))
     b.append('<rect x="1320" y="610" width="170" height="104" rx="6" fill="#070A08" stroke="%s" stroke-width="4"/><rect class="tv" x="1328" y="618" width="154" height="88" rx="3" fill="%s"/><rect x="1396" y="714" width="18" height="16" fill="%s"/>'
              % (TRIM, VIOLET, TRIM))
-    b.append(potted(1560, 830, 210, 8, 70, 50))
-    # canapé et son plaid
+    b.append(potted("A", 1556, 830, .8, 78, 54, sway=True))
+    # canapé
     b.append('<rect x="560" y="640" width="470" height="150" rx="26" fill="%s"/><rect x="530" y="690" width="70" height="130" rx="24" fill="%s"/><rect x="990" y="690" width="70" height="130" rx="24" fill="%s"/>'
              '<rect x="580" y="730" width="430" height="80" rx="18" fill="%s"/><rect x="620" y="660" width="170" height="80" rx="20" fill="%s"/><rect x="800" y="660" width="170" height="80" rx="20" fill="%s"/>'
              % (MASS, MASS2, MASS2, MASS3, MASS2, MASS2))
-    b.append('<path d="M560 652 Q640 636 700 650 L690 760 Q620 770 566 756 Z" fill="%s" opacity=".3"/>%s' % (PINK, "".join(
-        '<path d="M%d %d L%d %d" stroke="%s" stroke-width="5" opacity=".5"/>' % (566 + k * 2, 668 + k * 22, 696 - k, 664 + k * 22, FLAME2 if k % 2 else LAMP) for k in range(4))))
-    # table basse : le bang, le cendrier, la boîte à pizza
+    # table basse : le bang (éteint : à toi de jouer), la boîte à pizza
     b.append('<rect x="700" y="806" width="420" height="14" rx="4" fill="%s"/><rect x="720" y="820" width="10" height="10" fill="%s"/><rect x="1090" y="820" width="10" height="10" fill="%s"/>' % (EDGE, TRIM, TRIM))
     b.append('<rect x="760" y="792" width="110" height="14" rx="2" fill="%s"/><rect x="760" y="792" width="110" height="3" fill="%s"/>' % (MASS2, EDGE))
     bx = 960
     b.append('<path d="M%d 806 Q%d 740 %d 730 V600 H%d V730 Q%d 740 %d 806 Z" fill="%s" opacity=".3" stroke="%s" stroke-width="3"/>'
              % (bx - 34, bx - 40, bx - 13, bx + 13, bx + 40, bx + 34, VIOLET, VIOLET))
     b.append('<rect x="%d" y="594" width="34" height="8" rx="4" fill="%s"/><path d="M%d 762 L%d 728" stroke="%s" stroke-width="7" stroke-linecap="round"/><path d="M%d 724 h18 l-4 10 h-10 Z" fill="%s"/>'
-             '<circle class="ember" cx="%d" cy="724" r="5" fill="%s"/><path d="M%d 806 Q%d 772 %d 772 Q%d 772 %d 806 Z" fill="%s" opacity=".45"/>'
-             % (bx - 17, VIOLET, bx + 26, bx + 62, EDGE, bx + 54, EDGE, bx + 63, FLAME, bx - 32, bx - 36, bx, bx + 36, bx + 32, VIOLET))
-    b.append("".join('<circle class="bub" style="animation-delay:-%ss" cx="%d" cy="780" r="%s" fill="%s"/>' % (f(k * .5), bx - 14 + k * 9, "3" if k % 2 else "4", WHITE) for k in range(4)))
-    b.append(plume(bx, 590, 14, 6, 24))
-    b.append(ashtray(1066, 806))
+             '<path d="M%d 806 Q%d 772 %d 772 Q%d 772 %d 806 Z" fill="%s" opacity=".45"/>'
+             % (bx - 17, VIOLET, bx + 26, bx + 62, EDGE, bx + 54, EDGE, bx - 32, bx - 36, bx, bx + 36, bx + 32, VIOLET))
+    spot("puff", bx + 10, 806, 120, 220, sx=bx, sy=590, bx=bx + 63, by=724)
     b.append(ground(830))
-    return svg("Un salon la nuit : canapé, bang sur la table basse, lampe à lave, tenture au mandala", css, "\n".join(b))
+    return svg("Un salon la nuit : canapé, bang sur la table basse, lampe à lave", css, "\n".join(b))
 
 
-def thc_serre():
-    css = THC_CSS + """
-.fan{animation:rot 1.2s linear infinite;transform-box:fill-box;transform-origin:50% 50%}
-@keyframes rot{to{transform:rotate(360deg)}}
-"""
-    b = [room(), thc_defs()]
-    # murs de la chambre de culture : toile réfléchissante
-    b.append('<rect x="520" y="170" width="1080" height="660" fill="%s"/>%s%s' % (MASS3,
-             "".join('<rect x="%d" y="170" width="3" height="660" fill="%s"/>' % (x, TRIM) for x in range(520, 1600, 180)),
-             "".join('<path d="M%d 170 l60 0 l-150 660 l-60 0 Z" fill="%s" opacity=".18"/>' % (x, EDGE) for x in (760, 1120, 1480))))
-    # filtre à charbon et gaine d'extraction
-    b.append('<path d="M840 222 H1500 Q1560 222 1560 170" fill="none" stroke="%s" stroke-width="42"/><path d="M840 222 H1500 Q1560 222 1560 170" fill="none" stroke="%s" stroke-width="42" stroke-dasharray="3 13"/>' % (MASS, EDGE))
-    b.append('<rect x="620" y="194" width="230" height="56" rx="26" fill="%s"/>%s<path d="M680 194 V178 M790 194 V178" stroke="%s" stroke-width="3"/>'
-             % (MASS2, "".join('<rect x="%d" y="200" width="2" height="44" fill="%s"/>' % (x, EDGE) for x in range(640, 840, 12)), EDGE))
-    # deux rampes de LED et leurs cônes
-    for x0, x1, col, g in ((640, 1030, LAMP, "lc"), (1090, 1480, PINK, "pc")):
-        b.append('<path d="M%d 340 V180 M%d 340 V180" stroke="%s" stroke-width="2"/>' % (x0 + 40, x1 - 40, EDGE))
-        b.append('<g class="breath"><path d="M%d 362 H%d L%d 830 H%d Z" fill="url(#%s)"/><rect x="%d" y="350" width="%d" height="14" rx="3" fill="%s"/></g><rect x="%d" y="338" width="%d" height="14" rx="3" fill="%s"/>'
-                 % (x0, x1, x1 + 60, x0 - 60, g, x0, x1 - x0, col, x0, x1 - x0, EDGE))
-    # les plantes, bichonnées
-    for i, (x, h) in enumerate(((690, 300), (880, 350), (1070, 290), (1250, 340), (1430, 310))):
-        b.append('<rect x="%d" y="766" width="100" height="64" rx="9" fill="%s"/><rect x="%d" y="766" width="100" height="8" rx="4" fill="%s"/>' % (x - 50, MASS, x - 50, EDGE))
-        b.append(plant(x, 768, h, 40 + i))
-    # ventilateur sur pied
-    b.append('<path d="M565 830 V600 M540 830 H590" stroke="%s" stroke-width="6" stroke-linecap="round"/><circle cx="565" cy="590" r="38" fill="#0E1411" stroke="%s" stroke-width="4"/>'
-             '<g transform="translate(565 590)"><g class="fan">%s</g></g><circle cx="565" cy="590" r="6" fill="%s"/>'
-             % (EDGE, EDGE, "".join('<ellipse cx="0" cy="-17" rx="9" ry="17" fill="%s" transform="rotate(%d)"/>' % (TRIM, a) for a in (0, 120, 240)), EDGE))
-    # thermomètre : tout est sous contrôle
-    b.append('<rect x="1506" y="420" width="78" height="56" rx="5" fill="#070A08" stroke="%s" stroke-width="3"/>'
-             '<text x="1545" y="443" text-anchor="middle" font-family="ui-monospace,Menlo,monospace" font-size="16" font-weight="700" fill="%s">24°C</text>'
-             '<text x="1545" y="465" text-anchor="middle" font-family="ui-monospace,Menlo,monospace" font-size="16" font-weight="700" fill="%s">55 %%</text>' % (TRIM, LEAF3, FLAME2))
-    # arrosoir
-    b.append('<path d="M1520 830 V786 H1574 V830 Z M1520 800 L1492 778 M1574 794 Q1596 800 1574 820" fill="%s" stroke="%s" stroke-width="5"/>' % (MASS, MASS))
+# ------------------------------------------------------------ 4. le séchoir
+def thc_sechoir():
+    b = [room(), thc_defs(())]
+    # lambris
+    b.append("".join('<rect x="%d" y="0" width="2" height="812" fill="%s"/>' % (x, HILL2) for x in range(520, 1600, 60)))
+    # ampoule nue
+    b.append('<circle cx="1010" cy="250" r="330" fill="url(#warm)"/><path d="M1010 0 V226" stroke="%s" stroke-width="3"/><rect x="1002" y="222" width="16" height="14" fill="%s"/><circle cx="1010" cy="250" r="15" fill="%s"/>' % (EDGE, EDGE, FLAME2))
+    # deux fils, les branches pendues la tête en bas
+    dry_l, dry_b = "#3B5F36", ("#8FAE66", "#A6BD76")
+    rnd = random.Random(61)
+    for wy, x0, x1, step, sc in ((330, 560, 1600, 78, .82), (300, 520, 1600, 96, 1.12)):
+        b.append('<path d="M500 %d Q1050 %d 1600 %d" fill="none" stroke="%s" stroke-width="2.5"/>' % (wy, wy + 26, wy, EDGE))
+        x = x0 + rnd.randint(0, 30)
+        while x < x1:
+            t = (x - 500) / 1100.0
+            y = wy + 26 * 4 * t * (1 - t) * .5 + 2
+            L = rnd.randint(150, 250) * sc
+            parts = ['<path d="M0 -6 q6 -4 0 -10" fill="none" stroke="%s" stroke-width="2"/><path d="M0 0V%s" stroke="%s" stroke-width="%s"/>' % (EDGE, f(L * .7), dry_l, f(3.4 * sc))]
+            for j in range(rnd.randint(3, 5)):
+                u = .18 + j * .17
+                sd = 1 if j % 2 else -1
+                parts.append('<use href="#fan%d" transform="translate(0 %s) rotate(%s) scale(%s)" fill="%s" stroke="%s"/>' % (rnd.choice((3, 5)), f(L * u), f(180 + sd * rnd.uniform(18, 40)), f(.62 * sc), dry_l, dry_l))
+                parts.append('<use href="#cola%d" transform="translate(%s %s) rotate(%s) scale(%s)" fill="%s" color="%s"/>' % (rnd.randint(1, 2), f(sd * 4), f(L * u + 6), f(180 + sd * rnd.uniform(16, 34)), f(.62 * sc), dry_b[j % 2], dry_l))
+            parts.append('<use href="#cola1" transform="translate(0 %s) rotate(180) scale(%s)" fill="%s" color="%s"/>' % (f(L * .62), f(1.05 * sc), dry_b[1], dry_l))
+            b.append('<g transform="translate(%d %s) rotate(%s)">%s</g>' % (x, f(y), f(rnd.uniform(-3, 3)), "".join(parts)))
+            if sc > 1:
+                spot("plant", x, y + L * 1.05, 80, L * 1.05)
+            x += step + rnd.randint(-10, 14)
+    # étagère de bocaux
+    for sy in (604, 716):
+        b.append('<rect x="1290" y="%d" width="310" height="10" fill="%s"/>' % (sy, EDGE))
+        for k in range(4):
+            jx = 1306 + k * 74
+            b.append('<rect x="%d" y="%d" width="56" height="74" rx="9" fill="%s" opacity=".13"/><rect x="%d" y="%d" width="48" height="%d" rx="7" fill="%s"/>'
+                     '<rect x="%d" y="%d" width="56" height="74" rx="9" fill="none" stroke="%s" stroke-opacity=".3" stroke-width="2"/><rect x="%d" y="%d" width="46" height="10" rx="3" fill="%s"/><rect x="%d" y="%d" width="5" height="40" rx="2" fill="#fff" opacity=".16"/>'
+                     % (jx, sy - 74, WHITE, jx + 4, sy - 6 - (30 + (k * 17 + sy) % 34), 30 + (k * 17 + sy) % 34, dry_b[(k + sy) % 2],
+                        jx, sy - 74, WHITE, jx + 5, sy - 84, MASS, jx + 8, sy - 62))
+    # table de manucure : plateau, têtes en vrac, balance, ciseaux
+    b.append('<rect x="620" y="716" width="560" height="14" rx="3" fill="%s"/><rect x="640" y="730" width="12" height="100" fill="%s"/><rect x="1148" y="730" width="12" height="100" fill="%s"/>' % (EDGE, MASS, MASS))
+    b.append('<path d="M660 716 L676 694 H880 L896 716 Z" fill="%s"/>%s' % (MASS, "".join(
+        '<use href="#cola%d" transform="translate(%d 708) rotate(%d) scale(.55)" fill="%s" color="%s"/>' % (1 + k % 2, 696 + k * 26, 78 + (k * 37) % 50, dry_b[k % 2], dry_l) for k in range(7))))
+    b.append('<rect x="960" y="690" width="150" height="26" rx="4" fill="%s"/><rect x="972" y="680" width="126" height="10" rx="3" fill="%s"/><rect x="1040" y="696" width="58" height="15" rx="2" fill="#070A08"/>'
+             '<text x="1069" y="708" text-anchor="middle" font-family="ui-monospace,Menlo,monospace" font-size="12" font-weight="700" fill="%s">3.5 g</text>'
+             '<use href="#cola2" transform="translate(1010 682) rotate(84) scale(.5)" fill="%s" color="%s"/>' % (MASS, EDGE, LEAFS[4], dry_b[0], dry_l))
+    b.append('<g transform="translate(910 712) rotate(-16)" fill="none" stroke="%s" stroke-width="3"><path d="M0 0 L34 -22 M0 -22 L34 0"/><circle cx="-6" cy="3" r="7"/><circle cx="-6" cy="-25" r="7"/></g>' % WHITE)
+    # déshumidificateur
+    b.append('<rect x="1380" y="738" width="110" height="92" rx="8" fill="%s"/>%s<circle cx="1400" cy="754" r="4" fill="%s"/>'
+             % (MASS, "".join('<rect x="1398" y="%d" width="74" height="4" rx="2" fill="%s"/>' % (y, TRIM) for y in range(772, 816, 10)), LEAFS[4]))
     b.append(ground(830))
-    return svg("Une chambre de culture : cinq plants sous les lampes violettes", css, "\n".join(b))
+    return svg("Un séchoir : des branches pendues la tête en bas, des bocaux, une balance", "", "\n".join(b), still=True)
 
 
-def thc_van():
-    b = [sky(111, moon=None, top=520), thc_defs()]
-    b.append('<circle cx="1180" cy="330" r="220" fill="%s" opacity=".035"/><circle cx="1180" cy="330" r="118" fill="#1B2A20"/>%s' % (VIOLET, mandala(1180, 330, 190, (LEAF3, FLAME2, PINK, LAMP))))
-    b.append(hills(700, 760))
-    # sapins
-    for x, s in ((560, 1.0), (640, .7), (1540, .9), (1470, .6)):
-        b.append('<g transform="translate(%d 790) scale(%s)" fill="%s"><path d="M0 -190 L44 -110 H-44 Z M0 -140 L58 -50 H-58 Z M0 -86 L70 10 H-70 Z"/><rect x="-7" y="10" width="14" height="30"/></g>' % (x, s, MASS3))
-    # auvent et guirlande
-    b.append('<path d="M770 596 L610 650 V660 L770 612 Z" fill="%s"/><rect x="606" y="648" width="6" height="182" fill="%s"/>%s' % (MASS, EDGE, garland(612, 662, 772, 618, 10, 7)))
-    # le combi
-    vx, vy = 760, 800
-    low, up = "#2F6B48", "#8FA58C"
-    b.append('<g transform="translate(%d %d)">' % (vx, vy))
-    b.append('<path d="M0 -44 Q0 -206 44 -214 H426 Q500 -208 520 -122 L526 -44 Q526 -22 500 -22 H22 Q0 -22 0 -44 Z" fill="%s"/>' % low)
-    b.append('<path d="M3 -122 Q8 -206 44 -214 H426 Q498 -208 519 -122 Z" fill="%s"/><rect x="2" y="-126" width="518" height="6" fill="%s"/>' % (up, FLAME2))
-    b.append('<path d="M246 -120 V-24 M346 -120 V-24" stroke="#24543A" stroke-width="3" fill="none"/><rect x="318" y="-104" width="18" height="5" rx="2" fill="%s"/>' % up)
-    for wx in (54, 152, 250):
-        b.append('<rect x="%d" y="-200" width="84" height="62" rx="9" fill="#1A120A"/><rect x="%d" y="-200" width="84" height="62" rx="9" fill="%s" opacity=".55"/>'
-                 '<path d="M%d -200 h22 q-4 34 -22 46 Z M%d -200 h-22 q4 34 22 46 Z" fill="%s" opacity=".75"/>' % (wx, wx, FLAME2, wx, wx + 84, PINK))
-    b.append('<path d="M352 -200 H430 Q486 -194 506 -138 H352 Z" fill="#1A120A"/><path d="M352 -200 H430 Q486 -194 506 -138 H352 Z" fill="%s" opacity=".4"/>' % FLAME2)
-    b.append(peace(196, -74, 30, up, 5) + flower(84, -72, 12, PINK) + flower(322, -86, 10, FLAME2, PINK) + flower(372, -54, 13, LAMP) + flower(446, -84, 9, PINK) + flower(128, -40, 7, FLAME2, LAMP))
-    b.append('<circle cx="518" cy="-92" r="10" fill="%s"/><circle cx="518" cy="-92" r="40" fill="%s" opacity=".12"/><rect x="496" y="-40" width="40" height="12" rx="5" fill="%s"/><rect x="-10" y="-40" width="30" height="12" rx="5" fill="%s"/>' % (FLAME2, FLAME2, up, up))
-    for wx in (104, 420):
-        b.append('<circle cx="%d" cy="0" r="30" fill="#060907"/><circle cx="%d" cy="0" r="14" fill="%s"/><circle cx="%d" cy="0" r="5" fill="#060907"/>' % (wx, wx, up, wx))
-    # galerie : planche de surf et valise
-    b.append('<path d="M70 -214 V-228 H400 V-214" fill="none" stroke="%s" stroke-width="4"/><ellipse cx="220" cy="-238" rx="150" ry="9" fill="%s" opacity=".8"/><rect x="330" y="-252" width="56" height="24" rx="4" fill="%s"/>' % (EDGE, PINK, MASS))
-    b.append("</g>")
-    b.append(plume(vx + 300, vy - 220, 15, 6, 26))
-    # plantes en pot sous l'auvent, guitare contre le combi
-    b.append(potted(660, 830, 170, 61, 64, 46) + potted(730, 830, 120, 62, 54, 40))
-    b.append('<g transform="translate(1316 826) rotate(-14)"><rect x="-4" y="-150" width="8" height="100" fill="%s"/><rect x="-8" y="-166" width="16" height="20" rx="3" fill="%s"/>'
-             '<ellipse cx="0" cy="-22" rx="27" ry="24" fill="%s"/><ellipse cx="0" cy="-52" rx="20" ry="18" fill="%s"/><circle cx="0" cy="-36" r="8" fill="#060907"/></g>' % (EDGE, EDGE, FLAME, FLAME))
-    # feu de camp
-    fx = 1440
-    b.append('<circle cx="%d" cy="800" r="170" fill="url(#warm)" class="breath"/>' % fx)
-    b.append('<g transform="translate(%d 824)"><rect x="-44" y="-8" width="88" height="12" rx="6" fill="%s" transform="rotate(12)"/><rect x="-44" y="-8" width="88" height="12" rx="6" fill="%s" transform="rotate(-12)"/>'
-             '<g class="flame"><path d="M0 -4 C-30 -28 -18 -64 -6 -86 C-4 -64 8 -70 6 -100 C28 -74 38 -30 0 -4 Z" fill="%s"/><path d="M0 -4 C-14 -20 -8 -40 -2 -52 C0 -40 8 -42 8 -56 C18 -38 18 -16 0 -4 Z" fill="%s"/></g></g>'
-             % (fx, MASS, EDGE, FLAME, FLAME2))
-    b.append("".join('<circle class="tw" style="animation-delay:-%ss;animation-duration:2.2s" cx="%d" cy="%d" r="2" fill="%s"/>' % (f(k * .5), fx + dx, 700 - k * 26, FLAME2) for k, dx in enumerate((-14, 10, -4, 18, -20))))
-    b.append('<rect x="1520" y="806" width="70" height="24" rx="12" fill="%s"/><ellipse cx="1522" cy="818" rx="8" ry="12" fill="%s"/>' % (MASS, EDGE))
-    b.append(ground(830))
-    return svg("Un combi fleuri garé pour la nuit, feu de camp, lune en mandala", THC_CSS, "\n".join(b))
-
-
+# ------------------------------------------------------------- 5. le balcon
 def thc_balcon():
-    b = [sky(112, moon=(1330, 190), top=480), thc_defs()]
+    b = [sky(112, moon=(1330, 190), top=480, twinkle=False), thc_defs(("A", "B"))]
     b.append('<circle cx="1330" cy="190" r="150" fill="%s" opacity=".03"/>' % VIOLET)
     rnd = random.Random(53)
     x = 500
@@ -898,75 +969,40 @@ def thc_balcon():
         w, h = rnd.randint(50, 100), rnd.randint(50, 190)
         b.append('<rect x="%d" y="%d" width="%d" height="%d" fill="%s"/>%s' % (x, 720 - h, w, h + 80, HILL2, windows(x + 7, 732 - h, int((w - 8) / 15), int(h / 20), 15, 20, x + 3, 6, 7, .3)))
         x += w + rnd.randint(0, 14)
-    # garde-corps, dalle, pergola
+    # garde-corps, dalle, auvent
     b.append("".join('<rect x="%d" y="646" width="4" height="146" fill="%s"/>' % (x, EDGE) for x in range(520, 1600, 30)) + '<rect x="500" y="640" width="1100" height="8" rx="3" fill="%s"/>' % MASS)
     b.append('<rect x="500" y="790" width="1100" height="40" fill="%s"/><rect x="500" y="790" width="1100" height="6" fill="%s"/>' % (MASS2, EDGE))
     b.append('<rect x="500" y="226" width="1100" height="18" fill="%s"/><rect x="536" y="244" width="16" height="546" fill="%s"/><rect x="1016" y="244" width="16" height="546" fill="%s"/>' % (MASS, MASS, MASS))
-    b.append(garland(552, 250, 1016, 250, 34, 12) + garland(1032, 250, 1600, 256, 30, 14))
-    # hamac rayé
-    b.append('<path d="M552 470 L600 520 M1016 470 L968 520" stroke="%s" stroke-width="3"/>' % EDGE)
-    b.append('<path d="M600 520 Q784 720 968 520 Q784 612 600 520 Z" fill="%s"/>' % "#6B3F73")
-    for k, col in enumerate((FLAME2, PINK, LEAF3, FLAME2)):
-        d = 14 + k * 20
-        b.append('<path d="M%d %d Q784 %d %d %d" fill="none" stroke="%s" stroke-width="5" opacity=".7"/>' % (612 + k * 6, 530 + k * 3, 620 + d, 956 - k * 6, 530 + k * 3, col))
-    b.append('<ellipse cx="660" cy="566" rx="36" ry="16" fill="%s" transform="rotate(28 660 566)"/>' % MASS)
-    # suspensions en macramé
-    b.append(hanger(1120, 244, 170, 7) + hanger(1470, 244, 120, 9))
-    # lanterne
-    b.append('<circle cx="1090" cy="740" r="90" fill="url(#warm)" class="breath"/><path d="M1072 790 V732 L1090 712 L1108 732 V790 Z" fill="#070A08" stroke="%s" stroke-width="3"/>'
+    # une guirlande, blanche chaude
+    gx0, gx1, gy = 552, 1600, 252
+    b.append('<path d="M%d %d Q%d %d %d %d" fill="none" stroke="%s" stroke-width="1.5"/>' % (gx0, gy, (gx0 + gx1) // 2, gy + 70, gx1, gy, EDGE))
+    for k in range(1, 22):
+        t = k / 22.0
+        b.append('<circle cx="%s" cy="%s" r="3.6" fill="%s" opacity="%s"/>' % (f(gx0 + (gx1 - gx0) * t), f(gy + 70 * 2 * t * (1 - t) + 6), FLAME2, ".55" if k % 3 == 0 else "1"))
+    # hamac
+    b.append('<path d="M552 470 L600 520 M1016 470 L968 520" stroke="%s" stroke-width="3"/><path d="M600 520 Q784 720 968 520 Q784 612 600 520 Z" fill="%s"/>'
+             '<path d="M610 528 Q784 640 958 528" fill="none" stroke="%s" stroke-width="3"/><ellipse cx="660" cy="566" rx="36" ry="16" fill="%s" transform="rotate(28 660 566)"/>' % (EDGE, MASS, EDGE, MASS2))
+    # la chicha, éteinte : à toi de l'allumer
+    cx = 900
+    b.append('<path d="M%d 790 Q%d 730 %d 716 V690 H%d V716 Q%d 730 %d 790 Z" fill="%s" opacity=".35" stroke="%s" stroke-width="3"/>' % (cx - 30, cx - 40, cx - 9, cx + 9, cx + 40, cx + 30, LAMP, LAMP))
+    b.append('<rect x="%d" y="568" width="8" height="124" rx="3" fill="%s"/><rect x="%d" y="684" width="24" height="10" rx="3" fill="%s"/><ellipse cx="%d" cy="604" rx="20" ry="5" fill="%s"/>'
+             '<path d="M%d 566 h28 l-5 -22 h-18 Z" fill="%s"/><rect x="%d" y="538" width="24" height="6" rx="2" fill="#0A0E0B"/>'
+             % (cx - 4, EDGE, cx - 12, EDGE, cx, EDGE, cx - 14, MASS, cx - 12))
+    b.append('<path d="M%d 660 Q%d 640 %d 700 Q%d 770 %d 742 Q%d 730 %d 744" fill="none" stroke="%s" stroke-width="5" stroke-linecap="round"/><rect x="%d" y="738" width="26" height="7" rx="3" fill="%s" transform="rotate(8 %d 742)"/>'
+             % (cx + 4, cx + 70, cx + 70, cx + 74, cx - 60, cx - 90, cx - 116, PINK, cx - 142, EDGE, cx - 130))
+    spot("puff", cx - 30, 790, 230, 260, sx=cx - 142, sy=738, bx=cx, by=536)
+    # pouf, lanterne
+    b.append('<ellipse cx="740" cy="772" rx="62" ry="24" fill="%s"/>' % MASS)
+    b.append('<circle cx="1090" cy="740" r="90" fill="url(#warm)"/><path d="M1072 790 V732 L1090 712 L1108 732 V790 Z" fill="#070A08" stroke="%s" stroke-width="3"/>'
              '<path d="M1090 700 V712 M1082 700 H1098" stroke="%s" stroke-width="3"/>%s'
-             % (EDGE, EDGE, "".join('<path d="M%d %d l5 8 l-5 8 l-5 -8 Z" fill="%s" class="ember" style="animation-delay:-%ss"/>' % (x, y, FLAME2, f((x + y) % 4)) for x in (1082, 1098) for y in (738, 762))))
+             % (EDGE, EDGE, "".join('<path d="M%d %d l5 8 l-5 8 l-5 -8 Z" fill="%s"/>' % (x, y, FLAME2) for x in (1082, 1098) for y in (738, 762))))
     # les plantes du balcon
-    b.append(potted(1220, 790, 250, 71, 84, 60) + potted(1370, 790, 330, 72, 96, 66) + potted(1540, 790, 210, 73, 76, 54))
-    # pouf, cendrier posé sur la rambarde
-    b.append('<ellipse cx="840" cy="772" rx="62" ry="24" fill="%s"/><path d="M780 770 Q840 792 900 770" fill="none" stroke="%s" stroke-width="4" opacity=".6"/>' % ("#6B3F73", FLAME2))
-    b.append('<rect x="916" y="736" width="84" height="8" rx="3" fill="%s"/><path d="M926 744 L920 790 M990 744 L996 790" stroke="%s" stroke-width="5" stroke-linecap="round"/>%s' % (EDGE, MASS, ashtray(956, 736)))
+    b.append(potted("B", 1210, 790, .78, 84, 60) + potted("A", 1370, 790, 1.08, 96, 66) + potted("B", 1540, 790, .66, 76, 54, flip=True))
     b.append(ground(830))
-    return svg("Un balcon la nuit : hamac, guirlandes, plantes en pot, la ville au fond", THC_CSS, "\n".join(b))
+    return svg("Un balcon la nuit : hamac, chicha, plantes en pot, la ville au fond", "", "\n".join(b), still=True)
 
 
-def thc_cuisine():
-    b = [room(), thc_defs()]
-    # carrelage, placards
-    b.append('<rect x="520" y="470" width="620" height="210" fill="%s"/>%s%s' % (MASS3,
-             "".join('<rect x="%d" y="470" width="2" height="210" fill="%s"/>' % (x, TRIM) for x in range(520, 1140, 52)),
-             "".join('<rect x="520" y="%d" width="620" height="2" fill="%s"/>' % (y, TRIM) for y in range(470, 680, 52))))
-    b.append('<rect x="560" y="250" width="540" height="170" fill="%s"/>%s' % (MASS2, "".join('<rect x="%d" y="250" width="3" height="170" fill="%s"/><rect x="%d" y="380" width="26" height="5" rx="2" fill="%s"/>' % (x, TRIM, x - 40, EDGE) for x in (740, 920, 1100))))
-    b.append(garland(560, 430, 1100, 430, 14, 13))
-    b.append('<rect x="520" y="690" width="630" height="140" fill="%s"/><rect x="510" y="676" width="650" height="16" rx="3" fill="%s"/>%s'
-             % (MASS2, EDGE, "".join('<rect x="%d" y="704" width="3" height="126" fill="%s"/><rect x="%d" y="720" width="5" height="30" rx="2" fill="%s"/>' % (x, TRIM, x - 20, EDGE) for x in (730, 940))))
-    # micro-ondes : il est toujours 4 h 20
-    b.append('<rect x="560" y="584" width="190" height="92" rx="6" fill="%s"/><rect x="572" y="596" width="116" height="68" rx="4" fill="#070A08"/>'
-             '<text x="719" y="622" text-anchor="middle" font-family="ui-monospace,Menlo,monospace" font-size="17" font-weight="700" fill="%s" class="blink" style="animation-duration:2s">4:20</text>'
-             '<circle cx="719" cy="648" r="9" fill="%s"/>' % (MASS, LEAF3, EDGE))
-    # boîtes à pizza, céréales, bocal de cookies
-    for k in range(3):
-        b.append('<rect x="%d" y="%d" width="150" height="16" rx="2" fill="%s"/><rect x="%d" y="%d" width="150" height="3" fill="%s"/>' % (790 + (k % 2) * 8, 660 - k * 17, MASS, 790 + (k % 2) * 8, 660 - k * 17, EDGE))
-    b.append('<path d="M790 626 L930 580 L934 592 L798 628 Z" fill="%s"/><path d="M846 618 L906 596 L900 622 Z" fill="%s"/><circle cx="884" cy="612" r="4" fill="%s"/>' % (EDGE, FLAME2, RED))
-    b.append('<rect x="980" y="574" width="62" height="102" rx="3" fill="%s" opacity=".75"/><circle cx="1011" cy="610" r="17" fill="%s"/><rect x="990" y="640" width="42" height="6" fill="%s" opacity=".6"/>' % (PINK, FLAME2, WHITE))
-    b.append('<rect x="1066" y="600" width="56" height="76" rx="10" fill="%s" opacity=".35"/><rect x="1070" y="590" width="48" height="12" rx="4" fill="%s"/>%s'
-             % (WHITE, EDGE, "".join('<circle cx="%d" cy="%d" r="9" fill="%s"/>' % (x, y, FLAME) for x, y in ((1084, 660), (1104, 656), (1092, 642)))))
-    b.append(hanger(660, 244, 110, 13))
-    # le frigo, porte ouverte : la seule lumière de l'appartement
-    b.append('<rect x="1190" y="300" width="230" height="530" rx="8" fill="%s"/><rect x="1190" y="462" width="230" height="5" fill="%s"/><rect x="1204" y="360" width="6" height="70" rx="3" fill="%s"/>' % (MASS, TRIM, EDGE))
-    b.append(peace(1300, 384, 22, PINK, 4) + flower(1366, 340, 8, FLAME2, PINK) + flower(1250, 430, 7, LAMP))
-    b.append('<path d="M1202 818 H1408 L1500 1000 H820 Z" fill="url(#wc)"/><circle cx="1305" cy="650" r="300" fill="%s" opacity=".035"/>' % WHITE)
-    b.append('<rect x="1202" y="480" width="206" height="338" rx="3" fill="#DDEBDD"/>%s' % "".join('<rect x="1202" y="%d" width="206" height="5" fill="#9DB3A2"/>' % y for y in (566, 654, 742)))
-    b.append('<rect x="1222" y="506" width="22" height="60" rx="6" fill="%s"/><rect x="1228" y="494" width="10" height="14" fill="%s"/><rect x="1262" y="528" width="46" height="38" rx="5" fill="%s"/><circle cx="1350" cy="550" r="16" fill="%s"/>'
-             '<path d="M1226 654 L1296 654 L1262 606 Z" fill="%s"/><circle cx="1262" cy="638" r="5" fill="%s"/><rect x="1326" y="616" width="56" height="38" rx="4" fill="%s"/>'
-             '<rect x="1230" y="706" width="60" height="36" rx="18" fill="%s"/><rect x="1318" y="690" width="26" height="52" rx="5" fill="%s"/><rect x="1354" y="702" width="26" height="40" rx="5" fill="%s"/>'
-             '<rect x="1222" y="770" width="166" height="40" rx="6" fill="#B9CDBD"/>'
-             % (LEAF2, LEAF2, PINK, FLAME2, FLAME2, RED, LAMP, FLAME, LEAF2, PINK))
-    b.append('<path d="M1420 474 L1512 500 V830 L1420 824 Z" fill="%s"/><path d="M1428 560 L1504 578 V600 L1428 584 Z M1428 690 L1504 702 V726 L1428 716 Z" fill="%s"/><rect x="1440" y="532" width="16" height="36" rx="4" fill="%s"/><rect x="1470" y="548" width="14" height="30" rx="4" fill="%s"/>'
-             % (MASS2, EDGE, FLAME2, LEAF2))
-    # le chat, qui juge
-    b.append('<g transform="translate(1100 830)" fill="#050706"><path d="M-30 0 Q-36 -52 -10 -64 Q22 -62 26 0 Z"/><circle cx="-4" cy="-78" r="20"/><path d="M-22 -86 L-20 -110 L-6 -94 Z M14 -86 L12 -110 L-2 -94 Z"/>'
-             '<path d="M24 -8 Q64 -6 60 -46" fill="none" stroke="#050706" stroke-width="8" stroke-linecap="round"/></g>'
-             '<circle cx="1090" cy="752" r="3" fill="%s"/><circle cx="1104" cy="752" r="3" fill="%s"/>' % (LEAF3, LEAF3))
-    b.append(ground(830))
-    return svg("Une cuisine la nuit : le frigo ouvert, des boîtes à pizza, un chat", THC_CSS, "\n".join(b))
-
-
+# ---------------------------------------------------------- 6. le home studio
 def thc_studio():
     css = THC_CSS + """
 .pulse{animation:pulse .52s ease-in-out infinite alternate;transform-box:fill-box;transform-origin:50% 50%}
@@ -974,97 +1010,109 @@ def thc_studio():
 .bar{animation:bar 1.04s ease-in-out infinite alternate;transform-box:fill-box;transform-origin:50% 50%}
 @keyframes bar{from{transform:scaleY(.35)}to{transform:scaleY(1)}}
 """
-    b = [room(), thc_defs()]
-    b.append(garland(520, 196, 1600, 204, 24, 26))
-    b.append(tapestry(880, 230, 340, 300, 124))
+    b = [room(), thc_defs(("B",))]
+    # mousse acoustique
+    for r in range(4):
+        for c in range(6):
+            x, y = 884 + c * 58, 232 + r * 58
+            b.append('<rect x="%d" y="%d" width="54" height="54" fill="%s"/><path d="M%d %d l27 27 l27 -27 M%d %d l27 -27 l27 27" fill="none" stroke="%s" stroke-width="2"/>'
+                     % (x, y, MASS3 if (r + c) % 2 else MASS2, x, y, x, y + 54, TRIM))
+    # voyant d'enregistrement
+    b.append('<rect x="1010" y="486" width="100" height="30" rx="5" fill="#070A08" stroke="%s" stroke-width="3"/><circle class="blink" cx="1030" cy="501" r="6" fill="%s"/>'
+             '<text x="1068" y="507" text-anchor="middle" font-family="ui-monospace,Menlo,monospace" font-size="15" font-weight="700" fill="%s">REC</text>' % (TRIM, RED, RED))
     # étagère à vinyles, casque au mur
     b.append('<rect x="1300" y="470" width="270" height="8" fill="%s"/>%s<circle cx="1430" cy="340" r="52" fill="#070A08" stroke="%s" stroke-width="3"/><circle cx="1430" cy="340" r="34" fill="none" stroke="%s" stroke-width="1"/><circle cx="1430" cy="340" r="16" fill="%s"/><circle cx="1430" cy="340" r="3" fill="#070A08"/>'
-             % (EDGE, "".join('<rect x="%d" y="%d" width="%d" height="%d" fill="%s" opacity=".8"/>' % (1310 + k * 14, 404 - (k * 7) % 12, 10, 66 + (k * 7) % 12, (PINK, MASS, LEAF2, FLAME2, MASS, LAMP, EDGE)[k % 7]) for k in range(18)), TRIM, TRIM, PINK))
+             % (EDGE, "".join('<rect x="%d" y="%d" width="%d" height="%d" fill="%s" opacity=".8"/>' % (1310 + k * 14, 404 - (k * 7) % 12, 10, 66 + (k * 7) % 12, (PINK, MASS, LEAFS[3], FLAME2, MASS, LAMP, EDGE)[k % 7]) for k in range(18)), TRIM, TRIM, PINK))
     b.append('<path d="M640 350 Q640 290 690 290 Q740 290 740 350" fill="none" stroke="%s" stroke-width="7"/><rect x="626" y="340" width="26" height="46" rx="10" fill="%s"/><rect x="728" y="340" width="26" height="46" rx="10" fill="%s"/><rect x="687" y="270" width="6" height="22" fill="%s"/>' % (EDGE, MASS, MASS, EDGE))
     # bureau
     b.append('<rect x="660" y="690" width="800" height="16" rx="3" fill="%s"/><rect x="690" y="706" width="14" height="124" fill="%s"/><rect x="1416" y="706" width="14" height="124" fill="%s"/><rect x="704" y="706" width="200" height="90" fill="%s"/>' % (EDGE, MASS, MASS, MASS2))
-    # enceintes de monitoring
     for x in (716, 1296):
         b.append('<rect x="%d" y="520" width="108" height="170" rx="8" fill="%s"/><circle cx="%d" cy="556" r="14" fill="#0A0E0B" stroke="%s" stroke-width="3"/>'
                  '<g class="pulse"><circle cx="%d" cy="632" r="36" fill="#0A0E0B" stroke="%s" stroke-width="4"/><circle cx="%d" cy="632" r="13" fill="%s"/></g><circle cx="%d" cy="676" r="3" fill="%s"/>'
-                 % (x, MASS, x + 54, EDGE, x + 54, EDGE, x + 54, TRIM, x + 16, LEAF3))
+                 % (x, MASS, x + 54, EDGE, x + 54, EDGE, x + 54, TRIM, x + 16, LEAFS[4]))
     # l'écran : une waveform, évidemment
     b.append('<rect x="900" y="528" width="320" height="146" rx="8" fill="#070A08" stroke="%s" stroke-width="5"/><rect x="1050" y="674" width="20" height="16" fill="%s"/><rect x="1010" y="686" width="100" height="6" rx="3" fill="%s"/>' % (TRIM, TRIM, TRIM))
     rnd = random.Random(77)
     for k in range(34):
         hgt = rnd.randint(14, 92)
-        b.append('<rect class="bar" style="animation-delay:-%ss" x="%s" y="%s" width="5" height="%d" rx="2" fill="%s"/>' % (f(rnd.random() * 2), f(916 + k * 8.6), f(602 - hgt / 2), hgt, LEAF3 if k < 15 else "#33423A"))
+        b.append('<rect class="bar" style="animation-delay:-%ss" x="%s" y="%s" width="5" height="%d" rx="2" fill="%s"/>' % (f(rnd.random() * 2), f(916 + k * 8.6), f(602 - hgt / 2), hgt, LEAFS[4] if k < 15 else "#33423A"))
     b.append('<rect x="1044" y="544" width="2" height="116" fill="%s"/>' % WHITE)
-    # clavier maître
     b.append('<rect x="930" y="664" width="330" height="28" rx="4" fill="%s"/>%s%s' % (MASS,
              "".join('<rect x="%d" y="670" width="9" height="18" rx="1.5" fill="%s"/>' % (940 + k * 11, WHITE) for k in range(28)),
              "".join('<rect x="%d" y="670" width="6" height="11" fill="#070A08"/>' % (947 + k * 11) for k in range(27) if k % 7 not in (2, 6))))
-    # encens, cendrier
-    b.append('<ellipse cx="1404" cy="688" rx="34" ry="5" fill="%s"/><path d="M1384 686 L1432 628" stroke="%s" stroke-width="2.5"/><circle class="ember" cx="1433" cy="627" r="3.5" fill="%s"/>%s' % (TRIM, FLAME2, FLAME, plume(1434, 616, 8, 6, 22)))
-    b.append(ashtray(870, 690, .9))
-    # plante, pouf, tapis
-    b.append(potted(588, 830, 280, 81, 90, 64))
-    b.append('<path d="M1480 830 Q1450 760 1500 730 Q1560 708 1596 760 Q1612 800 1590 830 Z" fill="%s"/><path d="M1500 760 Q1540 744 1580 770" fill="none" stroke="%s" stroke-width="3" opacity=".5"/>' % ("#6B3F73", PINK))
+    b.append(potted("B", 588, 830, .95, 90, 64, sway=True))
+    b.append('<path d="M1480 830 Q1450 760 1500 730 Q1560 708 1596 760 Q1612 800 1590 830 Z" fill="%s"/>' % MASS)
     b.append(ground(830))
-    b.append('<ellipse cx="1060" cy="846" rx="400" ry="13" fill="%s" opacity=".22"/><ellipse cx="1060" cy="846" rx="330" ry="9" fill="none" stroke="%s" stroke-width="2" opacity=".5"/>' % (PINK, FLAME2))
-    return svg("Un home studio la nuit : enceintes, waveform à l'écran, mandala au mur, encens", css, "\n".join(b))
+    return svg("Un home studio la nuit : enceintes, waveform à l'écran, une plante", css, "\n".join(b))
 
 
-def thc_champ():
-    css = THC_CSS + """
-.flag{animation:flag 3.4s ease-in-out infinite alternate;transform-box:fill-box;transform-origin:0 50%}
-@keyframes flag{from{transform:skewY(-5deg)}to{transform:skewY(5deg)}}
-"""
-    b = [sky(113, moon=None, top=500), thc_defs()]
-    b.append('<circle cx="1120" cy="350" r="250" fill="%s" opacity=".035"/><circle cx="1120" cy="350" r="120" fill="#1B2A20"/>'
-             '<circle cx="1084" cy="318" r="18" fill="%s" opacity=".5"/><circle cx="1160" cy="390" r="26" fill="%s" opacity=".4"/>%s'
-             % (VIOLET, HILL2, HILL2, mandala(1120, 350, 205, (LEAF3, FLAME2, PINK, LAMP))))
-    b.append(hills(690, 744))
-    # cabane, drapeau peace and love
-    b.append('<path d="M540 780 V690 L620 640 L700 690 V780 Z" fill="%s"/><rect x="592" y="712" width="56" height="40" rx="3" fill="%s" opacity=".6"/><path d="M620 712 V752 M592 732 H648" stroke="%s" stroke-width="3"/>' % (MASS, FLAME2, MASS))
-    b.append('<rect x="716" y="560" width="5" height="220" fill="%s"/><g transform="translate(721 566)"><g class="flag"><rect width="96" height="62" fill="%s"/><rect width="96" height="20" fill="%s" opacity=".8"/><rect y="42" width="96" height="20" fill="%s" opacity=".8"/>%s</g></g>'
-             % (EDGE, "#6B3F73", PINK, LAMP, peace(48, 31, 20, WHITE, 4)))
-    # rangs du fond, au cordeau
-    for y, h, step, c1, c2, seed in ((770, 70, 54, "#16482A", "#1B5632", 3), (800, 130, 104, "#1B5632", LEAF1, 5)):
-        for k, x in enumerate(range(770 if y == 770 else 760, 1640, step)):
-            b.append(plant(x, y, h + (k * 13) % 22, seed * 100 + k, c1, c2, buds=False, sway=False))
-    # l'épouvantail hippie
-    sx = 980
-    b.append('<path d="M%d 830 V620 M%d 676 H%d" stroke="%s" stroke-width="7" stroke-linecap="round"/><path d="M%d 664 L%d 664 L%d 778 L%d 778 Z" fill="%s"/>%s'
-             '<circle cx="%d" cy="630" r="22" fill="%s"/><path d="M%d 614 H%d M%d 614 L%d 584 H%d Z" fill="%s" stroke="%s" stroke-width="5" stroke-linejoin="round"/>%s'
-             % (sx, sx - 74, sx + 74, EDGE, sx - 46, sx + 46, sx + 62, sx - 62, "#6B3F73",
-                "".join('<path d="M%d %d H%d" stroke="%s" stroke-width="6" opacity=".7"/>' % (sx - 50 - k * 4, 690 + k * 26, sx + 50 + k * 4, (FLAME2, PINK, LEAF3)[k]) for k in range(3)),
-                sx, MASS, sx - 40, sx + 40, sx - 22, sx - 14, sx + 14, EDGE, EDGE, peace(sx, 734, 13, WHITE, 3)))
+# ------------------------------------------------------------ 7. la cuisine
+def thc_cuisine():
+    b = [room(), thc_defs(("A",))]
+    b.append('<rect x="520" y="470" width="620" height="210" fill="%s"/>%s%s' % (MASS3,
+             "".join('<rect x="%d" y="470" width="2" height="210" fill="%s"/>' % (x, TRIM) for x in range(520, 1140, 52)),
+             "".join('<rect x="520" y="%d" width="620" height="2" fill="%s"/>' % (y, TRIM) for y in range(470, 680, 52))))
+    b.append('<rect x="560" y="250" width="540" height="170" fill="%s"/>%s' % (MASS2, "".join('<rect x="%d" y="250" width="3" height="170" fill="%s"/><rect x="%d" y="380" width="26" height="5" rx="2" fill="%s"/>' % (x, TRIM, x - 40, EDGE) for x in (740, 920, 1100))))
+    b.append('<rect x="520" y="690" width="630" height="140" fill="%s"/><rect x="510" y="676" width="650" height="16" rx="3" fill="%s"/>%s'
+             % (MASS2, EDGE, "".join('<rect x="%d" y="704" width="3" height="126" fill="%s"/><rect x="%d" y="720" width="5" height="30" rx="2" fill="%s"/>' % (x, TRIM, x - 20, EDGE) for x in (730, 940))))
+    # micro-ondes : il est toujours 4 h 20
+    b.append('<rect x="560" y="584" width="190" height="92" rx="6" fill="%s"/><rect x="572" y="596" width="116" height="68" rx="4" fill="#070A08"/>'
+             '<text x="719" y="622" text-anchor="middle" font-family="ui-monospace,Menlo,monospace" font-size="17" font-weight="700" fill="%s" class="blink" style="animation-duration:2s">4:20</text>'
+             '<circle cx="719" cy="648" r="9" fill="%s"/>' % (MASS, LEAFS[4], EDGE))
+    for k in range(3):
+        b.append('<rect x="%d" y="%d" width="150" height="16" rx="2" fill="%s"/><rect x="%d" y="%d" width="150" height="3" fill="%s"/>' % (790 + (k % 2) * 8, 660 - k * 17, MASS, 790 + (k % 2) * 8, 660 - k * 17, EDGE))
+    b.append('<path d="M790 626 L930 580 L934 592 L798 628 Z" fill="%s"/><path d="M846 618 L906 596 L900 622 Z" fill="%s"/><circle cx="884" cy="612" r="4" fill="%s"/>' % (EDGE, FLAME2, RED))
+    b.append('<rect x="980" y="574" width="62" height="102" rx="3" fill="%s" opacity=".75"/><circle cx="1011" cy="610" r="17" fill="%s"/><rect x="990" y="640" width="42" height="6" fill="%s" opacity=".6"/>' % (PINK, FLAME2, WHITE))
+    b.append('<rect x="1066" y="600" width="56" height="76" rx="10" fill="%s" opacity=".35"/><rect x="1070" y="590" width="48" height="12" rx="4" fill="%s"/>%s'
+             % (WHITE, EDGE, "".join('<circle cx="%d" cy="%d" r="9" fill="%s"/>' % (x, y, FLAME) for x, y in ((1084, 660), (1104, 656), (1092, 642)))))
+    # le frigo, porte ouverte : la seule lumière de l'appartement
+    b.append('<rect x="1190" y="300" width="230" height="530" rx="8" fill="%s"/><rect x="1190" y="462" width="230" height="5" fill="%s"/><rect x="1204" y="360" width="6" height="70" rx="3" fill="%s"/>' % (MASS, TRIM, EDGE))
+    b.append(potted("A", 1330, 300, .5, 56, 34, sway=True))
+    b.append('<path d="M1202 818 H1408 L1500 1000 H820 Z" fill="url(#wc)"/><circle cx="1305" cy="650" r="300" fill="%s" opacity=".035"/>' % WHITE)
+    b.append('<rect x="1202" y="480" width="206" height="338" rx="3" fill="#DDEBDD"/>%s' % "".join('<rect x="1202" y="%d" width="206" height="5" fill="#9DB3A2"/>' % y for y in (566, 654, 742)))
+    b.append('<rect x="1222" y="506" width="22" height="60" rx="6" fill="%s"/><rect x="1228" y="494" width="10" height="14" fill="%s"/><rect x="1262" y="528" width="46" height="38" rx="5" fill="%s"/><circle cx="1350" cy="550" r="16" fill="%s"/>'
+             '<path d="M1226 654 L1296 654 L1262 606 Z" fill="%s"/><circle cx="1262" cy="638" r="5" fill="%s"/><rect x="1326" y="616" width="56" height="38" rx="4" fill="%s"/>'
+             '<rect x="1230" y="706" width="60" height="36" rx="18" fill="%s"/><rect x="1318" y="690" width="26" height="52" rx="5" fill="%s"/><rect x="1354" y="702" width="26" height="40" rx="5" fill="%s"/>'
+             '<rect x="1222" y="770" width="166" height="40" rx="6" fill="#B9CDBD"/>'
+             % (LEAFS[3], LEAFS[3], PINK, FLAME2, FLAME2, RED, LAMP, FLAME, LEAFS[3], PINK))
+    b.append('<path d="M1420 474 L1512 500 V830 L1420 824 Z" fill="%s"/><path d="M1428 560 L1504 578 V600 L1428 584 Z M1428 690 L1504 702 V726 L1428 716 Z" fill="%s"/><rect x="1440" y="532" width="16" height="36" rx="4" fill="%s"/><rect x="1470" y="548" width="14" height="30" rx="4" fill="%s"/>'
+             % (MASS2, EDGE, FLAME2, LEAFS[3]))
+    # le chat, qui juge
+    b.append('<g transform="translate(1100 830)" fill="#050706"><path d="M-30 0 Q-36 -52 -10 -64 Q22 -62 26 0 Z"/><circle cx="-4" cy="-78" r="20"/><path d="M-22 -86 L-20 -110 L-6 -94 Z M14 -86 L12 -110 L-2 -94 Z"/>'
+             '<path d="M24 -8 Q64 -6 60 -46" fill="none" stroke="#050706" stroke-width="8" stroke-linecap="round"/></g>'
+             '<circle cx="1090" cy="752" r="3" fill="%s"/><circle cx="1104" cy="752" r="3" fill="%s"/>' % (LEAFS[4], LEAFS[4]))
     b.append(ground(830))
-    # premier rang : les belles
-    for i, (x, h) in enumerate(((610, 310), (840, 250), (1150, 330), (1380, 280), (1560, 220))):
-        b.append('<ellipse cx="%d" cy="834" rx="54" ry="9" fill="#0E1410"/>' % x + plant(x, 834, h, 90 + i, LEAF1, LEAF2))
-    # lucioles
-    rnd = random.Random(8)
-    b.append("".join('<circle class="tw" style="animation-delay:-%ss;animation-duration:%ss" cx="%d" cy="%d" r="2.4" fill="%s"/>'
-                     % (f(rnd.random() * 5), f(rnd.uniform(2.4, 5)), rnd.randint(520, 1590), rnd.randint(560, 800), FLAME2) for _ in range(16)))
-    return svg("Une plantation sous une lune en mandala, un épouvantail hippie", css, "\n".join(b))
+    return svg("Une cuisine la nuit : le frigo ouvert, des boîtes à pizza, un chat", THC_CSS, "\n".join(b))
 
 
 THC_SCENES = {
-    "thc-salon.svg": thc_salon,
     "thc-serre.svg": thc_serre,
-    "thc-van.svg": thc_van,
+    "thc-champ.svg": thc_champ,
+    "thc-salon.svg": thc_salon,
+    "thc-sechoir.svg": thc_sechoir,
     "thc-balcon.svg": thc_balcon,
     "thc-studio.svg": thc_studio,
     "thc-cuisine.svg": thc_cuisine,
-    "thc-champ.svg": thc_champ,
 }
 
-
 if __name__ == "__main__":
+    import json
     OUT.mkdir(parents=True, exist_ok=True)
     for name, fn in SCENES.items():
         data = fn()
         (OUT / name).write_text(data, encoding="utf-8")
         print(f"{name:16} {len(data) / 1024:5.1f} Ko")
     globals().update(THC_PALETTE)
+    spots = {}
     for name, fn in THC_SCENES.items():
+        del _spots[:]
         data = fn()
+        spots["img/scenes/" + name] = list(_spots)
         (OUT / name).write_text(data, encoding="utf-8")
-        print(f"{name:16} {len(data) / 1024:5.1f} Ko")
+        print(f"{name:16} {len(data) / 1024:5.1f} Ko  {len(_spots)} zones")
+    (ROOT / "js" / "thc-spots.js").write_text(
+        "// Zones cliquables des décors du mode THC, en coordonnées du décor\n"
+        "// (1600 x 1000 ; x au centre de la zone, y en bas). Écrit par\n"
+        "// tools/scenes.py : ne pas modifier à la main.\n"
+        "export const SPOTS = " + json.dumps(spots, separators=(",", ":")).replace('"img/', '\n  "img/').replace("]}", "]\n}") + ";\n",
+        encoding="utf-8")

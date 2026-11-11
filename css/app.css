@@ -1,5 +1,5 @@
-@import url("fonts.css?v=141");
-@import url("tokens.css?v=141");
+@import url("fonts.css?v=142");
+@import url("tokens.css?v=142");
 
 /* ================================================================= base */
 *, *::before, *::after { box-sizing: border-box; }
@@ -1729,3 +1729,27 @@ body.hub .deck { border-color: rgba(164, 139, 255, .16); border-radius: 16px; }
       var(--scene) center calc(var(--band) - var(--img-h) * .83 - 12px) / max(100vw, 160vh) auto no-repeat;
   }
 }
+
+/* ---- le décor se joue (js/thc-play.js) : joint au bout de la souris */
+body.thc-hot, body.thc-hot .hub-stage, body.thc-hot .app-main { cursor: pointer; }
+.wp-play { margin-top: 4px; color: var(--accent-bright); font-family: var(--mono); font-size: 10px; letter-spacing: .06em; text-transform: uppercase; }
+.thc-joint { --w: 76px; position: fixed; left: 0; top: 0; z-index: 6; width: 0; height: 0; pointer-events: none; opacity: 0; transform-origin: 0 0; transition: opacity .15s; will-change: transform; }
+.thc-joint.is-on { opacity: 1; }
+.thc-joint i { position: absolute; display: block; }
+.tj-filter { left: 0; top: -3.5px; width: 14px; height: 7px; border-radius: 1.5px; background: #D9B45F; }
+.tj-paper { left: 13px; top: -6px; width: calc(var(--w) - 13px); height: 12px; background: #ECF2EC; clip-path: polygon(0 21%, 100% 0, 100% 100%, 0 79%); }
+.tj-twist { left: calc(var(--w) - 1px); top: -4px; width: 9px; height: 8px; background: #C9D2C9; clip-path: polygon(0 0, 100% 50%, 0 100%); }
+.tj-ember { left: calc(var(--w) - 4px); top: -6px; width: 9px; height: 12px; border-radius: 3px 6px 6px 3px; background: #E8904A; box-shadow: 0 0 10px 3px rgba(232, 144, 74, .55), inset -3px 0 0 #F2C46B; opacity: 0; }
+.thc-joint.is-lit .tj-twist { opacity: 0; }
+.thc-joint.is-lit .tj-ember { opacity: 1; animation: tj-ember 2.4s ease-in-out infinite; }
+.thc-joint.is-puff .tj-ember { animation: tj-puff .7s ease-out; }
+.thc-joint.is-rolled .tj-paper, .thc-joint.is-rolled .tj-filter { animation: tj-roll .45s cubic-bezier(.3, 1.5, .5, 1); }
+@keyframes tj-ember { 0%, 100% { filter: brightness(.85); } 50% { filter: brightness(1.2); } }
+@keyframes tj-puff { 0% { filter: brightness(2); box-shadow: 0 0 22px 9px rgba(242, 196, 107, .8), inset -3px 0 0 #fff; } 100% { filter: brightness(1); } }
+@keyframes tj-roll { from { transform: scaleY(2.4) scaleX(.5); opacity: 0; } to { transform: none; opacity: 1; } }
+.thc-hint { position: fixed; left: 0; top: 0; z-index: 6; max-width: 240px; padding: 6px 10px; border: 1px solid rgba(95, 208, 104, .3); border-radius: 8px; background: rgba(11, 15, 12, .88); color: var(--text); font-family: var(--mono); font-size: 11px; line-height: 1.4; pointer-events: none; opacity: 0; transition: opacity .2s; }
+.thc-hint.is-on { opacity: 1; }
+.thc-glow { position: fixed; left: -9px; top: -9px; z-index: 0; width: 18px; height: 18px; border-radius: 50%; background: #E8904A; box-shadow: 0 0 26px 12px rgba(232, 144, 74, .5); pointer-events: none; opacity: 0; }
+.thc-glow.is-on { animation: thc-glow 3.2s ease-out; }
+@keyframes thc-glow { 0% { opacity: 0; } 8% { opacity: 1; } 60% { opacity: .8; } 100% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .thc-joint i, .thc-glow.is-on { animation: none !important; } }
