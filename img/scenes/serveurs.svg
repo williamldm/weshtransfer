@@ -4,6 +4,8 @@
 @keyframes drift{0%{transform:translate(0,0) scale(.5);opacity:0}12%{opacity:.95}100%{transform:translate(300px,-360px) scale(2.2);opacity:0}}
 .blink{animation:blink 2.6s steps(1) infinite}
 @keyframes blink{50%{opacity:.1}}
+.tw{animation:tw 5s ease-in-out infinite}
+@keyframes tw{50%{opacity:.2}}
 
 .fan{animation:spin 1.6s linear infinite;transform-box:fill-box;transform-origin:50% 50%}
 @keyframes spin{to{transform:rotate(360deg)}}
@@ -12,7 +14,8 @@
 .led{animation:led 1.9s steps(1) infinite}
 @keyframes led{30%{opacity:.15}60%{opacity:1}}
 @media (prefers-reduced-motion:reduce){*{animation:none!important}.smoke{opacity:.8}}</style>
-<rect width="1600" height="1000" fill="#0E0B14"/>
+<defs><linearGradient id="hz" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#A48BFF" stop-opacity="0"/><stop offset="1" stop-color="#A48BFF" stop-opacity=".16"/></linearGradient></defs>
+<rect width="1600" height="1000" fill="#0E0B14"/><rect y="330" width="1600" height="510" fill="url(#hz)"/>
 <g fill="#4A4266">
 <circle cx="287" cy="268" r="1"/>
 <circle cx="1255" cy="477" r="1"/>
@@ -104,8 +107,18 @@
 <circle cx="1048" cy="349" r="1.4"/>
 <circle cx="6" cy="264" r="1"/>
 <circle cx="117" cy="140" r="1.4"/>
+</g><g fill="#8279A6">
+<circle class="tw" style="animation-delay:-1.5s" cx="48" cy="181" r="1.8"/>
+<circle class="tw" style="animation-delay:-0.6s" cx="911" cy="190" r="1.8"/>
+<circle class="tw" style="animation-delay:-4.6s" cx="327" cy="264" r="1.8"/>
+<circle class="tw" style="animation-delay:-1.4s" cx="807" cy="201" r="1.8"/>
+<circle class="tw" style="animation-delay:-0.7s" cx="826" cy="177" r="1.8"/>
+<circle class="tw" style="animation-delay:-1.2s" cx="465" cy="338" r="1.8"/>
+<circle class="tw" style="animation-delay:-4.8s" cx="767" cy="40" r="1.8"/>
+<circle class="tw" style="animation-delay:-2.3s" cx="573" cy="283" r="1.8"/>
+<circle class="tw" style="animation-delay:-2.7s" cx="190" cy="85" r="1.8"/>
 </g>
-<circle cx="300" cy="140" r="44" fill="#1A1624"/><circle cx="316" cy="130" r="40" fill="#0E0B14"/>
+<circle cx="300" cy="140" r="78" fill="#A48BFF" opacity=".035"/><circle cx="300" cy="140" r="56" fill="#A48BFF" opacity=".04"/><circle cx="300" cy="140" r="40" fill="#2B2540"/><circle cx="315" cy="131" r="38" fill="#0E0B14"/>
 <path d="M0 720 C 200 650 380 700 560 690 C 760 676 900 640 1100 670 C 1300 700 1450 650 1600 680 V1000 H0 Z" fill="#16121E"/>
 <path d="M0 780 C 260 750 480 790 700 770 C 940 748 1180 790 1400 768 C 1500 758 1560 770 1600 766 V1000 H0 Z" fill="#1C1726"/>
 <rect x="560" y="600" width="6" height="230" fill="#221C2D"/><rect x="604" y="600" width="6" height="230" fill="#221C2D"/><path d="M563 700 L607 760 M607 700 L563 760" stroke="#221C2D" stroke-width="3"/><ellipse cx="585" cy="596" rx="46" ry="12" fill="#251F33"/><rect x="539" y="540" width="92" height="56" fill="#251F33"/><ellipse cx="585" cy="540" rx="46" ry="12" fill="#3B3152"/><circle cx="585" cy="526" r="2.2" fill="#E8674A" class="blink" style="animation-delay:0.5s"/>

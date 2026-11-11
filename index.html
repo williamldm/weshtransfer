@@ -26,8 +26,8 @@
 <link rel="icon" href="img/favicon.svg" type="image/svg+xml">
 <link rel="icon" href="img/favicon-32.png" sizes="32x32" type="image/png">
 <link rel="apple-touch-icon" href="img/apple-touch-icon.png">
-<link rel="stylesheet" href="css/app.css?v=137">
-<script type="module" src="js/wallpaper-boot.js?v=137" blocking="render"></script>
+<link rel="stylesheet" href="css/app.css?v=138">
+<script type="module" src="js/wallpaper-boot.js?v=138" blocking="render"></script>
 </head>
 <body class="hub">
 
@@ -57,11 +57,39 @@
     </div>
   </section>
 
-  <p class="wallpaper-note" data-wallpaper><span data-wp-text>Fond d'écran n° 3 · Centrale thermique, la nuit.<br>Ce fond d'écran consomme plus que ton frigo.</span><button type="button" class="wp-next" data-wp-next>Fond suivant &rarr;</button></p>
+  <div class="wallpaper-note" data-wallpaper>
+    <p class="wp-text"><span class="wp-n" data-wp-n>03 / 09</span><b data-wp-title>Centrale thermique, la nuit</b><span data-wp-joke>Ce fond d'écran consomme plus que ton frigo.</span></p>
+    <div class="wp-bar"><div class="wp-dots" data-wp-dots aria-label="Choisir le décor"></div><button type="button" class="wp-next" data-wp-next>Fond suivant &rarr;</button></div>
+  </div>
 </main>
 
 <section class="hub-below">
   <div class="ticker" aria-hidden="true"><div class="ticker-track"><span>Énergie 100 % fossile</span><i>✦</i><span>Zéro arbre planté</span><i>✦</i><span>Jet privé inclus</span><i>✦</i><span>2 Go par fichier</span><i>✦</i><span>Sans mot de passe</span><i>✦</i><span>Écoute avant de télécharger</span><i>✦</i><span>Bilan carbone : oui</span><i>✦</i><span>Énergie 100 % fossile</span><i>✦</i><span>Zéro arbre planté</span><i>✦</i><span>Jet privé inclus</span><i>✦</i><span>2 Go par fichier</span><i>✦</i><span>Sans mot de passe</span><i>✦</i><span>Écoute avant de télécharger</span><i>✦</i><span>Bilan carbone : oui</span><i>✦</i></div></div>
+
+  <h2 class="label-mono reveal">Trois façons de polluer</h2>
+  <div class="modes">
+    <button type="button" class="mode reveal" data-tab="send">
+      <span class="mode-ico" data-icon="send"></span>
+      <span class="mode-kicker">01 · Envoyer</span>
+      <strong>Un lien, et ça part</strong>
+      <span class="mode-text">Dépose tes fichiers, partage le lien. Ils écoutent avant de télécharger, tout s'efface au bout de 7 jours.</span>
+      <span class="mode-go">Envoyer un fichier <i>&rarr;</i></span>
+    </button>
+    <button type="button" class="mode reveal" data-tab="salon">
+      <span class="mode-ico" data-icon="headphones"></span>
+      <span class="mode-kicker">02 · Séminaire</span>
+      <strong>La villa, en ligne</strong>
+      <span class="mode-text">Une jam privée : chacun ajoute ses sons à la file, tout le monde écoute en même temps.</span>
+      <span class="mode-go">Lancer un séminaire <i>&rarr;</i></span>
+    </button>
+    <button type="button" class="mode reveal" data-tab="revue">
+      <span class="mode-ico" data-icon="comment"></span>
+      <span class="mode-kicker">03 · Verdict</span>
+      <strong>Le mix, à la seconde près</strong>
+      <span class="mode-text">L'artiste commente sur la waveform, l'ingé corrige, version après version, jusqu'à la validation.</span>
+      <span class="mode-go">Demander un verdict <i>&rarr;</i></span>
+    </button>
+  </div>
 
   <h2 class="label-mono reveal">Nos engagements</h2>
   <div class="pledges">
@@ -83,7 +111,11 @@
   </div>
 
   <div class="hub-faq">
-    <h2 class="label-mono reveal">Questions (rarement) posées</h2>
+    <div class="faq-side reveal">
+      <h2 class="label-mono">Questions (rarement) posées</h2>
+      <p class="faq-title">On répond à tout. <em>Mal, mais vite.</em></p>
+      <p class="faq-sub">Touche une question, la réponse arrive.</p>
+    </div>
     <div class="chat">
       <p class="chat-head"><img src="img/favicon.svg" alt="" width="18" height="18"><span>WeshTransfer<small>en ligne, malheureusement</small></span></p>
       <details class="reveal">
@@ -113,12 +145,16 @@
     </div>
   </div>
 
-  <footer class="hub-foot">WeshTransfer est un projet parodique. Aucun jet privé n'a été affrété pour transférer tes fichiers.<br>Fait par le WYP, pour le WYP.</footer>
+  <footer class="hub-foot">
+    <a class="logo" href="index.html" aria-label="WeshTransfer, accueil"><span class="wordmark"><em>Wesh</em>Transfer</span></a>
+    <p>WeshTransfer est un projet parodique. Aucun jet privé n'a été affrété pour transférer tes fichiers.<br>Fait par le WYP, pour le WYP.</p>
+    <button type="button" class="foot-top" data-top>Remonter polluer &uarr;</button>
+  </footer>
 </section>
 
 <div id="sheets"></div>
 <div class="toast-wrap" id="toasts" aria-live="polite"></div>
 
-<script type="module" src="js/hub.js?v=137"></script>
+<script type="module" src="js/hub.js?v=138"></script>
 </body>
 </html>

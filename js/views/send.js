@@ -8,19 +8,19 @@ import {
   getProject, getFilesByIds, createTransfer, transferWaitSeconds,
   getTransfer, transferUrl, createProject, signFiles, cachedUrl,
   emailTransfer, emailEnabled, listContacts, suggestContacts, senderEmail, rememberContactsLocal, knownVerified
-} from "../api.js?v=137";
-import { accountEmail } from "../session.js?v=137";
-import { ensureVerified } from "../verify.js?v=137";
-import { openUploadSheet } from "./upload-sheet.js?v=137";
-import { mountUploads } from "./uploads.js?v=137";
-import { onUploads, enqueue, checkFile, getJobs } from "../upload.js?v=137";
-import { categoryOf, canPreview, FILE_MAX } from "../files.js?v=137";
-import { takePending } from "../pending.js?v=137";
-import { icon } from "../icons.js?v=137";
+} from "../api.js?v=138";
+import { accountEmail } from "../session.js?v=138";
+import { ensureVerified } from "../verify.js?v=138";
+import { openUploadSheet } from "./upload-sheet.js?v=138";
+import { mountUploads } from "./uploads.js?v=138";
+import { onUploads, enqueue, checkFile, getJobs } from "../upload.js?v=138";
+import { categoryOf, canPreview, FILE_MAX } from "../files.js?v=138";
+import { takePending } from "../pending.js?v=138";
+import { icon } from "../icons.js?v=138";
 import {
   esc, formatBytes, formatDuration, plural, toast, errorText, copyText, shareLink,
   canShare, formatDate, daysLeft, fileBadge, fileTile
-} from "../ui.js?v=137";
+} from "../ui.js?v=138";
 
 // Dans un espace "envoi", ce composeur EST l'accueil.
 export const title = (ctx) => (ctx && ctx.space.mode === "envoi" ? ctx.space.name : "Envoyer");
@@ -337,7 +337,7 @@ export async function mount(root, ctx, params) {
   if (folderInput) {
     folderInput.addEventListener("change", async (e) => {
       const list = Array.from(e.target.files);
-      const m = await import("../folders.js?v=137");
+      const m = await import("../folders.js?v=138");
       toast("Préparation du dossier (zip)...", "ok");
       try { addDirect(await m.fromFolderInput(list)); } catch (err) { toast(m.folderError(err), "err"); }
       e.target.value = "";

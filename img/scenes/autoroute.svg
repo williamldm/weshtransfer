@@ -4,6 +4,8 @@
 @keyframes drift{0%{transform:translate(0,0) scale(.5);opacity:0}12%{opacity:.95}100%{transform:translate(300px,-360px) scale(2.2);opacity:0}}
 .blink{animation:blink 2.6s steps(1) infinite}
 @keyframes blink{50%{opacity:.1}}
+.tw{animation:tw 5s ease-in-out infinite}
+@keyframes tw{50%{opacity:.2}}
 
 .lane-a{animation:lanea 50s linear infinite}
 @keyframes lanea{from{transform:translateX(-400px)}to{transform:translateX(400px)}}
@@ -12,7 +14,8 @@
 .board{animation:board 6s steps(1) infinite}
 @keyframes board{80%{opacity:.85}83%{opacity:.3}86%{opacity:.85}}
 @media (prefers-reduced-motion:reduce){*{animation:none!important}.smoke{opacity:.8}}</style>
-<rect width="1600" height="1000" fill="#0E0B14"/>
+<defs><linearGradient id="hz" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#A48BFF" stop-opacity="0"/><stop offset="1" stop-color="#A48BFF" stop-opacity=".16"/></linearGradient></defs>
+<rect width="1600" height="1000" fill="#0E0B14"/><rect y="330" width="1600" height="510" fill="url(#hz)"/>
 <g fill="#4A4266">
 <circle cx="185" cy="120" r="1"/>
 <circle cx="1514" cy="174" r="1"/>
@@ -74,6 +77,16 @@
 <circle cx="1536" cy="89" r="1.8"/>
 <circle cx="301" cy="32" r="1"/>
 <circle cx="1545" cy="294" r="1"/>
+</g><g fill="#8279A6">
+<circle class="tw" style="animation-delay:-3.3s" cx="1461" cy="158" r="1.8"/>
+<circle class="tw" style="animation-delay:-3.7s" cx="1438" cy="206" r="1.8"/>
+<circle class="tw" style="animation-delay:-0.2s" cx="1321" cy="55" r="1.8"/>
+<circle class="tw" style="animation-delay:-2.1s" cx="1505" cy="143" r="1.8"/>
+<circle class="tw" style="animation-delay:-3.6s" cx="1034" cy="248" r="1.8"/>
+<circle class="tw" style="animation-delay:-0.4s" cx="728" cy="239" r="1.8"/>
+<circle class="tw" style="animation-delay:-3.4s" cx="28" cy="229" r="1.8"/>
+<circle class="tw" style="animation-delay:-2.5s" cx="1464" cy="134" r="1.8"/>
+<circle class="tw" style="animation-delay:-1.3s" cx="278" cy="166" r="1.8"/>
 </g>
 <rect x="0" y="464" width="69" height="256" fill="#1C1726"/>
 <rect x="6" y="510" width="6" height="6" fill="#A48BFF" opacity=".55"/><rect x="6" y="546" width="6" height="6" fill="#A48BFF" opacity=".55"/><rect x="6" y="564" width="6" height="6" fill="#A48BFF" opacity=".55"/><rect x="6" y="636" width="6" height="6" fill="#A48BFF" opacity=".55"/><rect x="6" y="672" width="6" height="6" fill="#A48BFF" opacity=".55"/><rect x="20" y="510" width="6" height="6" fill="#A48BFF" opacity=".55"/><rect x="20" y="582" width="6" height="6" fill="#A48BFF" opacity=".55"/><rect x="20" y="690" width="6" height="6" fill="#A48BFF" opacity=".55"/><rect x="34" y="492" width="6" height="6" fill="#A48BFF" opacity=".55"/><rect x="34" y="510" width="6" height="6" fill="#A48BFF" opacity=".55"/><rect x="34" y="546" width="6" height="6" fill="#A48BFF" opacity=".55"/><rect x="34" y="582" width="6" height="6" fill="#A48BFF" opacity=".55"/><rect x="34" y="618" width="6" height="6" fill="#A48BFF" opacity=".55"/><rect x="34" y="636" width="6" height="6" fill="#A48BFF" opacity=".55"/><rect x="34" y="672" width="6" height="6" fill="#E9E4F5" opacity=".3"/><rect x="34" y="690" width="6" height="6" fill="#A48BFF" opacity=".55"/><rect x="48" y="492" width="6" height="6" fill="#A48BFF" opacity=".55"/><rect x="48" y="636" width="6" height="6" fill="#A48BFF" opacity=".55"/><rect x="48" y="654" width="6" height="6" fill="#A48BFF" opacity=".55"/><rect x="48" y="672" width="6" height="6" fill="#E9E4F5" opacity=".3"/><rect x="48" y="690" width="6" height="6" fill="#A48BFF" opacity=".55"/>

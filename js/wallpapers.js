@@ -5,12 +5,15 @@
 // suit la version du site : un décor retouché s'affiche tout de suite.
 
 export const WALLPAPERS = [
-  { file: "img/scenes/plateforme.svg?v=137", title: "Plateforme pétrolière, torchère allumée", joke: "Chaque envoi rallume la torchère." },
-  { file: "img/scenes/serveurs.svg?v=137", title: "Ferme de serveurs dans le désert", joke: "Refroidie à l'eau potable, évidemment." },
-  { file: "img/scene.svg?v=137", title: "Centrale thermique, la nuit", joke: "Ce fond d'écran consomme plus que ton frigo." },
-  { file: "img/scenes/aeroport.svg?v=137", title: "Aéroport, jets privés", joke: "Un jet par fichier. Deux pour les WAV." },
-  { file: "img/scenes/ski.svg?v=137", title: "Station de ski, en août", joke: "Neige artificielle, 24 degrés dehors." },
-  { file: "img/scenes/autoroute.svg?v=137", title: "Périphérique, 23 h", joke: "Tous en SUV, clim à fond, seul à bord." }
+  { file: "img/scenes/plateforme.svg?v=138", title: "Plateforme pétrolière, torchère allumée", joke: "Chaque envoi rallume la torchère." },
+  { file: "img/scenes/serveurs.svg?v=138", title: "Ferme de serveurs dans le désert", joke: "Refroidie à l'eau potable, évidemment." },
+  { file: "img/scene.svg?v=138", title: "Centrale thermique, la nuit", joke: "Ce fond d'écran consomme plus que ton frigo." },
+  { file: "img/scenes/aeroport.svg?v=138", title: "Aéroport, jets privés", joke: "Un jet par fichier. Deux pour les WAV." },
+  { file: "img/scenes/ski.svg?v=138", title: "Station de ski, en août", joke: "Neige artificielle, 24 degrés dehors." },
+  { file: "img/scenes/autoroute.svg?v=138", title: "Périphérique, 23 h", joke: "Tous en SUV, clim à fond, seul à bord." },
+  { file: "img/scenes/croisiere.svg?v=138", title: "Paquebot de croisière, 6 000 cabines", joke: "Buffet à volonté. Fioul lourd aussi." },
+  { file: "img/scenes/fusee.svg?v=138", title: "Tourisme spatial, vol de 11 minutes", joke: "Une vie d'émissions pour un selfie en apesanteur." },
+  { file: "img/scenes/golf.svg?v=138", title: "Golf dans le désert", joke: "18 trous, 4 millions de litres d'eau par jour." }
 ];
 
 const KEY = "seminaire.wallpaper";       // dernier décor vu (d'une visite à l'autre)
@@ -110,19 +113,32 @@ export function startRotation(scene) {
   rotation = {
     get index() { return i; },
     next: async () => { await go((i + 1) % WALLPAPERS.length); schedule(); },
+    show: async (n) => { if (n !== i && WALLPAPERS[n]) { await go(n); schedule(); } },
     onChange: (fn) => { listeners.add(fn); return () => listeners.delete(fn); }
   };
   return rotation;
 }
 
-// Accueil : légende "Fond d'écran n° x sur 6" et bouton "Fond suivant".
+// Accueil : légende du décor, une pastille par décor (on choisit le sien)
+// et le bouton "Fond suivant".
 export function mountWallpaperNote(note) {
   if (!note) return;
   const r = rotation || startRotation(document.querySelector(".scene"));
+  const dots = note.querySelector("[data-wp-dots]");
+  if (dots) {
+    dots.innerHTML = WALLPAPERS.map((w, n) =>
+      '<button type="button" data-wp="' + n + '" aria-label="Décor ' + (n + 1) + " : " + w.title + '" title="' + w.title + '"></button>').join("");
+    dots.onclick = (e) => {
+      const b = e.target.closest("[data-wp]");
+      if (b && r) r.show(Number(b.dataset.wp));
+    };
+  }
   const show = (i) => {
     const w = WALLPAPERS[i];
-    note.querySelector("[data-wp-text]").innerHTML =
-      "Fond d'écran n° " + (i + 1) + " sur " + WALLPAPERS.length + " · " + w.title + ".<br>" + w.joke;
+    note.querySelector("[data-wp-title]").textContent = w.title;
+    note.querySelector("[data-wp-joke]").textContent = w.joke;
+    note.querySelector("[data-wp-n]").textContent = String(i + 1).padStart(2, "0") + " / " + String(WALLPAPERS.length).padStart(2, "0");
+    if (dots) for (const b of dots.children) b.setAttribute("aria-current", String(Number(b.dataset.wp) === i));
   };
   show(r ? r.index : currentWallpaper());
   if (!r) return;

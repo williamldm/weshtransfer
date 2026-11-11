@@ -4,13 +4,16 @@
 @keyframes drift{0%{transform:translate(0,0) scale(.5);opacity:0}12%{opacity:.95}100%{transform:translate(300px,-360px) scale(2.2);opacity:0}}
 .blink{animation:blink 2.6s steps(1) infinite}
 @keyframes blink{50%{opacity:.1}}
+.tw{animation:tw 5s ease-in-out infinite}
+@keyframes tw{50%{opacity:.2}}
 
 .spray{animation:spray 2.4s linear infinite;opacity:0}
 @keyframes spray{0%{opacity:.9;transform:translate(0,0)}100%{opacity:0;transform:translate(-120px,-60px)}}
 .chair{animation:chair 40s linear infinite}
 @keyframes chair{from{transform:translate(0,0)}to{transform:translate(900px,-420px)}}
 @media (prefers-reduced-motion:reduce){*{animation:none!important}.smoke{opacity:.8}}</style>
-<rect width="1600" height="1000" fill="#0E0B14"/>
+<defs><linearGradient id="hz" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#A48BFF" stop-opacity="0"/><stop offset="1" stop-color="#A48BFF" stop-opacity=".16"/></linearGradient></defs>
+<rect width="1600" height="1000" fill="#0E0B14"/><rect y="330" width="1600" height="510" fill="url(#hz)"/>
 <g fill="#4A4266">
 <circle cx="836" cy="286" r="1"/>
 <circle cx="361" cy="214" r="1"/>
@@ -102,8 +105,18 @@
 <circle cx="1016" cy="213" r="1.8"/>
 <circle cx="937" cy="77" r="1.4"/>
 <circle cx="1195" cy="118" r="1.4"/>
+</g><g fill="#8279A6">
+<circle class="tw" style="animation-delay:-4.2s" cx="983" cy="348" r="1.8"/>
+<circle class="tw" style="animation-delay:-3.9s" cx="706" cy="41" r="1.8"/>
+<circle class="tw" style="animation-delay:-1.8s" cx="869" cy="239" r="1.8"/>
+<circle class="tw" style="animation-delay:-1.5s" cx="559" cy="295" r="1.8"/>
+<circle class="tw" style="animation-delay:-4.7s" cx="895" cy="69" r="1.8"/>
+<circle class="tw" style="animation-delay:-0s" cx="1100" cy="174" r="1.8"/>
+<circle class="tw" style="animation-delay:-0.1s" cx="1584" cy="346" r="1.8"/>
+<circle class="tw" style="animation-delay:-1.1s" cx="1384" cy="186" r="1.8"/>
+<circle class="tw" style="animation-delay:-3.3s" cx="1303" cy="193" r="1.8"/>
 </g>
-<circle cx="260" cy="160" r="44" fill="#1A1624"/><circle cx="276" cy="150" r="40" fill="#0E0B14"/>
+<circle cx="260" cy="160" r="78" fill="#A48BFF" opacity=".035"/><circle cx="260" cy="160" r="56" fill="#A48BFF" opacity=".04"/><circle cx="260" cy="160" r="40" fill="#2B2540"/><circle cx="275" cy="151" r="38" fill="#0E0B14"/>
 <path d="M-40 830 L380 330 L560 520 L760 250 L1080 640 L1250 420 L1640 830 Z" fill="#1C1726"/>
 <path d="M380 330 L440 402 L420 420 L396 398 L372 420 L340 378 Z M760 250 L850 360 L820 372 L786 344 L760 372 L720 334 L690 336 Z M1250 420 L1310 482 L1280 490 L1258 470 L1232 490 L1210 462 Z" fill="#3B3152"/>
 <path d="M-40 830 L300 560 L520 700 L760 520 L1000 740 L1200 600 L1640 830 Z" fill="#16121E"/>

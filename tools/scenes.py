@@ -19,6 +19,8 @@ BASE_CSS = """
 @keyframes drift{0%{transform:translate(0,0) scale(.5);opacity:0}12%{opacity:.95}100%{transform:translate(300px,-360px) scale(2.2);opacity:0}}
 .blink{animation:blink 2.6s steps(1) infinite}
 @keyframes blink{50%{opacity:.1}}
+.tw{animation:tw 5s ease-in-out infinite}
+@keyframes tw{50%{opacity:.2}}
 """
 REDUCED = "@media (prefers-reduced-motion:reduce){*{animation:none!important}.smoke{opacity:.8}}"
 
@@ -33,14 +35,25 @@ def svg(label, css, body):
 
 
 def sky(seed, moon=(1330, 170), stars=90, top=560):
+    """Ciel de nuit : aplat, lueur violette qui monte de l'horizon (la
+    pollution lumineuse, forcément), étoiles dont quelques-unes scintillent,
+    croissant de lune dans son halo."""
     rnd = random.Random(seed)
-    out = ['<rect width="1600" height="1000" fill="%s"/>' % BG, '<g fill="#4A4266">']
+    out = ['<defs><linearGradient id="hz" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="%s" stop-opacity="0"/>'
+           '<stop offset="1" stop-color="%s" stop-opacity=".16"/></linearGradient></defs>' % (VIOLET, VIOLET),
+           '<rect width="1600" height="1000" fill="%s"/><rect y="330" width="1600" height="510" fill="url(#hz)"/>' % BG,
+           '<g fill="#4A4266">']
     for _ in range(stars):
         out.append('<circle cx="%d" cy="%d" r="%s"/>' % (rnd.randint(0, 1600), rnd.randint(20, top), rnd.choice(["1", "1", "1.4", "1.8"])))
+    out.append('</g><g fill="#8279A6">')
+    for i in range(9):
+        out.append('<circle class="tw" style="animation-delay:-%ss" cx="%d" cy="%d" r="1.8"/>' % (f(rnd.random() * 5), rnd.randint(0, 1600), rnd.randint(20, top - 120)))
     out.append("</g>")
     if moon:
         x, y = moon
-        out.append('<circle cx="%d" cy="%d" r="44" fill="#1A1624"/><circle cx="%d" cy="%d" r="40" fill="%s"/>' % (x, y, x + 16, y - 10, BG))
+        out.append('<circle cx="%d" cy="%d" r="78" fill="%s" opacity=".035"/><circle cx="%d" cy="%d" r="56" fill="%s" opacity=".04"/>'
+                   '<circle cx="%d" cy="%d" r="40" fill="#2B2540"/><circle cx="%d" cy="%d" r="38" fill="%s"/>'
+                   % (x, y, VIOLET, x, y, VIOLET, x, y, x + 15, y - 9, BG))
     return "\n".join(out)
 
 
@@ -362,12 +375,201 @@ def highway():
     return svg("Une autoroute de SUV embouteillée, la nuit", css, "\n".join(b))
 
 
+# ============================================================ 7. croisière
+def cruise():
+    css = """
+.swell{animation:swell 9s ease-in-out infinite alternate}
+@keyframes swell{from{transform:translateX(-30px)}to{transform:translateX(30px)}}
+.shimmer{animation:shimmer 3.4s ease-in-out infinite alternate}
+@keyframes shimmer{from{opacity:.05}to{opacity:.16}}
+"""
+    b = [sky(66, moon=(300, 150))]
+    # iceberg, de moins en moins gros
+    b.append('<path d="M120 764 L168 700 L196 724 L232 660 L262 706 L300 764 Z" fill="%s"/><path d="M232 660 L262 706 L240 722 L222 700 Z" fill="%s" opacity=".7"/>'
+             % (HILL2, EDGE))
+    b.append('<rect y="760" width="1600" height="240" fill="#0B0911"/>')
+    # coque, proue à droite
+    b.append('<path d="M640 728 L1456 728 L1508 714 L1446 796 L694 796 Q650 786 640 728 Z" fill="%s"/>'
+             '<path d="M640 728 L1456 728 L1508 714 L1505 720 L1456 734 L641 734 Z" fill="%s"/>' % (MASS, EDGE))
+    b.append("".join('<circle cx="%d" cy="762" r="3" fill="%s" opacity=".5"/>' % (x, VIOLET) for x in range(700, 1420, 26)))
+    # canots de sauvetage (pas assez pour tout le monde)
+    b.append("".join('<rect x="%d" y="716" width="30" height="9" rx="4.5" fill="%s" opacity=".6"/>' % (x, FLAME) for x in range(720, 1300, 64)))
+    # ponts empilés, cabines toutes allumées
+    tiers = [(676, 690, 760, 38), (700, 654, 700, 36), (736, 620, 610, 34), (780, 588, 500, 32), (840, 560, 360, 28)]
+    for i, (x, y, w, h) in enumerate(tiers):
+        b.append('<rect x="%d" y="%d" width="%d" height="%d" fill="%s"/><rect x="%d" y="%d" width="%d" height="3" fill="%s"/>%s'
+                 % (x, y, w, h, MASS2 if i % 2 == 0 else MASS3, x, y, w, EDGE,
+                    windows(x + 12, y + 10, int((w - 20) / 17), 2, 17, 12, 60 + i, 9, 6, .78)))
+    # passerelle de commandement
+    b.append('<path d="M1150 588 L1150 558 L1262 558 L1284 588 Z" fill="%s"/><path d="M1158 566 L1258 566 L1270 580 L1158 580 Z" fill="%s" opacity=".55"/>'
+             % (MASS, VIOLET))
+    # cheminées au fioul lourd
+    for x, top, w, r in ((904, 478, 62, 24), (1000, 500, 50, 18)):
+        b.append('<path d="M%d 560 L%d %d L%d %d L%d 560 Z" fill="%s"/><rect x="%d" y="%d" width="%d" height="10" fill="%s" opacity=".7"/>'
+                 % (x, x + 10, top, x + w - 4, top, x + w + 4, MASS, x + 9, top + 12, w - 12, VIOLET))
+        b.append(plume(x + w / 2 + 2, top - 6, r, 6, 26 if r > 20 else 30))
+    # toboggan aquatique, parce qu'il en faut un
+    b.append('<path d="M872 560 V520 C872 496 826 496 826 520 C826 544 866 540 866 556 C866 574 810 566 800 588" fill="none" stroke="%s" stroke-width="5" opacity=".55" stroke-linecap="round"/>' % VIOLET)
+    # mât et guirlandes
+    b.append('<rect x="1204" y="470" width="3" height="88" fill="%s"/><rect x="1192" y="492" width="27" height="2.5" fill="%s"/>%s' % (EDGE, EDGE, beacon(1205.5, 466, 0)))
+    for (x0, y0), (cx, cy), (x1, y1), n in (((1205, 474), (1380, 640), (1504, 714), 16), ((1205, 474), (1090, 520), (962, 480), 10)):
+        b.append('<path d="M%d %d Q%d %d %d %d" fill="none" stroke="%s" stroke-width="1"/>' % (x0, y0, cx, cy, x1, y1, TRIM))
+        for k in range(1, n):
+            t = k / n
+            px = (1 - t) ** 2 * x0 + 2 * t * (1 - t) * cx + t * t * x1
+            py = (1 - t) ** 2 * y0 + 2 * t * (1 - t) * cy + t * t * y1
+            b.append('<circle class="tw" style="animation-delay:-%ss;animation-duration:2.4s" cx="%s" cy="%s" r="2" fill="%s"/>' % (f(k * .37), f(px), f(py + 2), FLAME2))
+    # reflets et houle
+    rnd = random.Random(12)
+    b.append('<g class="shimmer">' + "".join('<rect x="%d" y="%d" width="%d" height="2" fill="%s"/>'
+             % (rnd.randint(680, 1420), 806 + i * 9, rnd.randint(30, 110), VIOLET if i % 3 else FLAME2) for i in range(14)) + "</g>")
+    b.append('<g class="swell" stroke="%s" stroke-width="2" fill="none">' % HILL +
+             "".join('<path d="M%d %d h%d"/>' % (x, y, l) for x, y, l in
+                     [(40, 800, 160), (330, 822, 220), (60, 880, 260), (520, 905, 180), (1180, 940, 300), (420, 960, 140), (1500, 850, 90)]) + "</g>")
+    return svg("Un paquebot de croisière géant, la nuit, toutes cabines allumées", css, "\n".join(b))
+
+
+# ====================================================== 8. tourisme spatial
+def rocket():
+    css = """
+.lift{animation:lift 24s cubic-bezier(.7,0,.9,.45) infinite}
+@keyframes lift{0%{transform:translate(0,0);opacity:0}3%{opacity:1}22%{transform:translate(0,0)}96%{opacity:1}100%{transform:translate(90px,-1150px);opacity:0}}
+.flame{animation:flick .3s ease-in-out infinite alternate;transform-box:fill-box;transform-origin:50% 0%}
+@keyframes flick{from{transform:scale(1,1)}to{transform:scale(.86,1.2)}}
+.glow{animation:glow 24s ease-out infinite}
+@keyframes glow{0%{opacity:0}8%{opacity:.42}40%{opacity:.3}70%,100%{opacity:0}}
+.billow{animation:billow 24s ease-out infinite;transform-box:fill-box;transform-origin:50% 100%;opacity:0}
+@keyframes billow{0%,6%{opacity:0;transform:translate(0,0) scale(.3)}22%{opacity:.95}70%{opacity:.85}100%{opacity:0;transform:translate(var(--dx),-46px) scale(2.9)}}
+"""
+    b = [sky(77, moon=(380, 150))]
+    b.append(hills(716, 772))
+    # hangar d'assemblage
+    b.append('<rect x="700" y="610" width="190" height="220" fill="%s"/><rect x="700" y="610" width="190" height="6" fill="%s"/>'
+             '<rect x="760" y="650" width="70" height="180" fill="%s"/>%s<rect x="716" y="630" width="30" height="5" fill="%s" opacity=".6"/>'
+             % (MASS2, EDGE, MASS3, "".join('<rect x="%d" y="650" width="1.5" height="180" fill="%s"/>' % (x, TRIM) for x in (777, 795, 813)), VIOLET))
+    b.append('<rect x="890" y="730" width="120" height="100" fill="%s"/><rect x="890" y="730" width="120" height="5" fill="%s"/>%s'
+             % (MASS3, EDGE, windows(902, 748, 5, 3, 21, 22, 8, 12, 9, .6)))
+    # sphères de carburant
+    for x, r in ((1340, 34), (1414, 26)):
+        b.append('<path d="M%d 830 L%d %d M%d 830 L%d %d" stroke="%s" stroke-width="4"/><circle cx="%d" cy="%d" r="%d" fill="%s"/>'
+                 '<path d="M%d %d A%d %d 0 0 1 %d %d" fill="none" stroke="%s" stroke-width="3"/>'
+                 % (x - r + 6, x - r + 12, 830 - r, x + r - 6, x + r - 12, 830 - r, TRIM, x, 826 - r - 8, r, MASS2,
+                    x - r + 5, 826 - r - 12, r - 5, r - 5, x + 4, 826 - 2 * r - 3, EDGE))
+    # paratonnerres
+    for x in (1030, 1300):
+        b.append('<path d="M%d 830 L%d 380" stroke="#2E2740" stroke-width="2.5"/>%s' % (x, x, beacon(x, 378, x / 700, 2)))
+    b.append('<path d="M1030 380 Q1165 430 1300 380" stroke="#2E2740" stroke-width="1" fill="none"/>')
+    # tour de lancement
+    tx = 1110
+    b.append('<rect x="%d" y="470" width="34" height="360" fill="none" stroke="%s" stroke-width="4"/>' % (tx, MASS))
+    b.append("".join('<path d="M%d %d L%d %d M%d %d L%d %d M%d %d H%d" stroke="%s" stroke-width="2.5"/>'
+                     % (tx, y, tx + 34, y + 45, tx + 34, y, tx, y + 45, tx, y + 45, tx + 34, TRIM) for y in range(470, 830, 45)))
+    b.append('<rect x="%d" y="560" width="46" height="5" fill="%s"/><rect x="%d" y="700" width="46" height="5" fill="%s"/>%s'
+             % (tx + 34, MASS, tx + 34, MASS, beacon(tx + 17, 466, .6)))
+    # compte à rebours
+    b.append('<rect x="930" y="672" width="92" height="34" rx="3" fill="#0A080E" stroke="%s" stroke-width="2"/>'
+             '<text x="976" y="696" text-anchor="middle" font-family="ui-monospace,Menlo,monospace" font-size="19" font-weight="700" fill="%s" class="blink">T-00:11</text>'
+             % (TRIM, RED))
+    # les SUV des passagers
+    for i, x in enumerate(range(470, 660, 62)):
+        b.append('<rect x="%d" y="812" width="46" height="14" rx="4" fill="%s"/><rect x="%d" y="804" width="26" height="10" rx="3" fill="%s"/><circle cx="%d" cy="819" r="2" fill="%s"/>'
+                 % (x, MASS3, x + 8, MASS3, x + 46, WHITE))
+    b.append(ground(830))
+    # pas de tir, lueur, nuage de décollage
+    px = 1202
+    b.append('<defs><radialGradient id="fg"><stop offset="0" stop-color="%s" stop-opacity="1"/><stop offset="1" stop-color="%s" stop-opacity="0"/></radialGradient></defs>'
+             '<circle class="glow" cx="%d" cy="806" r="300" fill="url(#fg)"/>' % (FLAME, FLAME, px))
+    b.append('<path d="M%d 830 L%d 816 L%d 816 L%d 830 Z" fill="%s"/>' % (px - 62, px - 46, px + 46, px + 62, MASS))
+    rnd = random.Random(21)
+    for i in range(16):
+        dx = rnd.choice((-1, 1)) * rnd.randint(60, 330)
+        r = rnd.randint(22, 40)
+        c = SMOKE[i % 3]
+        b.append('<g transform="translate(%d 834)"><g class="billow" style="--dx:%dpx;animation-delay:%ss">'
+                 '<circle r="%d" fill="%s"/><circle cx="%s" cy="%s" r="%s" fill="%s"/><circle cx="%s" cy="%s" r="%s" fill="%s"/></g></g>'
+                 % (px + rnd.randint(-24, 24), dx, f(rnd.random() * 2.2), r, c, f(r * .8), f(-r * .4), f(r * .75), c, f(-r * .7), f(-r * .3), f(r * .7), c))
+    # la fusée : 11 minutes d'apesanteur, une vie d'émissions
+    body = "#40375A"
+    b.append('<g class="lift"><g transform="translate(%d 816) scale(1.55)">'
+             '<g class="flame"><path d="M-12 0 Q0 96 12 0 Z" fill="%s"/><path d="M-6 0 Q0 54 6 0 Z" fill="%s"/>'
+             '<path d="M-27 -8 Q-21 40 -15 -8 Z" fill="%s"/><path d="M15 -8 Q21 40 27 -8 Z" fill="%s"/></g>'
+             '<rect x="-28" y="-128" width="13" height="120" rx="6" fill="%s"/><rect x="15" y="-128" width="13" height="120" rx="6" fill="%s"/>'
+             '<path d="M-15 0 L-15 -176 Q0 -236 15 -176 L15 0 Z" fill="%s"/>'
+             '<rect x="-15" y="-150" width="30" height="7" fill="%s" opacity=".75"/><rect x="-15" y="-60" width="30" height="4" fill="%s"/>'
+             '<circle cx="0" cy="-170" r="4.5" fill="%s" opacity=".8"/></g></g>'
+             % (px, FLAME, FLAME2, FLAME, FLAME, EDGE, EDGE, body, VIOLET, TRIM, WHITE))
+    return svg("Une fusée de tourisme spatial au décollage, la nuit", css, "\n".join(b))
+
+
+# ====================================================== 9. golf dans le désert
+def palm(x, base, s=1.0, lean=8):
+    out = ['<g transform="translate(%d %d) scale(%s)" fill="none" stroke="%s" stroke-linecap="round">' % (x, base, f(s), MASS2),
+           '<path d="M0 0 Q%d -60 %d -120" stroke-width="7"/>' % (lean, lean // 2)]
+    for a, l in ((-160, 54), (-125, 60), (-95, 50), (-60, 58), (-25, 56), (10, 48), (-190, 46)):
+        ex, ey = math.cos(math.radians(a)) * l, math.sin(math.radians(a)) * l
+        out.append('<path d="M%d -120 Q%s %s %s %s" stroke-width="5"/>' % (lean // 2, f(lean // 2 + ex * .5), f(-120 + ey * .5 - 16), f(lean // 2 + ex), f(-120 + ey + 14)))
+    out.append("</g>")
+    return "".join(out)
+
+
+def golf():
+    css = """
+.arc{stroke-dasharray:3 9;animation:arc 1s linear infinite}
+@keyframes arc{to{stroke-dashoffset:-24}}
+.cart{animation:cart 70s linear infinite}
+@keyframes cart{from{transform:translateX(-160px)}to{transform:translateX(1760px)}}
+.cone{animation:cone 7s ease-in-out infinite alternate}
+@keyframes cone{from{opacity:.035}to{opacity:.07}}
+"""
+    grass, green = "#15221C", "#1C3026"
+    b = [sky(88, moon=(1290, 140))]
+    b.append('<path d="M0 716 C 220 660 420 706 620 690 C 840 672 1000 650 1200 676 C 1380 700 1500 660 1600 676 V1000 H0 Z" fill="%s"/>' % HILL)
+    # la ville au loin, tours climatisées
+    rnd = random.Random(31)
+    x = 720
+    while x < 1560:
+        w, h = rnd.randint(26, 54), rnd.randint(60, 190)
+        b.append('<rect x="%d" y="%d" width="%d" height="%d" fill="%s"/>%s' % (x, 720 - h, w, h + 30, HILL2, windows(x + 5, 728 - h, int((w - 6) / 10), int(h / 14), 10, 14, x, 4, 5, .4)))
+        x += w + rnd.randint(4, 22)
+    b.append('<path d="M1090 750 L1098 470 L1104 330 L1110 470 L1118 750 Z" fill="%s"/>%s%s' % (MASS3, windows(1100, 500, 1, 16, 8, 15, 3, 5, 6, .7), beacon(1104, 326, 0)))
+    b.append('<path d="M0 772 C 260 742 480 780 700 762 C 940 742 1180 782 1400 760 C 1500 750 1560 762 1600 758 V1000 H0 Z" fill="%s"/>' % HILL2)
+    # projecteurs : on joue de nuit, il fait trop chaud le jour
+    for x, d in ((640, 1), (1530, -1)):
+        b.append('<path class="cone" d="M%d 598 L%d 830 L%d 830 Z" fill="%s"/>' % (x + d * 14, x + d * 60, x + d * 420, WHITE))
+        b.append('<rect x="%d" y="596" width="4" height="234" fill="%s"/><rect x="%d" y="590" width="34" height="10" rx="2" fill="%s"/>%s'
+                 % (x - 2, MASS, x - 17, EDGE, "".join('<rect x="%d" y="593" width="6" height="4" fill="%s" opacity=".9"/>' % (x - 14 + k * 8, WHITE) for k in range(4))))
+    # le parcours : gazon anglais, 45 degrés à l'ombre
+    b.append('<path d="M0 806 C 300 780 600 798 900 786 C 1200 774 1400 796 1600 784 V830 H0 Z" fill="%s"/>' % grass)
+    b.append('<ellipse cx="1060" cy="806" rx="250" ry="15" fill="%s"/>' % green)
+    b.append('<ellipse cx="800" cy="814" rx="70" ry="7" fill="%s"/>' % HILL2)
+    # lac artificiel et sa fontaine
+    b.append('<ellipse cx="1380" cy="812" rx="120" ry="10" fill="#0B0911"/><rect x="1330" y="810" width="70" height="1.5" fill="%s" opacity=".3"/>' % VIOLET)
+    b.append('<g fill="none" stroke="%s" stroke-width="2" opacity=".6"><path class="arc" d="M1380 810 Q1380 730 1362 808"/><path class="arc" d="M1380 810 Q1380 730 1398 808"/><path class="arc" d="M1380 810 V746"/></g>' % WHITE)
+    # drapeau
+    b.append('<rect x="1099" y="736" width="2" height="70" fill="%s" opacity=".7"/><path d="M1101 736 L1128 745 L1101 754 Z" fill="%s"/><ellipse cx="1100" cy="806" rx="6" ry="2" fill="#0A080E"/>' % (WHITE, RED))
+    # arrosage automatique, en continu
+    for x in (720, 930, 1220, 1480):
+        b.append('<rect x="%d" y="798" width="4" height="8" fill="%s"/><g fill="none" stroke="%s" stroke-width="2" opacity=".55">'
+                 '<path class="arc" d="M%d 798 Q%d 742 %d 800"/><path class="arc" d="M%d 798 Q%d 742 %d 800"/></g>'
+                 % (x - 2, EDGE, WHITE, x, x - 44, x - 92, x, x + 44, x + 92))
+    b.append(palm(560, 812, 1.15) + palm(860, 800, .8, -8) + palm(1560, 806, 1.0, -10) + palm(1250, 796, .7))
+    # voiturette
+    b.append('<g class="cart"><g transform="translate(0 800)"><rect x="0" y="0" width="40" height="12" rx="3" fill="%s"/><rect x="6" y="-16" width="26" height="3" fill="%s"/>'
+             '<path d="M8 -14 V0 M30 -14 V0" stroke="%s" stroke-width="2"/><circle cx="9" cy="14" r="4" fill="#0A080E"/><circle cx="31" cy="14" r="4" fill="#0A080E"/>'
+             '<circle cx="40" cy="5" r="2" fill="%s"/></g></g>' % (MASS, EDGE, EDGE, WHITE))
+    b.append(ground(830))
+    return svg("Un golf tout vert en plein désert, arrosé la nuit", css, "\n".join(b))
+
+
 SCENES = {
     "plateforme.svg": oil_rig,
     "serveurs.svg": datacenter,
     "aeroport.svg": airport,
     "ski.svg": ski,
     "autoroute.svg": highway,
+    "croisiere.svg": cruise,
+    "fusee.svg": rocket,
+    "golf.svg": golf,
 }
 
 if __name__ == "__main__":

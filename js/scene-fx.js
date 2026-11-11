@@ -11,7 +11,7 @@
 // Rien ne tourne quand rien ne bouge (la boucle s'arrête d'elle-même), rien
 // du tout avec "réduire les animations", ni onglet caché.
 
-import { WALLPAPERS } from "./wallpapers.js?v=137";
+import { WALLPAPERS } from "./wallpapers.js?v=138";
 
 const MAX_PARTICLES = 240;
 const SHIFT_X = 16;   // px, amplitude de la profondeur
@@ -61,6 +61,12 @@ const KINDS = {
     every: 11, burst: 24,
     make: (x, y, vx, vy) => ({ x, y, vx: vx * 0.1 + rand(-0.5, 0.5), vy: rand(-0.45, -0.1), s: rand(6, 10), gs: rand(0.2, 0.34), a: rand(0.32, 0.46), life: rand(150, 230) }),
     wind: -0.004, lift: -0.002
+  },
+  water: {        // golf : l'arrosage automatique, des gouttes qui retombent
+    colors: ["#bfe3ff", "#8fc7ff", "#ffffff"], shape: "dot", blend: "source-over",
+    every: 6, burst: 40,
+    make: (x, y, vx, vy) => ({ x, y, vx: vx * 0.3 + rand(-1.1, 1.1), vy: rand(-2.6, -1), s: rand(1.2, 2.4), gs: 0, a: rand(0.6, 0.95), life: rand(90, 150) }),
+    wind: 0, lift: 0.05
   }
 };
 
@@ -70,7 +76,10 @@ const KIND_OF = {
   "img/scenes/serveurs.svg": "bits",
   "img/scenes/aeroport.svg": "contrail",
   "img/scenes/ski.svg": "snow",
-  "img/scenes/autoroute.svg": "exhaust"
+  "img/scenes/autoroute.svg": "exhaust",
+  "img/scenes/croisiere.svg": "smoke",
+  "img/scenes/fusee.svg": "embers",
+  "img/scenes/golf.svg": "water"
 };
 
 // Sprite flou pré-rendu par couleur : bien moins cher qu'un dégradé par

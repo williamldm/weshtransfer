@@ -4,6 +4,8 @@
 @keyframes drift{0%{transform:translate(0,0) scale(.5);opacity:0}12%{opacity:.95}100%{transform:translate(300px,-360px) scale(2.2);opacity:0}}
 .blink{animation:blink 2.6s steps(1) infinite}
 @keyframes blink{50%{opacity:.1}}
+.tw{animation:tw 5s ease-in-out infinite}
+@keyframes tw{50%{opacity:.2}}
 
 .flame{animation:flick 1.3s ease-in-out infinite alternate;transform-box:fill-box;transform-origin:50% 100%}
 @keyframes flick{0%{transform:scale(1,1)}40%{transform:scale(.9,1.12)}100%{transform:scale(1.08,.92)}}
@@ -14,7 +16,8 @@
 .heli{animation:heli 46s linear infinite}
 @keyframes heli{0%{transform:translate(1700px,120px)}100%{transform:translate(-200px,60px)}}
 @media (prefers-reduced-motion:reduce){*{animation:none!important}.smoke{opacity:.8}}</style>
-<rect width="1600" height="1000" fill="#0E0B14"/>
+<defs><linearGradient id="hz" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#A48BFF" stop-opacity="0"/><stop offset="1" stop-color="#A48BFF" stop-opacity=".16"/></linearGradient></defs>
+<rect width="1600" height="1000" fill="#0E0B14"/><rect y="330" width="1600" height="510" fill="url(#hz)"/>
 <g fill="#4A4266">
 <circle cx="926" cy="496" r="1.8"/>
 <circle cx="1040" cy="214" r="1"/>
@@ -106,8 +109,18 @@
 <circle cx="438" cy="413" r="1"/>
 <circle cx="1194" cy="344" r="1"/>
 <circle cx="278" cy="157" r="1.8"/>
+</g><g fill="#8279A6">
+<circle class="tw" style="animation-delay:-1.8s" cx="83" cy="384" r="1.8"/>
+<circle class="tw" style="animation-delay:-0.3s" cx="566" cy="440" r="1.8"/>
+<circle class="tw" style="animation-delay:-0.8s" cx="922" cy="261" r="1.8"/>
+<circle class="tw" style="animation-delay:-1.4s" cx="438" cy="231" r="1.8"/>
+<circle class="tw" style="animation-delay:-1.9s" cx="1064" cy="272" r="1.8"/>
+<circle class="tw" style="animation-delay:-3.4s" cx="1466" cy="339" r="1.8"/>
+<circle class="tw" style="animation-delay:-2.3s" cx="152" cy="36" r="1.8"/>
+<circle class="tw" style="animation-delay:-1.4s" cx="1244" cy="41" r="1.8"/>
+<circle class="tw" style="animation-delay:-3.4s" cx="575" cy="312" r="1.8"/>
 </g>
-<circle cx="240" cy="150" r="44" fill="#1A1624"/><circle cx="256" cy="140" r="40" fill="#0E0B14"/>
+<circle cx="240" cy="150" r="78" fill="#A48BFF" opacity=".035"/><circle cx="240" cy="150" r="56" fill="#A48BFF" opacity=".04"/><circle cx="240" cy="150" r="40" fill="#2B2540"/><circle cx="255" cy="141" r="38" fill="#0E0B14"/>
 <g class="heli"><g transform="translate(0 200)"><ellipse cx="0" cy="0" rx="26" ry="9" fill="#3A3252"/><rect x="18" y="-3" width="40" height="4" fill="#3A3252"/><rect x="-34" y="-14" width="68" height="2" fill="#3A3252"/><circle cx="-20" cy="2" r="1.6" fill="#E8674A" class="blink" style="animation-delay:0s"/></g></g>
 <path d="M120 752 L420 752 L400 772 L140 772 Z" fill="#221C2D"/><rect x="330" y="728" width="46" height="24" fill="#221C2D"/><rect x="340" y="712" width="10" height="16" fill="#221C2D"/><rect x="334" y="734" width="8" height="5" fill="#A48BFF" opacity=".55"/><rect x="347" y="734" width="8" height="5" fill="#A48BFF" opacity=".55"/><rect x="360" y="734" width="8" height="5" fill="#E9E4F5" opacity=".3"/><circle cx="345" cy="710" r="1.6" fill="#E8674A" class="blink" style="animation-delay:0.8s"/>
 <rect y="760" width="1600" height="240" fill="#0B0911"/>
