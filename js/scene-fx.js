@@ -11,7 +11,7 @@
 // Rien ne tourne quand rien ne bouge (la boucle s'arrête d'elle-même), rien
 // du tout avec "réduire les animations", ni onglet caché.
 
-import { WALLPAPERS } from "./wallpapers.js?v=138";
+import { WALLPAPERS } from "./wallpapers.js?v=139";
 
 const MAX_PARTICLES = 240;
 const SHIFT_X = 16;   // px, amplitude de la profondeur
@@ -62,6 +62,18 @@ const KINDS = {
     make: (x, y, vx, vy) => ({ x, y, vx: vx * 0.1 + rand(-0.5, 0.5), vy: rand(-0.45, -0.1), s: rand(6, 10), gs: rand(0.2, 0.34), a: rand(0.32, 0.46), life: rand(150, 230) }),
     wind: -0.004, lift: -0.002
   },
+  haze: {         // mode THC : volutes vert pâle, lentes, qui s'étirent
+    colors: ["#8fb59a", "#a7c9b0", "#789e84"], shape: "puff", blend: "source-over",
+    every: 12, burst: 26,
+    make: (x, y, vx, vy) => ({ x, y, vx: vx * 0.08 + rand(-0.25, 0.25), vy: rand(-0.55, -0.2), s: rand(6, 11), gs: rand(0.3, 0.5), a: rand(0.26, 0.4), life: rand(220, 340) }),
+    wind: 0.004, lift: -0.002
+  },
+  joint: {        // mode THC : la braise, quelques étincelles ambrées
+    colors: ["#f2c46b", "#e8904a", "#8fb59a"], shape: "dot", blend: "lighter",
+    every: 9, burst: 36,
+    make: (x, y, vx, vy) => ({ x, y, vx: vx * 0.15 + rand(-0.5, 0.5), vy: rand(-1.3, -0.5), s: rand(2, 3.6), gs: -0.008, a: rand(0.7, 1), life: rand(120, 200), flicker: true }),
+    wind: 0.004, lift: -0.006
+  },
   water: {        // golf : l'arrosage automatique, des gouttes qui retombent
     colors: ["#bfe3ff", "#8fc7ff", "#ffffff"], shape: "dot", blend: "source-over",
     every: 6, burst: 40,
@@ -79,7 +91,14 @@ const KIND_OF = {
   "img/scenes/autoroute.svg": "exhaust",
   "img/scenes/croisiere.svg": "smoke",
   "img/scenes/fusee.svg": "embers",
-  "img/scenes/golf.svg": "water"
+  "img/scenes/golf.svg": "water",
+  "img/scenes/thc-salon.svg": "haze",
+  "img/scenes/thc-serre.svg": "haze",
+  "img/scenes/thc-toit.svg": "joint",
+  "img/scenes/thc-champ.svg": "haze",
+  "img/scenes/thc-snack.svg": "haze",
+  "img/scenes/thc-festival.svg": "haze",
+  "img/scenes/thc-canal.svg": "joint"
 };
 
 // Sprite flou pré-rendu par couleur : bien moins cher qu'un dégradé par

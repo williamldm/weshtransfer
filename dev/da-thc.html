@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WeshTransfer · direction artistique « Mode THC »</title>
+<style>
+:root{--bg:#0B0F0C;--s1:#121915;--s2:#19221C;--s3:#233028;--line:#26332B;--txt:#ECF2EC;--dim:#A3B3A7;--faint:#76877B;
+--leaf:#5FD068;--leaf-d:#2F9E4F;--smoke:#8FB59A;--lamp:#B05CFF;--lamp2:#E26BD8;--amber:#E8B04A;--ember:#E8674A;
+--display:"Outfit",-apple-system,"Segoe UI",sans-serif;--mono:"IBM Plex Mono",ui-monospace,Menlo,monospace}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--txt);font:15px/1.6 -apple-system,"Segoe UI",sans-serif}
+main{max-width:1080px;margin:0 auto;padding:48px 20px 80px}
+h1{font:800 clamp(38px,6vw,68px)/.98 var(--display);letter-spacing:-.04em;margin:8px 0 14px}
+h1 em{font-style:normal;color:var(--leaf)}
+h2{font:700 12px var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--faint);margin:56px 0 16px}
+h3{font:700 20px var(--display);letter-spacing:-.02em;margin:0 0 6px}
+p{margin:0 0 10px;color:var(--dim)}.lead{font-size:17px;max-width:62ch}
+.grid{display:grid;gap:14px}.g2{grid-template-columns:repeat(2,1fr)}.g3{grid-template-columns:repeat(3,1fr)}.g4{grid-template-columns:repeat(4,1fr)}
+.card{background:var(--s1);border:1px solid var(--line);border-radius:14px;padding:20px}
+.sw{height:84px;border-radius:10px;margin-bottom:10px;border:1px solid rgba(255,255,255,.06)}
+.sw-n{font:600 13px var(--display);color:var(--txt)}.sw-v{font:11px var(--mono);color:var(--faint)}
+.mono{font-family:var(--mono)}.tag{display:inline-block;font:11px var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--leaf);margin-bottom:8px}
+.pair{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.pair figure{margin:0}.pair figcaption{font:11px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--faint);margin-top:8px}
+svg{display:block;width:100%;height:auto;border-radius:12px;border:1px solid var(--line)}
+.toggle{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 16px;border:1px solid var(--line);border-radius:12px;background:var(--s2)}
+.sw-t{position:relative;width:46px;height:26px;border-radius:13px;background:var(--leaf-d);flex:none}.sw-t::after{content:"";position:absolute;right:3px;top:3px;width:20px;height:20px;border-radius:50%;background:#fff}
+.btn{display:block;width:100%;padding:13px;border:0;border-radius:10px;font:600 15px var(--display);color:#fff;text-align:center}
+.cmp{display:grid;grid-template-columns:1fr 1fr;gap:0;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.cmp>div{padding:12px 16px;border-bottom:1px solid var(--line);font-size:14px}.cmp>div:nth-child(odd){background:var(--s1);color:var(--faint)}.cmp>div:nth-child(even){background:var(--s2);color:var(--txt)}
+.cmp .hd{font:11px var(--mono);letter-spacing:.12em;text-transform:uppercase}
+ul{margin:0;padding-left:18px;color:var(--dim)}li{margin:4px 0}
+.ticker{background:var(--leaf-d);color:#fff;padding:12px 0;overflow:hidden;white-space:nowrap;font:800 17px var(--display);text-transform:uppercase;border-radius:10px}
+.ticker span{margin-right:22px}.ticker i{font-style:normal;opacity:.6;margin-right:22px}
+.note{border-left:3px solid var(--amber);padding:12px 16px;background:var(--s1);border-radius:0 10px 10px 0}
+@media(max-width:800px){.g2,.g3,.g4,.pair,.cmp{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<main>
+<span class="tag">Direction artistique · option</span>
+<h1>Le transfert de fichiers <em>le plus défoncé</em> du marché.</h1>
+<p class="lead">Même mécanique que la pollution : un faux argument de vente absurde, un décor de nuit en aplats, une blague par écran. Ici, la pollution devient la fumée, le charbon devient la serre, le CO₂ devient le taux de THC. Activable par un interrupteur, jamais imposé.</p>
+
+<h2>01 · Principe</h2>
+<div class="grid g3">
+  <div class="card"><h3>Même squelette</h3><p>Mêmes tokens, mêmes composants, mêmes décors SVG animés en aplats. Seuls la palette, les décors, les textes et la matière des particules changent.</p></div>
+  <div class="card"><h3>Le violet reste</h3><p>Le violet de la marque devient la lumière des lampes de culture (LED violettes). Le vert prend le rôle d'action. Un lien visuel avec le site d'origine, pas une rupture.</p></div>
+  <div class="card"><h3>Le ton</h3><p>Lent, doux, de mauvaise foi. Phrases courtes, hésitations, « attends, j'ai perdu mon fil ». Jamais de conseil de consommation ni de promesse santé : c'est de la parodie.</p></div>
+</div>
+
+<h2>02 · Interrupteur</h2>
+<div class="grid g2">
+  <div class="toggle"><div><strong>Mode THC</strong><br><span style="color:var(--faint);font-size:13px">Change le décor, les couleurs et les blagues. Rien d'autre.</span></div><div class="sw-t"></div></div>
+  <div class="card"><ul><li>Vit dans « Fond d'écran » : une pastille de plus, ou un réglage mémorisé (<span class="mono">localStorage</span>).</li><li>Désactivé par défaut. Jamais activé par un lien, jamais sur la page destinataire sans choix de l'envoyeur.</li><li>Un seul attribut <span class="mono">data-mode="thc"</span> sur <span class="mono">&lt;html&gt;</span> : les jetons CSS font le reste.</li></ul></div>
+</div>
+
+<h2>03 · Palette</h2>
+<div class="grid g4">
+  <div><div class="sw" style="background:#0B0F0C"></div><div class="sw-n">Nuit verte</div><div class="sw-v">#0B0F0C · fond</div></div>
+  <div><div class="sw" style="background:#233028"></div><div class="sw-n">Mousse</div><div class="sw-v">#233028 · masses</div></div>
+  <div><div class="sw" style="background:#5FD068"></div><div class="sw-n">Feuille</div><div class="sw-v">#5FD068 · texte, icônes</div></div>
+  <div><div class="sw" style="background:#2F9E4F"></div><div class="sw-n">Pousse</div><div class="sw-v">#2F9E4F · boutons (blanc 4,6:1)</div></div>
+  <div><div class="sw" style="background:#8FB59A"></div><div class="sw-n">Fumée</div><div class="sw-v">#8FB59A · particules</div></div>
+  <div><div class="sw" style="background:#B05CFF"></div><div class="sw-n">Lampe LED</div><div class="sw-v">#B05CFF · héritage violet</div></div>
+  <div><div class="sw" style="background:#E26BD8"></div><div class="sw-n">Lampe rose</div><div class="sw-v">#E26BD8 · reflets</div></div>
+  <div><div class="sw" style="background:#E8B04A"></div><div class="sw-n">Braise</div><div class="sw-v">#E8B04A · briquet, ambre</div></div>
+</div>
+<p style="margin-top:14px">Règle : un vert d'action, une lumière violette, une braise. Pas de vert fluo plein cadre, pas de dégradé arc-en-ciel, pas de feuille à sept doigts clipart.</p>
+
+<h2>04 · Décor type : la serre</h2>
+<div class="pair">
+<figure>
+<svg viewBox="0 0 800 500" role="img" aria-label="Serre de culture indoor, lampes violettes">
+<defs><linearGradient id="cone" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#B05CFF" stop-opacity=".30"/><stop offset="1" stop-color="#B05CFF" stop-opacity="0"/></linearGradient>
+<linearGradient id="hz" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5FD068" stop-opacity="0"/><stop offset="1" stop-color="#5FD068" stop-opacity=".10"/></linearGradient>
+<g id="plant"><path d="M0 0 V-46" stroke="#2F9E4F" stroke-width="3"/>
+<path id="lf" d="M0 -28 C-6 -40 -26 -48 -38 -40 C-26 -36 -12 -34 0 -28Z" fill="#2F9E4F"/>
+<use href="#lf" transform="scale(-1 1)"/>
+<use href="#lf" transform="translate(0 -12) rotate(-18)"/><use href="#lf" transform="translate(0 -12) scale(-1 1) rotate(-18)"/>
+<use href="#lf" transform="translate(0 -22) scale(.8) rotate(-34)"/><use href="#lf" transform="translate(0 -22) scale(-.8 .8) rotate(-34)"/>
+<path d="M0 -46 C-4 -58 0 -66 0 -70 C0 -66 4 -58 0 -46Z" fill="#5FD068"/></g></defs>
+<rect width="800" height="500" fill="#0B0F0C"/><rect y="150" width="800" height="300" fill="url(#hz)"/>
+<rect y="396" width="800" height="104" fill="#080B09"/>
+<!-- tentes de culture -->
+<rect x="70" y="150" width="270" height="246" rx="6" fill="#141C17" stroke="#26332B" stroke-width="2"/>
+<rect x="460" y="150" width="270" height="246" rx="6" fill="#141C17" stroke="#26332B" stroke-width="2"/>
+<rect x="84" y="164" width="242" height="14" rx="3" fill="#B05CFF" opacity=".85"/><rect x="474" y="164" width="242" height="14" rx="3" fill="#E26BD8" opacity=".8"/>
+<path d="M84 178 L326 178 L370 396 L40 396Z" fill="url(#cone)"/><path d="M474 178 L716 178 L760 396 L430 396Z" fill="url(#cone)"/>
+<g stroke="#26332B" stroke-width="2"><path d="M110 164 V150 M290 164 V150 M500 164 V150 M690 164 V150"/></g>
+<g transform="translate(0 396)">
+<use href="#plant" x="120" transform="translate(0 0)"/><use href="#plant" x="170" transform="translate(0 0) scale(1)"/><use href="#plant" x="225" transform="translate(0 0)"/><use href="#plant" x="280" transform="translate(0 0)"/>
+<use href="#plant" x="510"/><use href="#plant" x="565"/><use href="#plant" x="620"/><use href="#plant" x="675"/></g>
+<g transform="translate(0 396)" fill="#233028"><rect x="104" y="-6" width="40" height="6" rx="2"/><rect x="154" y="-6" width="40" height="6" rx="2"/><rect x="209" y="-6" width="40" height="6" rx="2"/><rect x="264" y="-6" width="40" height="6" rx="2"/><rect x="494" y="-6" width="40" height="6" rx="2"/><rect x="549" y="-6" width="40" height="6" rx="2"/><rect x="604" y="-6" width="40" height="6" rx="2"/><rect x="659" y="-6" width="40" height="6" rx="2"/></g>
+<!-- extracteur et fumée -->
+<rect x="370" y="250" width="60" height="146" rx="4" fill="#19221C"/><circle cx="400" cy="290" r="18" fill="#0F1511" stroke="#26332B" stroke-width="3"/>
+<g fill="#8FB59A" opacity=".35"><circle cx="400" cy="214" r="12"/><circle cx="414" cy="190" r="16"/><circle cx="396" cy="160" r="20"/><circle cx="420" cy="120" r="26"/><circle cx="440" cy="70" r="30"/></g>
+<rect x="390" y="228" width="20" height="22" fill="#19221C"/>
+<!-- diodes -->
+<g fill="#5FD068"><circle cx="388" cy="372" r="3"/><circle cx="400" cy="372" r="3" opacity=".4"/><circle cx="412" cy="372" r="3"/></g>
+</svg>
+<figcaption>Serre — lampes violettes, extracteur qui fume</figcaption>
+</figure>
+<div class="card">
+<h3>Pourquoi ça marche</h3>
+<p>Le violet de la marque éclaire déjà la scène : c'est la lampe. La silhouette est un aplat comme les autres décors, donc les mêmes animations s'appliquent (scintillement des diodes, fumée qui monte, lampes qui vacillent).</p>
+<ul><li>Animations : <span class="mono">.tw</span> sur les diodes, <span class="mono">.smoke</span> sur l'extracteur, léger pompage de la lumière.</li><li>Particules de souris : volutes vert pâle qui montent et s'étirent, lentes.</li><li>Un clic : bouffée de fumée.</li></ul>
+</div>
+</div>
+
+<h2>05 · Neuf décors, miroir des neuf d'origine</h2>
+<div class="cmp">
+<div class="hd">Pollution</div><div class="hd">Mode THC</div>
+<div>Centrale thermique</div><div><strong>La serre</strong> — tentes de culture, lampes LED violettes, extracteur qui fume.</div>
+<div>Plateforme pétrolière, torchère</div><div><strong>Le toit, 3 h du matin</strong> — terrasse, briquet comme torchère, volutes au-dessus de la ville.</div>
+<div>Ferme de serveurs</div><div><strong>Le salon</strong> — canapé, bang géant, table basse, écran qui boucle.</div>
+<div>Aéroport, jets privés</div><div><strong>Le trip</strong> — dirigeable en forme de joint qui décolle, nuages aux contours épais.</div>
+<div>Ski en août</div><div><strong>Champ de chanvre</strong> — rangées au vent, lune énorme, tracteur lent.</div>
+<div>Périphérique, 23 h</div><div><strong>Le snack ouvert 24 h</strong> — enseigne néon, files de voitures, queue au guichet.</div>
+<div>Paquebot de croisière</div><div><strong>Festival</strong> — scène, foule les bras levés, fumée de scène verte.</div>
+<div>Tourisme spatial</div><div><strong>La fusée-joint</strong> — décollage, 11 minutes de « bref ». Compte à rebours : « T-420 ».</div>
+<div>Golf dans le désert</div><div><strong>Dispensaire</strong> — enseigne verte, file d'attente, vitrine de bocaux lumineux.</div>
+</div>
+
+<h2>06 · Lettrage et textes</h2>
+<div class="grid g2">
+  <div class="card"><div class="tag">Titre</div>
+  <div style="font:800 40px/1 var(--display);letter-spacing:-.04em">Le transfert de fichiers <span style="color:var(--leaf)">le plus défoncé</span> du marché.</div>
+  <p style="margin-top:14px">Outfit 800, interlettrage serré, vert feuille sur la partie qui fait rire. Le reste ne change pas.</p></div>
+  <div class="card"><div class="tag">Compteur d'en-tête</div>
+  <div class="mono" style="font-size:12px;letter-spacing:.1em;color:var(--faint)">TAUX DE THC DEPUIS TON ARRIVÉE</div>
+  <div class="mono" style="font-size:26px">0,420 ‰</div>
+  <p style="margin-top:10px">Remplace le CO₂ : monte lentement, redescend si l'onglet est caché (« il a décroché »).</p></div>
+</div>
+<div class="ticker" style="margin-top:14px"><span>Énergie 100 % relax</span><i>✦</i><span>Zéro stress</span><i>✦</i><span>Fichiers à la cool</span><i>✦</i><span>2 Go par fichier, si t'y penses</span><i>✦</i><span>Sans mot de passe, sans pression</span><i>✦</i><span>Bilan carbone : flou</span></div>
+<div class="grid g2" style="margin-top:14px">
+<div class="card"><div class="tag">Phrases de décor (une par fond)</div><ul>
+<li>Serre : « Chaque envoi arrose une plante. »</li><li>Toit : « Le Wi-Fi marche mieux ici, enfin je crois. »</li><li>Salon : « Il reste du fichier ? Non, c'était le dernier. »</li><li>Snack : « Ouvert 24 h. Fermé dans nos têtes. »</li><li>Fusée : « Onze minutes. Deux heures de souvenirs. »</li></ul></div>
+<div class="card"><div class="tag">FAQ</div><ul>
+<li>C'est vraiment le plus défoncé ? — « On a oublié la question. Mais oui. »</li><li>Il faut un compte ? — « Non. Un blaze, c'est déjà beaucoup. »</li><li>Mes fichiers sont en sécurité ? — « Plus que ton briquet. »</li><li>C'est gratuit ? — « Oui. C'est le salon qui régale. »</li></ul></div>
+</div>
+
+<h2>07 · Matière des particules</h2>
+<div class="grid g3">
+<div class="card"><h3>Volutes</h3><p>Souris : traînée de fumée vert pâle, lente, qui s'étire en ruban puis disparaît. Équivalent de <span class="mono">smoke</span>.</p></div>
+<div class="card"><h3>Étincelles</h3><p>Clic : une braise ambre qui grésille, puis un petit nuage. Équivalent de <span class="mono">embers</span>.</p></div>
+<div class="card"><h3>Lueur</h3><p>Sur les décors à lampes : pompage doux de l'opacité, 6 s, comme une respiration.</p></div>
+</div>
+
+<h2>08 · Composants</h2>
+<div class="grid g3">
+<div class="card" style="background:rgba(18,25,21,.85)"><div class="tag">Bouton principal</div><div class="btn" style="background:var(--leaf-d)">Transférer</div><p style="margin-top:10px;font-size:13px">Pousse #2F9E4F, texte blanc. Hover #37B05B.</p></div>
+<div class="card"><div class="tag">Onglet actif</div><div style="border-bottom:2px solid var(--leaf);padding:8px 0;font-weight:600">Envoyer</div><p style="margin-top:10px;font-size:13px">Soulignement feuille. Waveform : jouée en feuille, reste en #36443B.</p></div>
+<div class="card"><div class="tag">Étiquette</div><span style="display:inline-block;padding:4px 10px;border-radius:999px;background:rgba(95,208,104,.12);color:var(--leaf);font:11px var(--mono);letter-spacing:.1em">À LA COOL</span><p style="margin-top:10px;font-size:13px">Pastilles à fond feuille à 12 %, texte feuille.</p></div>
+</div>
+
+<h2>09 · Mise en œuvre</h2>
+<div class="grid g2">
+<div class="card"><ul>
+<li><span class="mono">css/tokens.css</span> : bloc <span class="mono">:root[data-mode="thc"]</span> qui remplace <span class="mono">--accent*</span>, <span class="mono">--bg</span>, <span class="mono">--surface*</span>, <span class="mono">--line*</span>.</li>
+<li><span class="mono">tools/scenes.py</span> : <span class="mono">THC_SCENES</span>, neuf fonctions, même <span class="mono">svg()</span>, sortie dans <span class="mono">img/scenes/thc-*.svg</span>.</li>
+<li><span class="mono">js/wallpapers.js</span> : liste <span class="mono">WALLPAPERS_THC</span>, choisie selon le mode ; pastilles inchangées.</li>
+<li><span class="mono">js/scene-fx.js</span> : <span class="mono">KIND_OF</span> par décor, matières <span class="mono">smoke</span> et <span class="mono">embers</span> réutilisées en vert.</li></ul></div>
+<div class="card"><ul>
+<li>Textes : un dictionnaire <span class="mono">COPY_THC</span> appliqué par <span class="mono">data-copy</span> sur les titres, le ticker et le compteur.</li>
+<li>Mode mémorisé par appareil, jamais côté serveur, jamais dans les liens.</li>
+<li>Les mails et la page destinataire gardent la DA d'origine, sauf choix explicite.</li>
+<li>Fichiers neufs à ajouter en liste blanche dans <span class="mono">.gitignore</span> si besoin.</li></ul></div>
+</div>
+
+<h2>10 · Garde-fous</h2>
+<div class="note"><strong>Parodie, pas de promotion.</strong> Pas de conseils de dosage, pas de marque, pas d'allégation de santé, pas d'incitation. Mention « 18+ » discrète au moment de l'activation. Aucune image de mineur, aucun visage. Le mode ne s'active jamais sans geste de l'utilisateur.</div>
+</main>
+</body>
+</html>

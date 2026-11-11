@@ -97,3 +97,24 @@
   --cat-project:  #7FBF7A;
   --cat-other:    #8E8A98;
 }
+
+/* ---- Mode THC (js/mode.js) : la même maison, version fumette. Le vert
+   prend le rôle du violet ; le violet reste dans les décors (lampes). */
+:root[data-mode="thc"] {
+  --bg:          #0B0F0C;
+  --surface:     #121915;
+  --surface-2:   #19221C;
+  --surface-3:   #233028;
+  --field:       #0E1410;
+  --line:        #212C25;
+  --line-strong: #314037;
+  --text:        #ECF2EC;
+  --text-dim:    #A3B3A7;
+  --text-faint:  #76877B;
+  --accent:        #2A8F47;
+  --accent-hover:  #32A353;
+  --accent-bright: #5FD068;
+  --accent-hi:     #A9EBAE;
+  --accent-soft:   rgba(95, 208, 104, 0.10);
+  --wave-idle:   #33423A;
+}

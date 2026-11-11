@@ -572,9 +572,305 @@ SCENES = {
     "golf.svg": golf,
 }
 
+
+# ================================================================ mode THC
+# Direction parallèle : même dessin en aplats, palette verte, la lumière
+# violette de la marque devient celle des lampes de culture. Les décors
+# sortent dans img/scenes/thc-*.svg.
+LAMP, PINK = "#B05CFF", "#E26BD8"
+THC_PALETTE = dict(BG="#0B0F0C", HILL="#121915", HILL2="#19221C", MASS="#233028", MASS2="#1D2922", MASS3="#19241E",
+                   EDGE="#34463B", TRIM="#263229", SMOKE=["#3F5747", "#37503F", "#48614F"], VIOLET="#5FD068",
+                   WHITE="#ECF2EC", RED="#E8674A", FLAME="#E8904A", FLAME2="#F2C46B", GROUND="#070A08")
+
+
+def weed(x, base, s=1.0, col="#2F9E4F", tip="#5FD068"):
+    leaf = "M0 -26 C-6 -38 -26 -46 -38 -38 C-26 -34 -12 -32 0 -26Z"
+    out = ['<g transform="translate(%s %s) scale(%s)"><path d="M0 0 V-46" stroke="%s" stroke-width="3"/>' % (f(x), f(base), f(s), col)]
+    for tr in ("", "scale(-1 1)", "translate(0 -11) rotate(-18)", "translate(0 -11) scale(-1 1) rotate(-18)",
+               "translate(0 -21) scale(.8) rotate(-34)", "translate(0 -21) scale(-.8 .8) rotate(-34)"):
+        out.append('<path transform="%s" d="%s" fill="%s"/>' % (tr, leaf, col))
+    out.append('<path d="M0 -46 C-4 -58 0 -66 0 -70 C0 -66 4 -58 0 -46Z" fill="%s"/></g>' % tip)
+    return "".join(out)
+
+
+def cone_defs():
+    return ('<defs><linearGradient id="lc" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="%s" stop-opacity=".34"/><stop offset="1" stop-color="%s" stop-opacity="0"/></linearGradient>'
+            '<linearGradient id="pc" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="%s" stop-opacity=".3"/><stop offset="1" stop-color="%s" stop-opacity="0"/></linearGradient></defs>'
+            % (LAMP, LAMP, PINK, PINK))
+
+
+BREATH = """
+.breath{animation:breath 6s ease-in-out infinite alternate}
+@keyframes breath{from{opacity:.65}to{opacity:1}}
+"""
+
+
+def thc_serre():
+    b = [sky(101, moon=(330, 150)), cone_defs(), hills(716, 772)]
+    # trois tentes de culture, lampes allumées 18 heures sur 24
+    for i, (x, w, h) in enumerate(((640, 300, 250), (960, 360, 300), (1340, 220, 220))):
+        y = 830 - h
+        g = "lc" if i != 1 else "pc"
+        b.append('<rect x="%d" y="%d" width="%d" height="%d" rx="6" fill="%s" stroke="%s" stroke-width="3"/>' % (x, y, w, h, HILL, TRIM))
+        b.append('<g class="breath" style="animation-delay:-%ss"><path d="M%d %d H%d L%d 830 H%d Z" fill="url(#%s)"/>'
+                 '<rect x="%d" y="%d" width="%d" height="13" rx="3" fill="%s"/></g>'
+                 % (i * 2, x + 16, y + 30, x + w - 16, x + w - 4, x + 4, g, x + 16, y + 17, w - 32, LAMP if i != 1 else PINK))
+        b.append('<path d="M%d %d V%d M%d %d V%d" stroke="%s" stroke-width="2"/>' % (x + 40, y, y + 17, x + w - 40, y, y + 17, TRIM))
+        n = int((w - 40) / 52)
+        for k in range(n):
+            px = x + 34 + k * (w - 68) / max(1, n - 1)
+            b.append('<rect x="%s" y="820" width="36" height="10" rx="2" fill="%s"/>' % (f(px - 18), MASS))
+            b.append(weed(px, 820, 1.25 if i == 1 else 1.05))
+    # extracteur : l'odeur part chez les voisins
+    b.append('<rect x="930" y="430" width="34" height="100" fill="%s"/><rect x="924" y="424" width="46" height="10" rx="2" fill="%s"/>%s' % (MASS, EDGE, plume(947, 416, 22, 6, 28)))
+    b.append("".join('<circle class="tw" style="animation-delay:-%ss;animation-duration:2.6s" cx="%d" cy="556" r="3" fill="%s"/>' % (f(k * .7), 1250 + k * 14, VIOLET) for k in range(3)))
+    b.append(ground(830))
+    return svg("Une serre de culture, lampes violettes allumées, la nuit", BREATH, "\n".join(b))
+
+
+def thc_toit():
+    css = """
+.ember{animation:ember 4s ease-in-out infinite}
+@keyframes ember{0%,100%{opacity:.5}40%{opacity:1}}
+"""
+    b = [sky(102, moon=(1180, 190), top=520)]
+    b.append('<circle cx="1180" cy="190" r="120" fill="%s" opacity=".03"/>' % VIOLET)
+    rnd = random.Random(19)
+    x = 0
+    while x < 1600:
+        w, h = rnd.randint(50, 110), rnd.randint(60, 240)
+        b.append('<rect x="%d" y="%d" width="%d" height="%d" fill="%s"/>%s' % (x, 760 - h, w, h + 80, HILL2, windows(x + 7, 772 - h, int((w - 8) / 15), int(h / 20), 15, 20, x + 3, 6, 7, .35)))
+        x += w + rnd.randint(0, 18)
+    # le toit, au premier plan
+    b.append('<rect x="560" y="700" width="1040" height="130" fill="%s"/><rect x="560" y="700" width="1040" height="8" fill="%s"/>' % (MASS2, EDGE))
+    b.append("".join('<rect x="%d" y="676" width="4" height="26" fill="%s"/>' % (x, EDGE) for x in range(570, 1600, 90)) + '<rect x="560" y="674" width="1040" height="4" fill="%s"/>' % EDGE)
+    # réservoir d'eau et antenne
+    b.append('<path d="M660 700 L672 620 M740 700 L728 620 M672 660 L728 660" stroke="%s" stroke-width="4"/><rect x="654" y="548" width="92" height="76" rx="4" fill="%s"/>'
+             '<path d="M650 548 L700 520 L750 548 Z" fill="%s"/>' % (TRIM, MASS, EDGE))
+    b.append('<path d="M1500 700 V560 M1480 590 H1520 M1486 612 H1514" stroke="%s" stroke-width="3"/>%s' % (TRIM, beacon(1500, 556, .4)))
+    # canapé, table basse, guirlande
+    b.append('<rect x="930" y="640" width="220" height="48" rx="12" fill="%s"/><rect x="914" y="622" width="34" height="68" rx="12" fill="%s"/><rect x="1132" y="622" width="34" height="68" rx="12" fill="%s"/>'
+             '<rect x="946" y="606" width="188" height="46" rx="14" fill="%s"/><rect x="936" y="688" width="8" height="12" fill="%s"/><rect x="1136" y="688" width="8" height="12" fill="%s"/>'
+             % (MASS, MASS, MASS, MASS3, TRIM, TRIM))
+    b.append('<rect x="1210" y="672" width="110" height="8" rx="3" fill="%s"/><rect x="1222" y="680" width="6" height="20" fill="%s"/><rect x="1302" y="680" width="6" height="20" fill="%s"/>' % (EDGE, TRIM, TRIM))
+    b.append('<ellipse cx="1262" cy="670" rx="20" ry="5" fill="%s"/><path d="M1258 668 L1318 644" stroke="%s" stroke-width="9" stroke-linecap="round"/>'
+             '<circle class="ember" cx="1320" cy="643" r="6" fill="%s"/><circle class="ember" cx="1320" cy="643" r="26" fill="%s" opacity=".18"/>%s'
+             % (TRIM, WHITE, FLAME, FLAME, plume(1324, 628, 16, 6, 22)))
+    for k in range(1, 15):
+        t = k / 15
+        px, py = 700 + t * 800, 520 + 150 * (4 * (t - .5) ** 2) * -1 + 150 + 40 * t
+        b.append('<circle class="tw" style="animation-delay:-%ss;animation-duration:3s" cx="%s" cy="%s" r="3" fill="%s"/>' % (f(k * .4), f(px), f(py - 90), FLAME2 if k % 2 else VIOLET))
+    b.append(ground(830))
+    return svg("Un toit en ville, la nuit, un canapé et une fumée qui monte", css, "\n".join(b))
+
+
+def thc_champ():
+    css = """
+.sway{animation:sway 5s ease-in-out infinite alternate;transform-box:fill-box;transform-origin:50% 100%}
+@keyframes sway{from{transform:rotate(-2.5deg)}to{transform:rotate(2.5deg)}}
+.tractor{animation:tractor 90s linear infinite}
+@keyframes tractor{from{transform:translateX(1700px)}to{transform:translateX(-200px)}}
+"""
+    b = [sky(103, moon=None, top=500)]
+    b.append('<circle cx="1120" cy="470" r="230" fill="%s" opacity=".035"/><circle cx="1120" cy="470" r="170" fill="#1B2A20"/>'
+             '<circle cx="1070" cy="420" r="26" fill="%s" opacity=".5"/><circle cx="1180" cy="520" r="38" fill="%s" opacity=".4"/><circle cx="1150" cy="400" r="14" fill="%s" opacity=".5"/>'
+             % (VIOLET, HILL2, HILL2, HILL2))
+    b.append(hills(690, 740))
+    # grange
+    b.append('<path d="M360 760 V690 L420 650 L480 690 V760 Z" fill="%s"/>%s<rect x="480" y="712" width="90" height="48" fill="%s"/>' % (MASS, windows(396, 708, 2, 1, 34, 20, 4, 18, 14, 1), MASS3))
+    # tracteur, pas pressé
+    b.append('<g class="tractor"><g transform="translate(0 742)"><rect x="0" y="-22" width="44" height="18" rx="3" fill="%s"/><rect x="22" y="-40" width="22" height="20" rx="2" fill="%s"/>'
+             '<circle cx="34" cy="0" r="12" fill="#070A08"/><circle cx="6" cy="4" r="8" fill="#070A08"/><circle cx="-2" cy="-14" r="2.4" fill="%s"/></g></g>' % (MASS, MASS2, WHITE))
+    # rangs de chanvre, du fond vers nous
+    rnd = random.Random(23)
+    for row, (y, sc, col, step) in enumerate(((756, .5, "#1E5A34", 46), (780, .8, "#23703D", 64), (806, 1.15, "#2A8A48", 88), (836, 1.7, "#2F9E4F", 124))):
+        for k, x in enumerate(range(-20 + row * 17, 1640, step)):
+            b.append('<g class="sway" style="animation-delay:-%ss">%s</g>' % (f(rnd.random() * 5), weed(x, y, sc, col, VIOLET if row > 1 else col)))
+    b.append('<rect y="836" width="1600" height="164" fill="%s"/>' % GROUND)
+    return svg("Un champ de chanvre sous une lune énorme", css, "\n".join(b))
+
+
+def thc_snack():
+    css = """
+.neon{animation:neon 5s steps(1) infinite}
+@keyframes neon{0%,100%{opacity:1}71%{opacity:.35}73%{opacity:1}76%{opacity:.5}78%{opacity:1}}
+.lane-a{animation:lanea 60s linear infinite}
+@keyframes lanea{from{transform:translateX(-400px)}to{transform:translateX(400px)}}
+"""
+    b = [sky(104, moon=(280, 160)), cone_defs(), hills(712, 770)]
+    # le snack, ouvert 24 h : la fringale n'a pas d'horaires
+    b.append('<rect x="820" y="610" width="520" height="220" fill="%s"/><rect x="800" y="596" width="560" height="18" rx="3" fill="%s"/>' % (MASS2, EDGE))
+    b.append('<rect x="850" y="676" width="330" height="96" rx="4" fill="%s" opacity=".5"/><path d="M850 772 H1180 L1230 830 H800 Z" fill="url(#lc)"/>' % WHITE)
+    b.append("".join('<rect x="%d" y="676" width="4" height="96" fill="%s"/>' % (x, MASS2) for x in (930, 1014, 1098)))
+    b.append('<path d="M836 676 H1194 L1210 650 H820 Z" fill="%s"/>%s' % (LAMP, "".join('<path d="M%d 650 L%d 676" stroke="%s" stroke-width="10" opacity=".35"/>' % (x - 6, x, BG) for x in range(860, 1200, 44))))
+    b.append('<rect x="1230" y="700" width="70" height="130" fill="%s"/><rect x="1240" y="712" width="50" height="50" fill="%s" opacity=".35"/>' % (MASS3, VIOLET))
+    # enseigne
+    b.append('<rect x="900" y="500" width="360" height="92" rx="8" fill="#070A08" stroke="%s" stroke-width="3"/><path d="M960 592 V598 M1200 592 V598" stroke="%s" stroke-width="6"/>' % (TRIM, TRIM))
+    b.append('<g class="neon"><text x="1080" y="562" text-anchor="middle" font-family="Arial Black,Helvetica,Arial,sans-serif" font-weight="900" font-size="54" fill="%s" letter-spacing="2">SNACK 24H</text>'
+             '<rect x="916" y="576" width="328" height="4" rx="2" fill="%s"/></g>' % (VIOLET, PINK))
+    # cheminée de la friteuse
+    b.append('<rect x="1290" y="552" width="22" height="48" fill="%s"/>%s' % (MASS, plume(1301, 546, 15, 6, 26)))
+    # lampadaires et file de voitures
+    b.append("".join('<path d="M%d 830 V690 h26" stroke="%s" stroke-width="4" fill="none"/><rect x="%d" y="688" width="14" height="5" fill="%s" opacity=".8"/>' % (x, TRIM, x + 20, FLAME2) for x in (620, 1440)))
+    cars = "".join('<rect x="%d" y="812" width="50" height="15" rx="4" fill="%s"/><rect x="%d" y="802" width="28" height="12" rx="4" fill="%s"/><circle cx="%d" cy="820" r="2.2" fill="%s"/>'
+                   % (x, MASS3, x + 10, MASS3, x + 50, WHITE) for x in range(-380, 780, 78))
+    b.append('<g class="lane-a">%s</g>' % cars)
+    b.append(ground(830))
+    return svg("Un snack ouvert 24 heures, enseigne au néon, file de voitures", css, "\n".join(b))
+
+
+def thc_festival():
+    css = """
+.beam{animation:beam 7s ease-in-out infinite alternate;transform-box:fill-box;transform-origin:50% 0%}
+@keyframes beam{from{transform:rotate(-14deg)}to{transform:rotate(14deg)}}
+.bounce{animation:bounce .9s ease-in-out infinite alternate}
+@keyframes bounce{from{transform:translateY(0)}to{transform:translateY(-7px)}}
+"""
+    b = [sky(105, moon=(300, 140)), cone_defs(), hills(716, 772)]
+    # la scène : pont de lumières, enceintes empilées
+    b.append('<rect x="760" y="470" width="14" height="330" fill="%s"/><rect x="1386" y="470" width="14" height="330" fill="%s"/>' % (MASS, MASS))
+    b.append('<rect x="740" y="446" width="680" height="30" fill="none" stroke="%s" stroke-width="4"/>%s' % (MASS, "".join('<path d="M%d 446 L%d 476 L%d 446" stroke="%s" stroke-width="2.5" fill="none"/>' % (x, x + 20, x + 40, TRIM) for x in range(740, 1420, 40))))
+    b.append('<rect x="790" y="520" width="580" height="250" fill="%s"/>' % HILL)
+    for i, x in enumerate(range(800, 1380, 80)):
+        b.append('<g transform="translate(%d 478)"><g class="beam" style="animation-delay:-%ss;animation-duration:%ss"><path d="M-7 0 H7 L70 330 H-70 Z" fill="url(#%s)"/></g>'
+                 '<rect x="-9" y="-2" width="18" height="12" rx="3" fill="%s"/></g>' % (x, f(i * 1.3), 6 + i % 3, "lc" if i % 2 else "pc", EDGE))
+    b.append('<rect x="720" y="770" width="720" height="60" fill="%s"/><rect x="720" y="770" width="720" height="6" fill="%s"/>' % (MASS2, EDGE))
+    for x in (640, 1450):
+        b.append("".join('<rect x="%d" y="%d" width="66" height="52" rx="3" fill="%s"/><circle cx="%d" cy="%d" r="15" fill="#0E1411" stroke="%s" stroke-width="3"/>'
+                         % (x, y, MASS, x + 33, y + 26, TRIM) for y in range(610, 830, 55)))
+    # fumée de scène
+    b.append(plume(900, 770, 26, 5, 24) + plume(1240, 770, 24, 5, 28))
+    b.append(ground(830))
+    # la foule, bras levés
+    rnd = random.Random(29)
+    crowd = []
+    for x in range(520, 1600, 30):
+        y = 842 + rnd.randint(-6, 8)
+        px = x + rnd.randint(-8, 8)
+        g = '<circle cx="%d" cy="%d" r="11" fill="#040605"/><rect x="%d" y="%d" width="26" height="60" rx="10" fill="#040605"/>' % (px, y, px - 13, y + 8)
+        if rnd.random() < .45:
+            g += '<path d="M%d %d L%d %d" stroke="#040605" stroke-width="6" stroke-linecap="round"/>' % (px + 10, y + 14, px + 18 + rnd.randint(-4, 6), y - 26)
+        crowd.append('<g class="bounce" style="animation-delay:-%ss">%s</g>' % (f(rnd.random()), g))
+    b.append("".join(crowd))
+    return svg("Un festival la nuit, faisceaux de lumière et foule bras levés", css, "\n".join(b))
+
+
+def thc_canal():
+    css = """
+.neon{animation:neon 6s steps(1) infinite}
+@keyframes neon{0%,100%{opacity:1}64%{opacity:.4}66%{opacity:1}}
+.swell{animation:swell 9s ease-in-out infinite alternate}
+@keyframes swell{from{transform:translateX(-24px)}to{transform:translateX(24px)}}
+"""
+    b = [sky(106, moon=(1360, 150))]
+    # maisons à pignon le long du canal
+    rnd = random.Random(37)
+    x = 520
+    shop = None
+    k = 0
+    while x < 1560:
+        w, h = rnd.randint(86, 120), rnd.randint(200, 290)
+        y = 770 - h
+        col = [MASS2, MASS3, MASS][k % 3]
+        gable = rnd.choice((0, 1, 2))
+        top = ('M%d %d L%d %d L%d %d Z' % (x, y, x + w / 2, y - 46, x + w, y) if gable == 0 else
+               'M%d %d V%d H%d V%d H%d V%d H%d V%d H%d V%d H%d V%d Z' % (x, y, y - 16, x + w * .25, y - 34, x + w * .4, y - 50, x + w * .6, y - 34, x + w * .75, y - 16, x + w, y) if gable == 1 else
+               'M%d %d Q%d %d %d %d Z' % (x, y, x + w / 2, y - 70, x + w, y))
+        b.append('<rect x="%d" y="%d" width="%d" height="%d" fill="%s"/><path d="%s" fill="%s"/>' % (x, y, w, h, col, top, col))
+        if k == 3:
+            shop = (x, w)
+        else:
+            b.append(windows(x + 14, y + 18, int((w - 16) / 28), int((h - 30) / 44), 28, 44, x, 14, 26, .5))
+        x += w + 4
+        k += 1
+    sx, sw = shop
+    # le coffee shop : vitrine de bocaux, croix verte
+    b.append('<rect x="%d" y="640" width="%d" height="100" rx="3" fill="%s" opacity=".28"/>' % (sx + 10, sw - 20, VIOLET))
+    b.append("".join('<rect x="%d" y="%d" width="12" height="18" rx="3" fill="%s" opacity=".85"/>' % (sx + 18 + c * 20, 656 + r * 34, FLAME2 if (c + r) % 3 == 0 else VIOLET)
+                     for c in range(int((sw - 30) / 20)) for r in range(2)))
+    b.append('<rect x="%d" y="740" width="%d" height="30" fill="%s"/>' % (sx, sw, MASS))
+    cx = sx + sw / 2
+    b.append('<g class="neon"><path d="M%s 560 h18 v18 h18 v18 h-18 v18 h-18 v-18 h-18 v-18 h18 Z" fill="%s"/><circle cx="%s" cy="596" r="60" fill="%s" opacity=".07"/></g>' % (f(cx - 9), VIOLET, f(cx), VIOLET))
+    b.append(plume(sx + sw - 16, 760 - 300, 12, 5, 26))
+    # quai, vélos, canal
+    b.append('<rect x="0" y="770" width="1600" height="16" fill="%s"/><rect x="0" y="770" width="1600" height="3" fill="%s"/>' % (MASS, EDGE))
+    for bx in (700, 760, 1180, 1420):
+        b.append('<g transform="translate(%d 758)" fill="none" stroke="%s" stroke-width="2.5"><circle cx="0" cy="0" r="11"/><circle cx="34" cy="0" r="11"/><path d="M0 0 L12 -16 H28 L34 0 M12 -16 L20 0 H0 M28 -16 L30 -22 h6"/></g>' % (bx, EDGE))
+    b.append("".join('<path d="M%d 770 V736 M%d 736 h-8 h16" stroke="%s" stroke-width="3"/><circle cx="%d" cy="734" r="4" fill="%s" opacity=".9"/>' % (x, x, TRIM, x, FLAME2) for x in (620, 1000, 1500)))
+    b.append('<rect y="786" width="1600" height="214" fill="#080C0A"/>')
+    b.append('<g class="swell">' + "".join('<rect x="%d" y="%d" width="%d" height="2" fill="%s" opacity="%s"/>'
+             % (rnd.randint(500, 1500), 796 + i * 10, rnd.randint(30, 120), VIOLET if i % 3 else FLAME2, ".22" if i < 6 else ".1") for i in range(16)) + "</g>")
+    return svg("Un canal bordé de maisons à pignon, un coffee shop à croix verte", css, "\n".join(b))
+
+
+def thc_salon():
+    css = """
+.lava{animation:lava 9s ease-in-out infinite alternate;transform-box:fill-box;transform-origin:50% 50%}
+@keyframes lava{from{transform:translateY(0) scale(1)}to{transform:translateY(-46px) scale(.8,1.25)}}
+.bub{animation:bub 2.2s ease-in infinite;opacity:0}
+@keyframes bub{0%{opacity:0;transform:translateY(0)}20%{opacity:.8}100%{opacity:0;transform:translateY(-70px)}}
+.ember{animation:ember 4s ease-in-out infinite}
+@keyframes ember{0%,100%{opacity:.5}40%{opacity:1}}
+.tv{animation:tv 3s steps(1) infinite}
+@keyframes tv{0%{opacity:.5}33%{opacity:.7}66%{opacity:.4}}
+"""
+    b = ['<rect width="1600" height="1000" fill="%s"/>' % BG, cone_defs()]
+    # le mur, la fenêtre sur la nuit, l'affiche de travers
+    b.append('<rect y="0" width="1600" height="830" fill="%s"/>' % HILL)
+    b.append('<rect x="640" y="250" width="250" height="300" rx="4" fill="%s" stroke="%s" stroke-width="8"/><path d="M765 250 V550 M640 400 H890" stroke="%s" stroke-width="6"/>'
+             '<circle cx="820" cy="320" r="26" fill="#2B3A30"/><circle cx="830" cy="313" r="24" fill="%s"/>' % (BG, TRIM, TRIM, BG))
+    b.append("".join('<circle class="tw" style="animation-delay:-%ss" cx="%d" cy="%d" r="1.6" fill="#7E9A86"/>' % (f(k * .9), x, y)
+                     for k, (x, y) in enumerate(((670, 290), (720, 350), (700, 470), (850, 440), (790, 500), (740, 290)))))
+    b.append('<g transform="rotate(-4 1420 380)"><rect x="1350" y="290" width="140" height="180" fill="%s" stroke="%s" stroke-width="4"/>%s</g>'
+             % (MASS3, TRIM, weed(1420, 440, 1.5)))
+    # lampe à lave
+    b.append('<path d="M1220 700 L1232 560 Q1245 520 1258 560 L1270 700 Z" fill="%s" opacity=".28"/><path d="M1210 700 H1280 L1272 730 H1218 Z" fill="%s"/><rect x="1236" y="530" width="18" height="12" rx="3" fill="%s"/>'
+             '<circle class="lava" cx="1245" cy="672" r="13" fill="%s"/><circle class="lava" style="animation-delay:-4s;animation-duration:7s" cx="1250" cy="640" r="8" fill="%s"/>'
+             % (LAMP, MASS, MASS, PINK, LAMP))
+    b.append('<circle cx="1245" cy="630" r="150" fill="%s" opacity=".05"/>' % LAMP)
+    # meuble bas et télé qui tourne dans le vide
+    b.append('<rect x="1180" y="730" width="330" height="100" rx="4" fill="%s"/><rect x="1180" y="730" width="330" height="6" fill="%s"/>' % (MASS2, EDGE))
+    b.append('<rect x="1320" y="610" width="170" height="104" rx="6" fill="#070A08" stroke="%s" stroke-width="4"/><rect class="tv" x="1328" y="618" width="154" height="88" rx="3" fill="%s"/><rect x="1396" y="714" width="18" height="16" fill="%s"/>'
+             % (TRIM, VIOLET, TRIM))
+    # canapé
+    b.append('<rect x="560" y="640" width="470" height="150" rx="26" fill="%s"/><rect x="530" y="690" width="70" height="130" rx="24" fill="%s"/><rect x="990" y="690" width="70" height="130" rx="24" fill="%s"/>'
+             '<rect x="580" y="730" width="430" height="80" rx="18" fill="%s"/><rect x="620" y="660" width="170" height="80" rx="20" fill="%s"/><rect x="800" y="660" width="170" height="80" rx="20" fill="%s"/>'
+             % (MASS, MASS2, MASS2, MASS3, MASS2, MASS2))
+    # table basse : le bang, le cendrier, la boîte à pizza
+    b.append('<rect x="700" y="806" width="420" height="14" rx="4" fill="%s"/><rect x="720" y="820" width="10" height="10" fill="%s"/><rect x="1090" y="820" width="10" height="10" fill="%s"/>' % (EDGE, TRIM, TRIM))
+    b.append('<rect x="760" y="792" width="110" height="14" rx="2" fill="%s"/><rect x="760" y="792" width="110" height="3" fill="%s"/>' % (MASS2, EDGE))
+    bx = 960
+    b.append('<path d="M%d 806 Q%d 740 %d 730 V600 H%d V730 Q%d 740 %d 806 Z" fill="%s" opacity=".3" stroke="%s" stroke-width="3"/>'
+             % (bx - 34, bx - 40, bx - 13, bx + 13, bx + 40, bx + 34, VIOLET, VIOLET))
+    b.append('<rect x="%d" y="594" width="34" height="8" rx="4" fill="%s"/><path d="M%d 762 L%d 728" stroke="%s" stroke-width="7" stroke-linecap="round"/><path d="M%d 724 h18 l-4 10 h-10 Z" fill="%s"/>'
+             '<circle class="ember" cx="%d" cy="724" r="5" fill="%s"/><path d="M%d 806 Q%d 772 %d 772 Q%d 772 %d 806 Z" fill="%s" opacity=".45"/>'
+             % (bx - 17, VIOLET, bx + 26, bx + 62, EDGE, bx + 54, EDGE, bx + 63, FLAME, bx - 32, bx - 36, bx, bx + 36, bx + 32, VIOLET))
+    b.append("".join('<circle class="bub" style="animation-delay:-%ss" cx="%d" cy="780" r="%s" fill="%s"/>' % (f(k * .5), bx - 14 + k * 9, "3" if k % 2 else "4", WHITE) for k in range(4)))
+    b.append(plume(bx, 590, 14, 6, 24))
+    b.append('<ellipse cx="1060" cy="804" rx="24" ry="5" fill="%s"/><path d="M1052 800 L1086 788" stroke="%s" stroke-width="5" stroke-linecap="round"/><circle class="ember" cx="1087" cy="787.5" r="4" fill="%s"/>%s'
+             % (TRIM, WHITE, FLAME, plume(1090, 778, 8, 5, 20)))
+    b.append(ground(830))
+    return svg("Un salon la nuit : canapé, bang sur la table basse, lampe à lave", css, "\n".join(b))
+
+
+THC_SCENES = {
+    "thc-salon.svg": thc_salon,
+    "thc-serre.svg": thc_serre,
+    "thc-toit.svg": thc_toit,
+    "thc-champ.svg": thc_champ,
+    "thc-snack.svg": thc_snack,
+    "thc-festival.svg": thc_festival,
+    "thc-canal.svg": thc_canal,
+}
+
 if __name__ == "__main__":
     OUT.mkdir(parents=True, exist_ok=True)
     for name, fn in SCENES.items():
+        data = fn()
+        (OUT / name).write_text(data, encoding="utf-8")
+        print(f"{name:16} {len(data) / 1024:5.1f} Ko")
+    globals().update(THC_PALETTE)
+    for name, fn in THC_SCENES.items():
         data = fn()
         (OUT / name).write_text(data, encoding="utf-8")
         print(f"{name:16} {len(data) / 1024:5.1f} Ko")

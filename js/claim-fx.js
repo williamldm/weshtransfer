@@ -10,12 +10,14 @@
 // Le texte reste lisible par les lecteurs d'écran (aria-label), le découpage
 // en lettres leur est caché. Rien ne bouge avec "réduire les animations".
 
+import { isThc } from "./mode.js?v=139";
+
 // Le grand titre change d'une visite à l'autre. [début, partie en feu, fin] :
 // la partie du milieu est celle qui brûle, elle finit la phrase quand il
 // n'y a pas de fin (le point est alors dedans, sinon il se décollerait).
 // Première visite : la phrase de marque ; ensuite, toutes les autres dans
 // un ordre mélangé, sans répétition avant d'avoir fait le tour.
-const CLAIMS = [
+const CLAIMS_POLLUTION = [
   ["Le transfert de fichiers", "le moins écoresponsable", "du marché."],
   ["Tes fichiers voyagent", "en jet privé."],
   ["Chaque mégaoctet fait", "fondre un glaçon", "quelque part."],
@@ -31,7 +33,21 @@ const CLAIMS = [
   ["Zéro compression.", "Zéro remords."],
   ["Le transfert qui", "chauffe la planète", "pour toi."]
 ];
-const CLAIM_KEY = "weshtransfer.claims";
+// Mode THC : mêmes règles, autre matière.
+const CLAIMS_THC = [
+  ["Le transfert de fichiers", "le plus défoncé", "du marché."],
+  ["Tes fichiers arrivent.", "Tranquille."],
+  ["Envoie lourd.", "Plane léger."],
+  ["Le cloud,", "mais en nuage de fumée."],
+  ["Du 24 bits,", "zéro pression."],
+  ["Livré vite.", "Enfin, vite..."],
+  ["Chaque envoi", "arrose une plante."],
+  ["Ton mix tourne.", "La pièce aussi."],
+  ["Zéro compression.", "Zéro stress."],
+  ["On a oublié", "ce qu'on voulait dire."]
+];
+const CLAIMS = isThc ? CLAIMS_THC : CLAIMS_POLLUTION;
+const CLAIM_KEY = isThc ? "weshtransfer.claims.thc" : "weshtransfer.claims";
 
 function pickClaim() {
   let st = null;
@@ -150,7 +166,7 @@ export function mountClaim(claim) {
     new IntersectionObserver((entries) => { visible = entries[0].isIntersecting; }).observe(claim);
   }
   let fx = null;
-  import("./scene-fx.js?v=138").then((m) => { fx = m; }).catch(() => {});
+  import("./scene-fx.js?v=139").then((m) => { fx = m; }).catch(() => {});
   setInterval(() => {
     if (!fx || !visible || document.hidden || !letters.length) return;
     const l = letters[Math.floor(Math.random() * letters.length)];

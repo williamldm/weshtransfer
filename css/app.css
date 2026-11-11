@@ -1,5 +1,5 @@
-@import url("fonts.css?v=138");
-@import url("tokens.css?v=138");
+@import url("fonts.css?v=139");
+@import url("tokens.css?v=139");
 
 /* ================================================================= base */
 *, *::before, *::after { box-sizing: border-box; }
@@ -1698,4 +1698,34 @@ body.hub .deck { border-color: rgba(164, 139, 255, .16); border-radius: 16px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .mode, .mode:hover { transform: none; }
+}
+
+
+/* ============================================ Mode THC (js/mode.js) */
+/* interrupteur, dans l'en-tête de l'accueil */
+.hub-right { display: flex; align-items: center; gap: var(--sp-4); }
+.mode-switch { display: inline-flex; align-items: center; gap: 8px; min-height: 34px; padding: 4px 6px 4px 12px; border: 1px solid var(--line-strong); border-radius: var(--r-pill); background: rgba(15, 13, 19, .6); color: var(--text-dim); font-family: var(--mono); font-size: 10px; letter-spacing: .12em; text-transform: uppercase; cursor: pointer; -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); transition: border-color .15s, color .15s; }
+.mode-switch:hover { border-color: var(--accent-bright); color: var(--text); }
+.mode-switch i { position: relative; width: 34px; height: 20px; border-radius: 10px; background: var(--surface-3); transition: background .2s; }
+.mode-switch i::after { content: ""; position: absolute; left: 3px; top: 3px; width: 14px; height: 14px; border-radius: 50%; background: var(--text-dim); transition: transform .2s cubic-bezier(.3, 1.4, .5, 1), background .2s; }
+.mode-switch[aria-checked="true"] { color: var(--accent-bright); border-color: rgba(95, 208, 104, .4); }
+.mode-switch[aria-checked="true"] i { background: var(--accent); }
+.mode-switch[aria-checked="true"] i::after { transform: translateX(14px); background: #fff; }
+@media (max-width: 480px) { .hub-right { gap: var(--sp-3); } .mode-switch { padding-left: 10px; } }
+
+/* les quelques violets écrits en dur passent au vert */
+:root[data-mode="thc"] { background-color: #0B0F0C; }
+:root[data-mode="thc"] .scene { background: #0B0F0C; }
+:root[data-mode="thc"] body.hub .deck { background: rgba(14, 20, 16, .8); border-color: rgba(95, 208, 104, .18); }
+:root[data-mode="thc"] .wp-bar { background: rgba(11, 15, 12, .7); border-color: rgba(95, 208, 104, .18); }
+:root[data-mode="thc"] .wp-next:hover { background: rgba(95, 208, 104, .2); }
+:root[data-mode="thc"] .mode:hover { border-color: rgba(95, 208, 104, .45); }
+:root[data-mode="thc"] .mode-switch { background: rgba(11, 15, 12, .6); }
+:root[data-mode="thc"] .logo .monogram path:first-child { fill: #5FD068; }
+@media (min-width: 860px) {
+  :root[data-mode="thc"] body.hub .scene::after, :root[data-mode="thc"] body.app .scene::after, :root[data-mode="thc"] body.public .scene::after {
+    background:
+      radial-gradient(60% 55% at 50% 0%, rgba(95, 208, 104, .14), transparent 70%),
+      var(--scene) center calc(var(--band) - var(--img-h) * .83 - 12px) / max(100vw, 160vh) auto no-repeat;
+  }
 }
