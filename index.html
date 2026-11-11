@@ -26,8 +26,8 @@
 <link rel="icon" href="img/favicon.svg" type="image/svg+xml">
 <link rel="icon" href="img/favicon-32.png" sizes="32x32" type="image/png">
 <link rel="apple-touch-icon" href="img/apple-touch-icon.png">
-<link rel="stylesheet" href="css/app.css?v=139">
-<script type="module" src="js/wallpaper-boot.js?v=139" blocking="render"></script>
+<link rel="stylesheet" href="css/app.css?v=140">
+<script type="module" src="js/wallpaper-boot.js?v=140" blocking="render"></script>
 </head>
 <body class="hub">
 
@@ -73,28 +73,28 @@
   <div class="modes">
     <button type="button" class="mode reveal" data-tab="send">
       <span class="mode-ico" data-icon="send"></span>
-      <span class="mode-kicker">01 · Envoyer</span>
-      <strong>Un lien, et ça part</strong>
-      <span class="mode-text">Dépose tes fichiers, partage le lien. Ils écoutent avant de télécharger, tout s'efface au bout de 7 jours.</span>
+      <span class="mode-kicker" data-thc="01 · Faire tourner">01 · Envoyer</span>
+      <strong data-thc="Un lien, et ça plane">Un lien, et ça part</strong>
+      <span class="mode-text" data-thc="Pose tes fichiers, fais tourner le lien. Ils écoutent avant de télécharger, tout s'évapore au bout de 7 jours.">Dépose tes fichiers, partage le lien. Ils écoutent avant de télécharger, tout s'efface au bout de 7 jours.</span>
       <span class="mode-go">Envoyer un fichier <i>&rarr;</i></span>
     </button>
     <button type="button" class="mode reveal" data-tab="salon">
       <span class="mode-ico" data-icon="headphones"></span>
-      <span class="mode-kicker">02 · Séminaire</span>
-      <strong>La villa, en ligne</strong>
-      <span class="mode-text">Une jam privée : chacun ajoute ses sons à la file, tout le monde écoute en même temps.</span>
+      <span class="mode-kicker" data-thc="02 · Session">02 · Séminaire</span>
+      <strong data-thc="Le salon, en ligne">La villa, en ligne</strong>
+      <span class="mode-text" data-thc="Une session entre potes : chacun pose son son à la file, tout le monde écoute en même temps. Qui a la télécommande ?">Une jam privée : chacun ajoute ses sons à la file, tout le monde écoute en même temps.</span>
       <span class="mode-go">Lancer un séminaire <i>&rarr;</i></span>
     </button>
     <button type="button" class="mode reveal" data-tab="revue">
       <span class="mode-ico" data-icon="comment"></span>
       <span class="mode-kicker">03 · Verdict</span>
-      <strong>Le mix, à la seconde près</strong>
-      <span class="mode-text">L'artiste commente sur la waveform, l'ingé corrige, version après version, jusqu'à la validation.</span>
+      <strong data-thc="Le mix, à tête reposée">Le mix, à la seconde près</strong>
+      <span class="mode-text" data-thc="L'artiste commente sur la waveform, l'ingé corrige, version après version. Personne ne se presse, tout le monde valide.">L'artiste commente sur la waveform, l'ingé corrige, version après version, jusqu'à la validation.</span>
       <span class="mode-go">Demander un verdict <i>&rarr;</i></span>
     </button>
   </div>
 
-  <h2 class="label-mono reveal">Nos engagements</h2>
+  <h2 class="label-mono reveal" data-thc="Nos promesses (de ce qu'on s'en souvient)">Nos engagements</h2>
   <div class="pledges">
     <article class="pledge reveal">
       <p class="pledge-stat"><b data-count="100" data-from="0">100</b><span>%</span></p>
@@ -103,21 +103,21 @@
     </article>
     <article class="pledge reveal">
       <p class="pledge-stat"><b data-count="1" data-from="9">1</b><span>blaze</span></p>
-      <h3>Zéro mot de passe</h3>
+      <h3 data-thc="Zéro prise de tête">Zéro mot de passe</h3>
       <p data-thc="Ni inscription, ni prise de tête. Un blaze suffit, pour toi comme pour ceux qui reçoivent. Ton email sert de clé, avec un code.">Ni inscription, ni arbre planté. Un blaze suffit, pour toi comme pour ceux qui reçoivent. Ton email sert de clé, avec un code.</p>
     </article>
     <article class="pledge reveal">
       <p class="pledge-stat"><b data-count="0" data-from="100">0</b><span>trace</span></p>
-      <h3>Suppression automatique</h3>
+      <h3 data-thc="Ça s'évapore tout seul">Suppression automatique</h3>
       <p data-thc="Comme ta mémoire à court terme : tout disparaît à la date prévue. Tu peux aussi tout effacer toi-même.">On n'est pas des monstres : tout disparaît à la date prévue. Tu peux aussi tout effacer toi-même.</p>
     </article>
   </div>
 
   <div class="hub-faq">
     <div class="faq-side reveal">
-      <h2 class="label-mono">Questions (rarement) posées</h2>
+      <h2 class="label-mono" data-thc="Questions (posées deux fois)">Questions (rarement) posées</h2>
       <p class="faq-title" data-thc="On répond à tout. &lt;em&gt;Lentement, mais bien.&lt;/em&gt;">On répond à tout. <em>Mal, mais vite.</em></p>
-      <p class="faq-sub">Touche une question, la réponse arrive.</p>
+      <p class="faq-sub" data-thc="Touche une question. La réponse arrive, à son rythme.">Touche une question, la réponse arrive.</p>
     </div>
     <div class="chat">
       <p class="chat-head"><img src="img/favicon.svg" alt="" width="18" height="18"><span>WeshTransfer<small data-thc="en ligne, plus ou moins">en ligne, malheureusement</small></span></p>
@@ -126,23 +126,23 @@
         <div class="chat-answer"><span class="chat-typing"><i></i><i></i><i></i></span><p data-thc="On a oublié la question. Mais oui. Et on efface tout à la date prévue : ça, on s'en souvient.">On fait de notre mieux. Mais en vrai, on efface tout à la date prévue. Quelque part sous le charbon, on a un cœur.</p></div>
       </details>
       <details class="reveal">
-        <summary>Il faut un compte ?</summary>
-        <div class="chat-answer"><span class="chat-typing"><i></i><i></i><i></i></span><p>Non, un blaze suffit. Pour l'email, un code à 6 chiffres, une fois par appareil.</p></div>
+        <summary data-thc="Il faut un compte ? Genre, s'inscrire ?">Il faut un compte ?</summary>
+        <div class="chat-answer"><span class="chat-typing"><i></i><i></i><i></i></span><p data-thc="Non, un blaze suffit. Pour l'email, un code à 6 chiffres, une fois par appareil. Note-le, tu vas l'oublier.">Non, un blaze suffit. Pour l'email, un code à 6 chiffres, une fois par appareil.</p></div>
       </details>
       <details class="reveal">
-        <summary>Je peux envoyer quoi ?</summary>
+        <summary data-thc="Je peux envoyer quoi, déjà ?">Je peux envoyer quoi ?</summary>
         <div class="chat-answer"><span class="chat-typing"><i></i><i></i><i></i></span><p data-thc="Tout, jusqu'à 2 Go par fichier et 3 Go par jour. Sauf les programmes : on plane, mais proprement.">Tout, jusqu'à 2 Go par fichier et 3 Go par jour. Sauf les programmes : on pollue, mais proprement.</p></div>
       </details>
       <details class="reveal">
-        <summary>Séminaire, Verdict : la différence ?</summary>
-        <div class="chat-answer"><span class="chat-typing"><i></i><i></i><i></i></span><p>Le séminaire, c'est la villa : une jam où chacun ajoute ses sons à la file et où tout le monde écoute en même temps. Le verdict, c'est le studio : l'artiste commente le mix à la seconde près, l'ingé corrige.</p></div>
+        <summary data-thc="Séminaire, Verdict : c'est quoi la différence, frère ?">Séminaire, Verdict : la différence ?</summary>
+        <div class="chat-answer"><span class="chat-typing"><i></i><i></i><i></i></span><p data-thc="Le séminaire, c'est le salon : chacun pose ses sons à la file et tout le monde écoute en même temps. Le verdict, c'est le studio : l'artiste commente le mix à la seconde près, l'ingé corrige. Dans les deux cas, quelqu'un a apporté à manger.">Le séminaire, c'est la villa : une jam où chacun ajoute ses sons à la file et où tout le monde écoute en même temps. Le verdict, c'est le studio : l'artiste commente le mix à la seconde près, l'ingé corrige.</p></div>
       </details>
       <details class="reveal">
-        <summary>Qui peut entrer dans mon séminaire ?</summary>
-        <div class="chat-answer"><span class="chat-typing"><i></i><i></i><i></i></span><p>Seulement ceux que tu invites par email, code à l'appui. Même nous, on n'a pas les clés.</p></div>
+        <summary data-thc="Qui peut entrer dans mon salon ?">Qui peut entrer dans mon séminaire ?</summary>
+        <div class="chat-answer"><span class="chat-typing"><i></i><i></i><i></i></span><p data-thc="Seulement ceux que tu invites par email, code à l'appui. Même nous, on n'a pas les clés. On les a perdues, d'ailleurs.">Seulement ceux que tu invites par email, code à l'appui. Même nous, on n'a pas les clés.</p></div>
       </details>
       <details class="reveal">
-        <summary>C'est gratuit ?</summary>
+        <summary data-thc="C'est gratuit ? Sérieux ?">C'est gratuit ?</summary>
         <div class="chat-answer"><span class="chat-typing"><i></i><i></i><i></i></span><p data-thc="Oui. C'est le salon qui régale.">Oui. C'est la planète qui paie.</p></div>
       </details>
     </div>
@@ -158,6 +158,6 @@
 <div id="sheets"></div>
 <div class="toast-wrap" id="toasts" aria-live="polite"></div>
 
-<script type="module" src="js/hub.js?v=139"></script>
+<script type="module" src="js/hub.js?v=140"></script>
 </body>
 </html>

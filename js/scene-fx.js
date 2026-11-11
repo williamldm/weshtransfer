@@ -11,7 +11,7 @@
 // Rien ne tourne quand rien ne bouge (la boucle s'arrête d'elle-même), rien
 // du tout avec "réduire les animations", ni onglet caché.
 
-import { WALLPAPERS } from "./wallpapers.js?v=139";
+import { WALLPAPERS } from "./wallpapers.js?v=140";
 
 const MAX_PARTICLES = 240;
 const SHIFT_X = 16;   // px, amplitude de la profondeur
@@ -94,11 +94,11 @@ const KIND_OF = {
   "img/scenes/golf.svg": "water",
   "img/scenes/thc-salon.svg": "haze",
   "img/scenes/thc-serre.svg": "haze",
-  "img/scenes/thc-toit.svg": "joint",
-  "img/scenes/thc-champ.svg": "haze",
-  "img/scenes/thc-snack.svg": "haze",
-  "img/scenes/thc-festival.svg": "haze",
-  "img/scenes/thc-canal.svg": "joint"
+  "img/scenes/thc-van.svg": "joint",
+  "img/scenes/thc-balcon.svg": "haze",
+  "img/scenes/thc-studio.svg": "haze",
+  "img/scenes/thc-cuisine.svg": "haze",
+  "img/scenes/thc-champ.svg": "joint"
 };
 
 // Sprite flou pré-rendu par couleur : bien moins cher qu'un dégradé par

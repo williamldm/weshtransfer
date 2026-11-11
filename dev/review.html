@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Banc : page d'un morceau (Verdict)</title>
-<link rel="stylesheet" href="../css/app.css?v=139">
+<link rel="stylesheet" href="../css/app.css?v=140">
 <!-- Banc local : faux serveur (fetch), aucune donnée réelle. ?role=artist pour la vue artiste. -->
 <script>
 const role = new URLSearchParams(location.search).get("role") === "artist" ? "artist" : "eng";
@@ -39,7 +39,7 @@ window.fetch = async (input, init) => {
 <header class="app-header" id="header"></header>
 <main class="app-main"><div id="view"></div></main>
 <script type="module">
-import { mount } from "../js/views/file.js?v=139";
+import { mount } from "../js/views/file.js?v=140";
 const space = { id: "s1", participantId: ME, name: "Yagiza", code: "YAGIZ7", pseudo: role === "eng" ? "William" : "Yagiza", mode: "revue", isHost: role === "eng", viewer: false };
 const ctx = { space, online: new Set(), bus: { on: () => () => {}, emit() {} }, navigate() {}, setTitle() {}, setBack() {}, setDrop() {} };
 document.getElementById("header").innerHTML = '<span class="brand-dot"></span><div class="title">Nuit blanche</div>';
