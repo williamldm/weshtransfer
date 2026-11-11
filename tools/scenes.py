@@ -149,8 +149,8 @@ def datacenter():
     css = """
 .fan{animation:spin 1.6s linear infinite;transform-box:fill-box;transform-origin:50% 50%}
 @keyframes spin{to{transform:rotate(360deg)}}
-.heat{animation:heat 5s ease-in-out infinite;opacity:0}
-@keyframes heat{0%{opacity:0;transform:translateY(0)}40%{opacity:.5}100%{opacity:0;transform:translateY(-70px)}}
+.heat{animation:heat 6s ease-out infinite;opacity:0;transform-box:fill-box;transform-origin:50% 100%}
+@keyframes heat{0%{opacity:0;transform:translateY(0) scale(.6)}25%{opacity:.5}100%{opacity:0;transform:translateY(-90px) scale(1.9)}}
 .led{animation:led 1.9s steps(1) infinite}
 @keyframes led{30%{opacity:.15}60%{opacity:1}}
 """
@@ -177,14 +177,23 @@ def datacenter():
                     leds.append('<rect x="%d" y="%d" width="6" height="3" fill="%s" class="led" style="animation-delay:-%ss;opacity:.8"/>'
                                 % (x + 14 + c * 26, y + 22 + r * 22, col, f(rnd.random() * 2)))
         b.append("".join(leds))
-        # ventilateurs sur le toit
+        # groupes froids sur le toit : caisson à ventelles, turbine dans sa
+        # virole, air chaud qui s'en échappe en bouffées
         for k in range(int(w / 70)):
-            cx, cy = x + 36 + k * 70, y - 16
-            b.append('<rect x="%d" y="%d" width="56" height="16" fill="%s"/><circle cx="%d" cy="%d" r="15" fill="%s"/>'
-                     '<g class="fan" style="animation-delay:-%ss"><path d="M%d %d l0 -12 l5 0 Z M%d %d l12 0 l0 5 Z M%d %d l0 12 l-5 0 Z M%d %d l-12 0 l0 -5 Z" fill="%s"/></g>'
-                     % (cx - 28, cy, TRIM, cx, cy, "#1A1624", f(rnd.random()), cx, cy, cx, cy, cx, cy, cx, cy, EDGE))
-            b.append('<path class="heat" style="animation-delay:-%ss" d="M%d %d c -8 -14 8 -22 0 -36 c -8 -14 8 -22 0 -36" stroke="%s" stroke-width="2" fill="none"/>'
-                     % (f(rnd.random() * 5), cx, cy - 18, "#4A4266"))
+            cx, cy = x + 36 + k * 70, y - 20
+            b.append('<rect x="%d" y="%d" width="60" height="20" rx="2" fill="%s"/><rect x="%d" y="%d" width="60" height="3" fill="%s"/>%s'
+                     % (cx - 30, cy, TRIM, cx - 30, cy, EDGE,
+                        "".join('<rect x="%d" y="%d" width="%d" height="1.5" fill="#1A1624"/>' % (cx + sx, cy + 7 + r * 4, 14, )
+                                for sx in (-26, 12) for r in range(3))))
+            b.append('<circle cx="%d" cy="%d" r="15" fill="#15111C" stroke="%s" stroke-width="2.5"/>'
+                     '<g transform="translate(%d %d)"><g class="fan" style="animation-delay:-%ss"><circle r="12" fill="none"/>%s</g></g>'
+                     '<circle cx="%d" cy="%d" r="3" fill="%s"/>'
+                     % (cx, cy - 6, EDGE, cx, cy - 6, f(rnd.random() * 1.6),
+                        "".join('<path transform="rotate(%d)" d="M0 0 C4 -3 9 -6 6 -12 C1 -11 -2 -6 0 0 Z" fill="#4A4266"/>' % a for a in (0, 120, 240)),
+                        cx, cy - 6, EDGE))
+            for n in range(2):
+                b.append('<ellipse class="heat" style="animation-delay:-%ss" cx="%s" cy="%d" rx="9" ry="6" fill="#3A3252"/>'
+                         % (f(rnd.random() * 6), f(cx + rnd.uniform(-5, 5)), cy - 26))
     # lignes haute tension qui alimentent le tout
     b.append(pylon(1520, 600) + pylon(420, 620))
     b.append('<path d="M0 640 C 150 660 300 660 420 626 M438 626 C 800 660 1200 660 1520 606 M1538 606 C 1580 610 1600 612 1600 612" stroke="#2E2740" stroke-width="1.5" fill="none"/>')
@@ -198,14 +207,31 @@ def datacenter():
 
 
 # ====================================================== 4. aéroport, jets privés
-JET = ('<path d="M0 0 L52 -3 C60 -3 66 -1 68 1 C66 3 60 4 52 4 L0 4 Z" fill="%s"/>'
-       '<path d="M22 -2 L30 -14 L36 -14 L32 -2 Z M22 4 L30 14 L36 14 L32 4 Z M2 -1 L6 -9 L10 -9 L9 0 Z" fill="%s"/>')
+def jet(body, wing, gear=True, lit=True):
+    out = [
+        # dérive en T et réacteur arrière
+        '<path d="M9 -5 L3 -25 L13 -25 L27 -6 Z" fill="%s"/><path d="M-3 -27 L17 -27 L20 -23.5 L1 -23.5 Z" fill="%s"/>' % (body, body),
+        '<rect x="19" y="-13" width="20" height="7.5" rx="3.6" fill="%s"/><rect x="36" y="-12" width="3" height="5.5" rx="1.4" fill="#15111C"/>' % wing,
+        # fuselage effilé
+        '<path d="M4 -1 C10 -5 20 -6.5 34 -6.5 L78 -6.5 C89 -6.5 96 -3.5 100 0 C96 3 89 4.5 78 4.5 L20 4.5 C12 4.5 6 2.5 4 -1 Z" fill="%s"/>' % body,
+        # aile en flèche et winglet
+        '<path d="M42 2 L62 2 L50 8.5 L33 9.5 Z" fill="%s"/><path d="M33 9.5 L29 3 L32 3 L37 9 Z" fill="%s"/>' % (wing, wing),
+    ]
+    if lit:
+        out.append('<path d="M85 -4.8 L93 -1.8 L85 -1.8 Z" fill="%s" opacity=".5"/>' % WHITE)
+        out.append("".join('<rect x="%d" y="-4.2" width="3.2" height="2.6" rx="1.2" fill="%s" opacity=".7"/>' % (x, VIOLET) for x in (48, 54, 60, 66, 72)))
+    if gear:
+        out.append('<path d="M30 4 V10 M83 4 V10" stroke="%s" stroke-width="1.6"/><circle cx="30" cy="10.5" r="2.4" fill="#15111C"/>'
+                   '<circle cx="83" cy="10.5" r="2" fill="#15111C"/>' % wing)
+    return "".join(out)
 
 
 def airport():
     css = """
 .takeoff{animation:takeoff 16s cubic-bezier(.5,0,.9,.6) infinite}
-@keyframes takeoff{0%{transform:translate(180px,800px) rotate(0deg) scale(1.3);opacity:1}35%{transform:translate(700px,796px) rotate(0deg) scale(1.3)}100%{transform:translate(1750px,300px) rotate(-16deg) scale(1.1);opacity:1}}
+@keyframes takeoff{0%{transform:translate(120px,843px) rotate(0deg)}34%{transform:translate(660px,843px) rotate(0deg)}42%{transform:translate(800px,838px) rotate(-9deg)}100%{transform:translate(1760px,330px) rotate(-17deg)}}
+.radar{animation:radar 5s ease-in-out infinite;transform-box:fill-box;transform-origin:50% 100%}
+@keyframes radar{0%,100%{transform:scaleX(1)}50%{transform:scaleX(-1)}}
 .rabbit{animation:rabbit 1.6s steps(1) infinite;opacity:.12}
 @keyframes rabbit{0%{opacity:1}12%{opacity:.12}}
 .sweep{animation:sweep 4s linear infinite;transform-box:fill-box;transform-origin:0 50%}
@@ -213,21 +239,35 @@ def airport():
 """
     b = [sky(33, moon=(1200, 130))]
     b.append(hills(700, 760))
-    # tour de contrôle
-    b.append('<rect x="1330" y="470" width="34" height="360" fill="%s"/><path d="M1300 430 L1394 430 L1384 470 L1310 470 Z" fill="%s"/>'
-             '<rect x="1308" y="440" width="78" height="18" fill="%s" opacity=".45"/><rect x="1300" y="420" width="94" height="10" fill="%s"/>'
-             '<path class="sweep" d="M1347 412 L1600 398 L1600 424 Z" fill="%s"/>%s'
-             % (MASS, MASS2, VIOLET, TRIM, WHITE, beacon(1347, 404, 0)))
+    # tour de contrôle : fût en béton qui s'affine, vigie vitrée évasée,
+    # toit débordant, radar et balise (310 de haut, contre 420 avant)
+    tx = 1380
+    b.append('<path d="M%d 830 L%d 640 Q%d 622 %d 612 L%d 612 Q%d 622 %d 640 L%d 830 Z" fill="%s"/>'
+             % (tx - 22, tx - 13, tx - 13, tx - 22, tx + 22, tx + 13, tx + 13, tx + 22, MASS))
+    b.append('<rect x="%d" y="700" width="5" height="12" fill="%s" opacity=".4"/><rect x="%d" y="760" width="5" height="12" fill="%s" opacity=".4"/>'
+             % (tx - 3, VIOLET, tx - 3, VIOLET))
+    b.append('<rect x="%d" y="606" width="60" height="8" rx="2" fill="%s"/>' % (tx - 30, TRIM))
+    b.append('<path d="M%d 606 L%d 574 L%d 574 L%d 606 Z" fill="%s"/>' % (tx - 34, tx - 46, tx + 46, tx + 34, MASS2))
+    b.append('<path d="M%d 601 L%d 580 L%d 580 L%d 601 Z" fill="%s" opacity=".5"/>%s'
+             % (tx - 33, tx - 41, tx + 41, tx + 33, VIOLET,
+                "".join('<path d="M%s 580 L%s 601" stroke="%s" stroke-width="2"/>' % (f(tx + k * 13.6), f(tx + k * 11), MASS2) for k in (-2, -1, 0, 1, 2))))
+    b.append('<rect x="%d" y="566" width="104" height="8" rx="2" fill="%s"/><rect x="%d" y="558" width="40" height="8" fill="%s"/>'
+             % (tx - 52, EDGE, tx - 20, TRIM))
+    b.append('<rect x="%d" y="524" width="2.5" height="34" fill="%s"/><g transform="translate(%d 552)"><path class="radar" d="M-13 0 Q0 -9 13 0 L11 2 Q0 -5 -11 2 Z" fill="%s"/></g>%s'
+             % (tx - 1, EDGE, tx + 12, EDGE, beacon(tx, 522, 0)))
+    b.append('<path class="sweep" d="M%d 590 L1600 572 L1600 606 Z" fill="%s"/>' % (tx + 46, WHITE))
     # terminal
     b.append('<rect x="820" y="720" width="480" height="110" fill="%s"/><rect x="820" y="720" width="480" height="8" fill="%s"/>%s'
              % (MASS2, EDGE, windows(836, 740, 15, 3, 30, 24, 9, 18, 12, .65)))
     # jets garés, un chauffeur par jet
-    for x in (380, 520, 660):
-        b.append('<g transform="translate(%d 812) scale(1.4)">%s</g>%s' % (x, JET % (MASS, MASS), beacon(x + 6, 813, x / 300, 1.6)))
+    for x, sc in ((230, 1.2), (400, 1.4), (600, 1.2)):
+        b.append('<g transform="translate(%d %s) scale(%s)">%s</g>%s%s'
+                 % (x, f(830 - 13 * sc), sc, jet(MASS, MASS3), beacon(x + 8 * sc, 830 - 39 * sc, x / 300, 1.6),
+                    beacon(x + 34 * sc, 830 - 3.5 * sc, x / 200, 1.3, WHITE)))
     # camion de kérosène
-    b.append('<rect x="1440" y="800" width="70" height="24" rx="5" fill="%s"/><rect x="1510" y="806" width="26" height="18" fill="%s"/>'
-             '<circle cx="1455" cy="826" r="5" fill="%s"/><circle cx="1522" cy="826" r="5" fill="%s"/>%s'
-             % (MASS2, MASS, TRIM, TRIM, beacon(1523, 803, .3, 1.6, "#E2B55A")))
+    b.append('<rect x="1460" y="800" width="70" height="24" rx="5" fill="%s"/><rect x="1530" y="806" width="26" height="18" fill="%s"/>'
+             '<circle cx="1475" cy="826" r="5" fill="%s"/><circle cx="1542" cy="826" r="5" fill="%s"/>%s'
+             % (MASS2, MASS, TRIM, TRIM, beacon(1543, 803, .3, 1.6, "#E2B55A")))
     b.append(ground(830))
     # piste : balisage qui court vers le seuil
     b.append('<rect y="836" width="1600" height="26" fill="#0D0B12"/>')
@@ -236,7 +276,8 @@ def airport():
                      for i, x in enumerate(range(1560, 0, -100))))
     b.append("".join('<circle cx="%d" cy="834" r="1.6" fill="%s" opacity=".6"/>' % (x, VIOLET) for x in range(20, 1600, 60)))
     # le jet qui décolle (pour un fichier de 3 Mo)
-    b.append('<g class="takeoff"><g transform="translate(0 -6)">%s%s</g></g>' % (JET % ("#3A3252", "#3A3252"), beacon(4, 1, 0, 1.6)))
+    b.append('<g class="takeoff"><g transform="scale(1.25) translate(-50 -12)">%s%s%s</g></g>'
+             % (jet("#3A3252", "#2C2540", gear=False), beacon(8, -27, 0, 1.6), beacon(34, 9, .4, 1.3, WHITE)))
     return svg("Un aéroport de jets privés, la nuit, un jet au décollage", css, "\n".join(b))
 
 

@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Banc : page d'un morceau (Verdict)</title>
+<link rel="stylesheet" href="../css/app.css?v=137">
+<!-- Banc local : faux serveur (fetch), aucune donnée réelle. ?role=artist pour la vue artiste. -->
+<script>
+const role = new URLSearchParams(location.search).get("role") === "artist" ? "artist" : "eng";
+const ME = role === "eng" ? "p1" : "p2";
+const pk = []; let x = 7;
+for (let i = 0; i < 800; i++) { x = (x * 9301 + 49297) % 233280; const r = x / 233280; pk.push(Math.round(255 * (0.5 + 0.5 * Math.sin(i / 70)) * (i % 40 < 2 ? 1 : 0.45 + r * 0.45))); }
+const ago = (m) => new Date(Date.now() - m * 60000).toISOString();
+const vers = [3, 2, 1].map((n) => ({ id: "f" + n, version_no: n, label: null, kind: "audio", status: "ready", storage_path: "x/f" + n + ".wav", original_name: "Nuit blanche v" + n + ".wav", mime_type: "audio/wav", duration_sec: 214, approved_at: null, uploaded_by: "p1" }));
+const FILE = Object.assign({}, vers[0], { space_id: "s1", project_id: "a", size_bytes: 41e6, bpm: null, musical_key: null, peaks: pk, created_at: ago(300), approved_by: null, approved_on_behalf: false, changelog: "Voix remontée de 1,5 dB, reverb du refrain raccourcie.", uploader: { id: "p1", pseudo: "William" }, project: { id: "a", title: "Nuit blanche", files: vers } });
+const C = (id, at, body, o) => Object.assign({ id, file_id: "f3", parent_id: null, body, at_ms: at, tag: null, created_at: ago(60), resolved_at: null, resolved_by: null, resolved_in: null, resolution_note: null, verified_at: null, verified_by: null, author_id: "p2", author: { id: "p2", pseudo: "Yagiza" } }, o || {});
+const COMMENTS = [
+  C("c1", 21000, "La voix est un peu loin sur le premier couplet", { tag: "voix" }),
+  C("c2", 77000, "Les harmonies sont trop fortes ici, tu peux les baisser ?"),
+  C("c3", 104000, "Le kick tape moins qu'avant", { file_id: "f2", resolved_at: ago(200), resolved_by: "William", resolved_in: "f3", resolution_note: "Kick remonté de 1 dB, compression allégée" }),
+  C("c4", 150000, "Coupe le delay à la fin de la phrase", { file_id: "f2", resolved_at: ago(200), resolved_by: "William", resolved_in: "f3", verified_at: ago(30), verified_by: "Yagiza" }),
+  C("c5", null, "Globalement c'est beaucoup mieux que la v2"),
+  C("r1", null, "Ok je regarde ça ce soir", { parent_id: "c2", author_id: "p1", author: { id: "p1", pseudo: "William" } })
+];
+const real = window.fetch.bind(window);
+window.fetch = async (input, init) => {
+  const url = typeof input === "string" ? input : input.url;
+  if (!/supabase\.co/.test(url)) return real(input, init);
+  const j = (d) => new Response(JSON.stringify(d), { status: 200, headers: { "content-type": "application/json", "content-range": "0-0/*" } });
+  if (/\/rest\/v1\/files/.test(url)) return j([FILE]);
+  if (/\/rest\/v1\/comments/.test(url)) return j(COMMENTS);
+  if (/\/rest\/v1\/space_covers/.test(url)) return j([{ image: null, title: null, art: 4 }]);
+  if (/\/rest\/v1\/participants/.test(url)) return j([{ id: ME, space_id: "s1", prefs: {}, pseudo: "x", is_host: role === "eng" }]);
+  if (/\/rpc\/is_engineer/.test(url)) return j(role === "eng");
+  if (/\/functions\/v1\/storage/.test(url)) return j({ urls: {}, ttl: 3600 });
+  if (/\/functions\/v1\//.test(url)) return j({ email: null });
+  return j([]);
+};
+</script>
+</head><body>
+<header class="app-header" id="header"></header>
+<main class="app-main"><div id="view"></div></main>
+<script type="module">
+import { mount } from "../js/views/file.js?v=137";
+const space = { id: "s1", participantId: ME, name: "Yagiza", code: "YAGIZ7", pseudo: role === "eng" ? "William" : "Yagiza", mode: "revue", isHost: role === "eng", viewer: false };
+const ctx = { space, online: new Set(), bus: { on: () => () => {}, emit() {} }, navigate() {}, setTitle() {}, setBack() {}, setDrop() {} };
+document.getElementById("header").innerHTML = '<span class="brand-dot"></span><div class="title">Nuit blanche</div>';
+mount(document.getElementById("view"), ctx, { id: "f3" }).catch((e) => { document.getElementById("view").textContent = "ERREUR " + e.message; });
+</script>
+</body></html>

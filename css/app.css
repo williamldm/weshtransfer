@@ -1,5 +1,5 @@
-@import url("fonts.css?v=136");
-@import url("tokens.css?v=136");
+@import url("fonts.css?v=137");
+@import url("tokens.css?v=137");
 
 /* ================================================================= base */
 *, *::before, *::after { box-sizing: border-box; }
@@ -1356,17 +1356,6 @@ body.app .app-header { view-transition-name: topbar; }
 .rv-bubble-head { display: flex; gap: var(--sp-2); margin-bottom: 2px; font-size: var(--fs-xs); color: var(--text-dim); }
 .rv-bubble-head b { color: var(--c); }
 
-/* points rapides */
-.rv-quick { margin-top: var(--sp-4); padding: var(--sp-3) var(--sp-4); border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--surface); }
-.rv-quick-head { display: flex; align-items: center; gap: var(--sp-2); margin-bottom: var(--sp-2); font-size: var(--fs-sm); font-weight: 600; }
-.rv-quick-head svg { color: var(--accent-bright); }
-.rv-quick-head b { color: var(--accent-bright); }
-.rv-quick-hint { margin-left: auto; color: var(--text-faint); font-size: var(--fs-xs); font-weight: 400; }
-.rv-quick-chips { display: flex; flex-wrap: wrap; gap: 6px; }
-.rv-quick-chips .chip:hover { border-color: var(--accent-bright); color: var(--text); }
-.rv-quick-chips .chip:disabled { opacity: .5; }
-.rv-quick-chips .chip-more { color: var(--text-dim); }
-
 /* liste d'album numérotée, façon plateforme de streaming */
 .track-num { position: relative; display: flex; flex: none; align-items: center; justify-content: center; width: 36px; height: 36px; padding: 0; border: none; border-radius: 50%; background: none; color: var(--text-faint); font-family: var(--mono); font-size: var(--fs-sm); cursor: pointer; }
 .track-num .track-play { position: absolute; inset: 0; border-radius: 50%; background: var(--accent); color: #fff; opacity: 0; }
@@ -1560,7 +1549,7 @@ body.app .app-header { view-transition-name: topbar; }
 .rh-viewer { display: inline-flex; align-items: center; gap: 6px; margin: 0 0 var(--sp-4); padding: 5px 12px; border-radius: 99px; background: rgba(255, 255, 255, .1); color: rgba(255, 255, 255, .85); font-size: 13px; }
 body.is-viewer [data-edit-title], body.is-viewer [data-menu], body.is-viewer [data-drag],
 body.is-viewer .rh-cover-edit, body.is-viewer .cover-cta, body.is-viewer [data-help-show],
-body.is-viewer [data-rv-form], body.is-viewer [data-quickbox], body.is-viewer [data-rv-approve], body.is-viewer [data-approve],
+body.is-viewer [data-rv-form], body.is-viewer [data-rv-approve], body.is-viewer [data-approve],
 body.is-viewer [data-resolve], body.is-viewer [data-unresolve], body.is-viewer [data-reopen], body.is-viewer [data-ok],
 body.is-viewer [data-reply], body.is-viewer [data-reply-form], body.is-viewer [data-del], body.is-viewer [data-rv-flush],
 body.is-viewer [data-behalf], body.is-viewer [data-more], body.is-viewer [data-goto-verify], body.is-viewer [data-rv-update],
@@ -1585,3 +1574,53 @@ body.is-viewer .rh-cover-btn { pointer-events: none; }
 
 .sx-mail { display: grid; gap: var(--sp-2); }
 .sx-mail .recents { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+
+/* ---- Page d'un morceau (Verdict), refonte du 11/11 : une carte d'état,
+   une carte de saisie, une seule action principale à l'écran. */
+.rv-stage .transport { justify-content: space-between; margin-top: var(--sp-2); }
+.rv-stage .transport .t-time { margin-right: auto; text-align: left; }
+.rv-stage .transport .t-dur { margin-left: auto; text-align: right; }
+.rv-stage .transport .mono { color: var(--text-dim); font-size: var(--fs-sm); font-variant-numeric: tabular-nums; }
+
+.rv-status { margin-bottom: var(--sp-5); border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--surface); overflow: hidden; }
+.rv-status > div:empty { display: none; }
+.rv-status > div + div:not(:empty) { border-top: 1px solid var(--line); }
+.rv-status > div { padding: var(--sp-4); }
+.rv-status .rv-inge, .rv-status .approve, .rv-status .rv-card { margin: 0; }
+.rv-status .rv-card { padding: 0; border: none; background: none; }
+.rv-status .review-hint { margin: 0; }
+.rv-inge { display: flex; align-items: center; gap: var(--sp-4); }
+.rv-inge-text { flex: 1; min-width: 0; }
+.rv-step { margin: 0; font-family: var(--display); font-size: 18px; font-weight: 700; letter-spacing: -0.01em; }
+.rv-inge .rv-changelog-text { margin: 4px 0 0; }
+.rv-changelog-text .mono { margin-right: 4px; padding: 1px 6px; border-radius: 99px; background: var(--surface-3); color: var(--text-dim); font-size: var(--fs-xs); }
+.rv-inge .rv-update { flex: none; margin: 0; }
+.rv-status .approve { display: flex; align-items: center; gap: var(--sp-3); padding: 0; border: none; }
+.rv-status .approve .btn-block { flex: 1; }
+.rv-status .approve-text { font-size: var(--fs-sm); }
+.rv-status .approve-text.muted .ic { color: var(--text-faint); }
+
+.rv-compose { padding: var(--sp-3) var(--sp-4) var(--sp-3); border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--surface); transition: border-color .15s; }
+.rv-compose:focus-within { border-color: var(--accent-bright); }
+.rv-compose-head { margin-bottom: var(--sp-1); }
+.rv-compose-head strong { font-size: var(--fs-sm); color: var(--text-dim); font-weight: 600; }
+.rv-compose .chip-time { min-height: 28px; padding: 0 10px; border-radius: 99px; }
+.rv-compose textarea.input { min-height: 56px; padding: var(--sp-2) 0; border: none; border-radius: 0; background: none; box-shadow: none; resize: none; field-sizing: content; }
+.rv-compose textarea.input:focus { outline: none; box-shadow: none; }
+.rv-compose-bar { display: flex; align-items: center; gap: var(--sp-3); padding-top: var(--sp-2); border-top: 1px solid var(--line); }
+.rv-compose-bar .rv-tags { flex: 1; min-width: 0; margin: 0; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+.rv-compose-bar .rv-tags::-webkit-scrollbar { display: none; }
+.rv-compose-bar .rv-tags .chip { flex: none; min-height: 28px; border-radius: 99px; }
+.rv-compose-bar .btn { flex: none; }
+
+/* dans la liste, "Corrigé" est une action de ligne, pas l'action de la page */
+.rv-actions .btn-primary { border-color: transparent; background: var(--accent-soft); color: var(--accent-hi); }
+.rv-actions .btn-primary:hover { background: var(--accent); color: var(--on-accent); }
+
+@media (max-width: 560px) {
+  .rv-inge { flex-direction: column; align-items: stretch; gap: var(--sp-3); }
+  .rv-status .approve { flex-wrap: wrap; }
+  .rv-status .approve .btn { flex: 1; }
+}
+.rv-compose { margin-bottom: var(--sp-4); }
+.rv-flush { margin-top: calc(-1 * var(--sp-1)); }

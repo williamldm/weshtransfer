@@ -1,18 +1,18 @@
 // Écoute d'une version : grande waveform, transport, commentaires
 // horodatés façon SoundCloud ("à 1:23, la voix sature").
 
-import { getFile, listComments, addComment, deleteComment, signFiles, cachedUrl, cachedDownload, deleteFile, updateFile } from "../api.js?v=136";
-import { createReview } from "./review.js?v=136";
-import { cover, backdrop, albumArt } from "./review-home.js?v=136";
-import { albumOf } from "../cover.js?v=136";
-import { Waveform, formatTime } from "../waveform.js?v=136";
-import { play, toggle, isCurrent, onPlayer, seekRatio, seekSeconds, skip, state as playerState, trackFromFile } from "../player.js?v=136";
-import { icon } from "../icons.js?v=136";
-import { isAudio, canPreview, categoryOf } from "../files.js?v=136";
+import { getFile, listComments, addComment, deleteComment, signFiles, cachedUrl, cachedDownload, deleteFile, updateFile } from "../api.js?v=137";
+import { createReview } from "./review.js?v=137";
+import { cover, backdrop, albumArt } from "./review-home.js?v=137";
+import { albumOf } from "../cover.js?v=137";
+import { Waveform, formatTime } from "../waveform.js?v=137";
+import { play, toggle, isCurrent, onPlayer, seekRatio, seekSeconds, skip, state as playerState, trackFromFile } from "../player.js?v=137";
+import { icon } from "../icons.js?v=137";
+import { isAudio, canPreview, categoryOf } from "../files.js?v=137";
 import {
   esc, h, fileBadge, fileTile, timeAgo, formatBytes, avatar, toast, errorText, triggerDownload, plural,
   confirmSheet, actionSheet, openSheet
-} from "../ui.js?v=136";
+} from "../ui.js?v=137";
 
 export const title = () => "Écoute";
 
@@ -117,7 +117,7 @@ export function renderFileShell(file, space) {
 
 // Verdict : présenté comme une plateforme de streaming. En-tête "en
 // lecture" sur la pochette floutée, la forme d'onde avec les retours posés
-// dessus (pastilles des auteurs, comme SoundCloud), les points rapides,
+// dessus (pastilles des auteurs, comme SoundCloud),
 // puis la liste des retours.
 function renderReviewShell(file, versions, audio, media, cat, mine, space) {
   const title = file.project ? file.project.title : file.original_name;
@@ -156,8 +156,6 @@ function renderReviewShell(file, versions, audio, media, cat, mine, space) {
             '<button class="btn btn-ghost btn-icon" data-fwd aria-label="Avancer de 10 secondes">' + icon("fwd10", 22) + "</button>" +
             '<span class="mono t-dur" data-dur>' + formatTime(Number(file.duration_sec) || 0) + "</span>" +
           "</div>" +
-          // correction rapide : un tap sur un problème, posé à la seconde
-          '<div class="rv-quick" data-quickbox></div>' +
         "</section>") +
     '<div data-review-root></div>'
   );
@@ -237,7 +235,6 @@ export async function mount(root, ctx, params) {
         currentMs,
         playAt,
         rail: root.querySelector("[data-rail]"),
-        quick: root.querySelector("[data-quickbox]"),
         durationMs: () => durationSec() * 1000,
         setMarkers: (list) => { markers = list; applyMarkers(); }
       });

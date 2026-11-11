@@ -15,25 +15,17 @@
 import {
   listCommentsOf, addComment, deleteComment, setCommentResolved, setCommentVerified,
   setFileApproved, getFileApproval, updateFile, reviewFlush
-} from "../api.js?v=136";
-import { formatTime } from "../waveform.js?v=136";
-import { icon } from "../icons.js?v=136";
-import { esc, h, timeAgo, toast, errorText, plural, confirmSheet, openSheet, copyText, triggerDownload, formatBytes } from "../ui.js?v=136";
-import { enqueue, onUploads, checkFile } from "../upload.js?v=136";
+} from "../api.js?v=137";
+import { formatTime } from "../waveform.js?v=137";
+import { icon } from "../icons.js?v=137";
+import { esc, h, timeAgo, toast, errorText, plural, confirmSheet, openSheet, copyText, triggerDownload, formatBytes } from "../ui.js?v=137";
+import { enqueue, onUploads, checkFile } from "../upload.js?v=137";
 
 export const TAGS = [
   ["voix", "Voix"], ["instru", "Instru"], ["basse", "Basse"], ["batterie", "Batterie"],
   ["effets", "Effets"], ["niveau", "Volume"], ["structure", "Structure"], ["autre", "Autre"]
 ];
 const TAG_LABEL = Object.fromEntries(TAGS);
-
-// Points rapides : les problèmes qu'on entend le plus, posés d'un tap à la
-// seconde où on est (comme un commentaire SoundCloud, en plus direct).
-const QUICK = [
-  ["Voix trop basse", "voix"], ["Voix trop forte", "voix"], ["Plus de basse", "basse"], ["Moins de basse", "basse"],
-  ["Kick trop faible", "batterie"], ["Trop de réverb", "effets"], ["Aigus qui piquent", "instru"],
-  ["Clic / craquement", "autre"], ["Trop compressé", "niveau"], ["Ça sature", "niveau"]
-];
 
 const STATES = {
   open: { label: "À corriger", cls: "is-open", color: "#E2B55A" },
@@ -82,23 +74,24 @@ function textSheet(title, o) {
 export function renderReviewShell(engineer) {
   return (
     '<section class="rv" data-review>' +
-      '<div data-rv-news></div>' +
-      '<div data-rv-approve></div>' +
+      // où en est cette version : note, validation, prochaine action
+      '<div class="rv-status"><div data-rv-news></div><div data-rv-approve></div></div>' +
 
       '<form class="comment-form rv-compose" data-rv-form>' +
         '<div class="rv-compose-head">' +
           "<strong>" + (engineer ? "Ajouter une note" : "Ton retour") + "</strong>" +
           '<button type="button" class="chip chip-time is-on" data-rv-time>' + icon("clock", 14) + " <span>à 0:00</span></button>" +
         "</div>" +
-        '<textarea class="input" name="body" rows="2" maxlength="1000" placeholder="' +
+        '<textarea class="input" name="body" rows="2" maxlength="1000" aria-label="' + (engineer ? "Ta note" : "Ton retour") + '" placeholder="' +
           (engineer
             ? "Ex : penser à refaire la reverb du refrain"
             : "Dis ce que tu entends, avec tes mots : la voix est trop loin, plus de basse ici...") + '"></textarea>' +
-        '<div class="chips rv-tags" data-rv-tags>' +
-          TAGS.map(([k, label]) => '<button type="button" class="chip" data-tag="' + k + '">' + label + "</button>").join("") +
+        '<div class="rv-compose-bar">' +
+          '<div class="chips rv-tags" data-rv-tags>' +
+            TAGS.map(([k, label]) => '<button type="button" class="chip" data-tag="' + k + '">' + label + "</button>").join("") +
+          "</div>" +
+          '<button class="btn btn-primary btn-sm" type="submit">Publier</button>' +
         "</div>" +
-        '<div class="row"><span class="hint">' +
-          '</span><span class="spacer"></span><button class="btn btn-primary btn-sm" type="submit">Publier</button></div>' +
       "</form>" +
       (engineer ? "" : '<button type="button" class="btn btn-block rv-flush" data-rv-flush hidden>' + icon("send", 18) + "<span>J'ai fini mes retours : prévenir l'ingé</span></button>") +
 
@@ -196,7 +189,6 @@ export function createReview(o) {
       .sort((a, b) => a.version_no - b.version_no);
     engineer = isEngineerOf(ctx.space, versions.length ? versions : [f]);
     el.innerHTML = renderReviewShell(engineer);
-    drawQuick();
     bind();
     if (engineer && ctx.setDrop) ctx.setDrop((files) => openUpdate(files));
   }
@@ -285,19 +277,6 @@ export function createReview(o) {
     }).join("");
   }
 
-  // Les points rapides, sous le lecteur
-  function drawQuick() {
-    const box = o.quick;
-    if (!box) return;
-    box.innerHTML =
-      '<div class="rv-quick-head">' + icon("plus", 14) + "<span>" + (engineer ? "Note rapide" : "Point rapide") +
-        ' à <b class="mono" data-quick-at>' + formatTime(o.currentMs() / 1000) + '</b></span><span class="rv-quick-hint">un tap, c\'est noté</span></div>' +
-      '<div class="rv-quick-chips">' +
-        QUICK.map(([label], i) => '<button type="button" class="chip" data-quick="' + i + '">' + esc(label) + "</button>").join("") +
-        '<button type="button" class="chip chip-more" data-quick-more>' + icon("edit", 13) + " Autre…</button>" +
-      "</div>";
-  }
-
   // Barre d'avancement : réglés / à vérifier / à corriger
   function drawProgress(counts) {
     const box = q("[data-rv-progress]");
@@ -359,10 +338,15 @@ export function createReview(o) {
       const todo = counts && counts.open;
       box.innerHTML =
         '<div class="rv-inge">' +
-          '<label class="btn btn-block rv-update' + (todo ? " btn-primary" : "") + '">' + icon("upload", 18) +
+          '<div class="rv-inge-text">' +
+            '<p class="rv-step">' + (todo
+              ? plural(todo, "retour à corriger", "retours à corriger")
+              : counts && counts.verify ? "Corrections envoyées, l'artiste vérifie" : "Rien à corriger pour l'instant") + "</p>" +
+            (file.changelog ? '<p class="rv-changelog-text"><span class="mono">' + v + "</span> " + esc(file.changelog) + "</p>" : "") +
+          "</div>" +
+          '<label class="btn rv-update' + (todo ? " btn-primary" : "") + '">' + icon("upload", 18) +
             "<span>Envoyer la v" + nextVersion() + (todo ? " corrigée" : "") + "</span>" +
             '<input type="file" hidden data-rv-update></label>' +
-          (file.changelog ? '<p class="rv-changelog-text">' + esc(file.changelog) + "</p>" : "") +
         "</div>";
       box.querySelector("[data-rv-update]").onchange = (e) => {
         openUpdate(e.target.files);
@@ -411,7 +395,7 @@ export function createReview(o) {
         '<button class="btn btn-sm" data-approve data-behalf>' + icon("check", 15) + "<span>Déjà validée</span></button></div>";
     } else {
       box.innerHTML = '<div class="approve">' +
-        '<button class="btn btn-primary btn-block" data-approve>' + icon("check", 18) + "<span>Valider la " + v + " : c'est bon pour moi</span></button></div>";
+        '<button class="btn btn-block' + (counts.verify ? "" : " btn-primary") + '" data-approve>' + icon("check", 18) + "<span>Valider la " + v + " : c'est bon pour moi</span></button></div>";
     }
     const b = box.querySelector("[data-approve]");
     if (b) {
@@ -451,8 +435,6 @@ export function createReview(o) {
   const noteMs = () => (lockedMs != null ? lockedMs : o.currentMs());
 
   function syncTime(ms) {
-    const at = o.quick && o.quick.querySelector("[data-quick-at]");
-    if (at) at.textContent = formatTime((ms != null ? ms : o.currentMs()) / 1000);
     const chip = q("[data-rv-time]");
     if (!chip) return;
     chip.querySelector("span").textContent = "à " + formatTime((lockedMs != null ? lockedMs : (ms != null ? ms : o.currentMs())) / 1000);
@@ -603,26 +585,6 @@ export function createReview(o) {
         o.playAt(Number(d.dataset.at) / 1000);
       });
     }
-    // points rapides : posés tout de suite, à la seconde en cours
-    if (o.quick && !o.quick.dataset.bound) {
-      o.quick.dataset.bound = "1";
-      o.quick.addEventListener("click", async (e) => {
-        if (e.target.closest("[data-quick-more]")) { focusComposer(); return; }
-        const b = e.target.closest("[data-quick]");
-        if (!b || b.disabled) return;
-        const [label, t] = QUICK[Number(b.dataset.quick)];
-        const at = o.currentMs();
-        b.disabled = true;
-        try {
-          await addComment(file.id, label, at, { tag: t });
-          filter = "open";
-          await reload();
-          toast(label + " : noté à " + formatTime(at / 1000), "ok");
-        } catch (err) { toast(errorText(err), "err"); }
-        b.disabled = false;
-      });
-    }
-
     const form = q("[data-rv-form]");
     const ta = form.querySelector("textarea");
 
