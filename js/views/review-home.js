@@ -6,17 +6,17 @@
 import {
   listProjects, listReviewComments, deleteProjectFully, listParticipants, updateProject,
   reviewNotifyStatus, reviewSubscribe, reviewUnsubscribe, signFiles, cachedDownload, myPrefs, savePref
-} from "../api.js?v=140";
-import { saveZip, canStreamToDisk, MEMORY_LIMIT } from "../zip.js?v=140";
-import { mountUploads } from "./uploads.js?v=140";
-import { openUploadSheet } from "./upload-sheet.js?v=140";
-import { stateOf, isEngineerOf } from "./review.js?v=140";
-import { ensureVerified } from "../verify.js?v=140";
-import { accountEmail } from "../session.js?v=140";
-import { albumOf, onCover, setCover, clearCover, setAlbumTitle } from "../cover.js?v=140";
-import { playQueue, onPlayer, isCurrent, state as playerState, toggle, trackFromFile } from "../player.js?v=140";
-import { icon } from "../icons.js?v=140";
-import { esc, h, plural, toast, errorText, formatDuration, actionSheet, confirmSheet, promptSheet, openSheet, triggerDownload } from "../ui.js?v=140";
+} from "../api.js?v=141";
+import { saveZip, canStreamToDisk, MEMORY_LIMIT } from "../zip.js?v=141";
+import { mountUploads } from "./uploads.js?v=141";
+import { openUploadSheet } from "./upload-sheet.js?v=141";
+import { stateOf, isEngineerOf } from "./review.js?v=141";
+import { ensureVerified } from "../verify.js?v=141";
+import { accountEmail } from "../session.js?v=141";
+import { albumOf, onCover, setCover, clearCover, setAlbumTitle } from "../cover.js?v=141";
+import { playQueue, onPlayer, isCurrent, state as playerState, toggle, trackFromFile } from "../player.js?v=141";
+import { icon } from "../icons.js?v=141";
+import { esc, h, plural, toast, errorText, formatDuration, actionSheet, confirmSheet, promptSheet, openSheet, triggerDownload } from "../ui.js?v=141";
 
 // Pochette générée : un aplat dont la teinte dépend du nom, les initiales
 // en grand. Pas de dégradé (identité sobre).
@@ -578,7 +578,7 @@ export async function mountReviewHome(root, ctx) {
 
   engActions.addEventListener("click", async (e) => {
     if (e.target.closest("[data-share-verdict]")) {
-      const { openShareSheet } = await import("./people.js?v=140");
+      const { openShareSheet } = await import("./people.js?v=141");
       openShareSheet(ctx);
       return;
     }

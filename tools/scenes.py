@@ -743,9 +743,22 @@ def room():
 
 
 def joint(x, y, ang=-20, sc=1.0):
-    return ('<g transform="translate(%s %s) rotate(%s) scale(%s)"><path d="M0 -4 L46 -6.5 V6.5 L0 4 Z" fill="%s"/><rect x="-10" y="-4" width="11" height="8" rx="1.5" fill="%s"/>'
-            '<circle class="ember" cx="48" cy="0" r="6.5" fill="%s"/><circle class="ember" cx="48" cy="0" r="22" fill="%s" opacity=".2"/></g>'
+    """Un joint : cône de papier, filtre en carton, petite braise au bout."""
+    return ('<g transform="translate(%s %s) rotate(%s) scale(%s)"><path d="M0 -2.6 L44 -5.5 Q49 0 44 5.5 L0 2.6 Z" fill="%s"/><path d="M12 -3.4 L14 3.5 M24 -4.2 L26 4.3" stroke="#C9D2C9" stroke-width="1"/>'
+            '<rect x="-11" y="-2.6" width="12" height="5.2" rx="1" fill="%s"/><path d="M43 -5.4 Q49 0 43 5.4 Q40 0 43 -5.4 Z" fill="#3A3F3B"/>'
+            '<g class="ember"><circle cx="46" cy="0" r="3.4" fill="%s"/><circle cx="46" cy="0" r="10" fill="%s" fill-opacity=".16"/></g></g>'
             % (f(x), f(y), f(ang), f(sc), WHITE, FLAME2, FLAME, FLAME))
+
+
+def ashtray(x, y, sc=1.0):
+    """Cendrier posé sur une surface (y), un joint calé sur le bord, sa fumée."""
+    ang = -17
+    jx, jy = x - 6 * sc, y - 15 * sc
+    tx, ty = jx + math.cos(math.radians(ang)) * 46 * sc, jy + math.sin(math.radians(ang)) * 46 * sc
+    return ('<path d="M%s %s H%s L%s %s H%s Z" fill="%s"/><rect x="%s" y="%s" width="%s" height="%s" rx="2" fill="#4A6152"/>'
+            % (f(x - 28 * sc), f(y - 14 * sc), f(x + 28 * sc), f(x + 21 * sc), f(y), f(x - 21 * sc), EDGE,
+               f(x - 30 * sc), f(y - 17 * sc), f(60 * sc), f(5 * sc))
+            + joint(jx, jy, ang, sc) + plume(tx + 2, ty - 8 * sc, 7 * sc, 6, 22))
 
 
 def thc_salon():
@@ -790,7 +803,7 @@ def thc_salon():
              % (bx - 17, VIOLET, bx + 26, bx + 62, EDGE, bx + 54, EDGE, bx + 63, FLAME, bx - 32, bx - 36, bx, bx + 36, bx + 32, VIOLET))
     b.append("".join('<circle class="bub" style="animation-delay:-%ss" cx="%d" cy="780" r="%s" fill="%s"/>' % (f(k * .5), bx - 14 + k * 9, "3" if k % 2 else "4", WHITE) for k in range(4)))
     b.append(plume(bx, 590, 14, 6, 24))
-    b.append('<ellipse cx="1060" cy="804" rx="24" ry="5" fill="%s"/>%s%s' % (TRIM, joint(1050, 800, -18, .8), plume(1090, 778, 8, 5, 20)))
+    b.append(ashtray(1066, 806))
     b.append(ground(830))
     return svg("Un salon la nuit : canapé, bang sur la table basse, lampe à lave, tenture au mandala", css, "\n".join(b))
 
@@ -907,7 +920,7 @@ def thc_balcon():
     b.append(potted(1220, 790, 250, 71, 84, 60) + potted(1370, 790, 330, 72, 96, 66) + potted(1540, 790, 210, 73, 76, 54))
     # pouf, cendrier posé sur la rambarde
     b.append('<ellipse cx="840" cy="772" rx="62" ry="24" fill="%s"/><path d="M780 770 Q840 792 900 770" fill="none" stroke="%s" stroke-width="4" opacity=".6"/>' % ("#6B3F73", FLAME2))
-    b.append('<ellipse cx="1290" cy="638" rx="22" ry="5" fill="%s"/>%s%s' % (TRIM, joint(1284, 634, -16, .8), plume(1326, 612, 9, 6, 22)))
+    b.append('<rect x="916" y="736" width="84" height="8" rx="3" fill="%s"/><path d="M926 744 L920 790 M990 744 L996 790" stroke="%s" stroke-width="5" stroke-linecap="round"/>%s' % (EDGE, MASS, ashtray(956, 736)))
     b.append(ground(830))
     return svg("Un balcon la nuit : hamac, guirlandes, plantes en pot, la ville au fond", THC_CSS, "\n".join(b))
 
@@ -988,7 +1001,7 @@ def thc_studio():
              "".join('<rect x="%d" y="670" width="6" height="11" fill="#070A08"/>' % (947 + k * 11) for k in range(27) if k % 7 not in (2, 6))))
     # encens, cendrier
     b.append('<ellipse cx="1404" cy="688" rx="34" ry="5" fill="%s"/><path d="M1384 686 L1432 628" stroke="%s" stroke-width="2.5"/><circle class="ember" cx="1433" cy="627" r="3.5" fill="%s"/>%s' % (TRIM, FLAME2, FLAME, plume(1434, 616, 8, 6, 22)))
-    b.append('<ellipse cx="870" cy="688" rx="22" ry="5" fill="%s"/>%s' % (TRIM, joint(862, 684, -14, .7)))
+    b.append(ashtray(870, 690, .9))
     # plante, pouf, tapis
     b.append(potted(588, 830, 280, 81, 90, 64))
     b.append('<path d="M1480 830 Q1450 760 1500 730 Q1560 708 1596 760 Q1612 800 1590 830 Z" fill="%s"/><path d="M1500 760 Q1540 744 1580 770" fill="none" stroke="%s" stroke-width="3" opacity=".5"/>' % ("#6B3F73", PINK))
